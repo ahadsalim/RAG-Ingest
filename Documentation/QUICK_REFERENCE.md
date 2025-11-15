@@ -450,12 +450,11 @@ POSTGRES_PASSWORD=...
 
 # MinIO
 AWS_SECRET_ACCESS_KEY=...
-
-# Core API
-CORE_API_KEY=...
 ```
 
 **⚠️ هرگز credentials را commit نکنید!**
+
+**نکته**: تنظیمات Core API از طریق Admin Panel (`/admin/embeddings/coreconfig/`) انجام می‌شود.
 
 ---
 

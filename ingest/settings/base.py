@@ -302,8 +302,9 @@ CELERY_BEAT_SCHEDULE = {
 }
 
 # Core Service Integration
+# Note: Core API connection is configured via CoreConfig model in database
+# Access via Admin Panel: /admin/embeddings/coreconfig/
 CORE_BASE_URL = os.getenv('CORE_BASE_URL', 'http://localhost:8000')
-CORE_TOKEN = os.getenv('CORE_TOKEN', 'your-core-token-here')
 
 # Chunking Settings
 DEFAULT_CHUNK_SIZE = int(os.getenv('DEFAULT_CHUNK_SIZE', '450'))

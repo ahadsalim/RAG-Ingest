@@ -120,10 +120,11 @@ AWS_ACCESS_KEY_ID=minioadmin
 AWS_SECRET_ACCESS_KEY=secure-password
 AWS_STORAGE_BUCKET_NAME=advisor-docs
 
-# Core API
+# Core API (اتصال از طریق Admin Panel تنظیم می‌شود)
 CORE_BASE_URL=https://core.arpanet.ir
-CORE_API_KEY=your-core-api-key
 ```
+
+**نکته**: تنظیمات اتصال به سیستم Core (شامل API Key) از طریق پنل ادمین در آدرس `/admin/embeddings/coreconfig/` انجام می‌شود.
 
 #### گام 3: راه‌اندازی با Docker
 ```bash
