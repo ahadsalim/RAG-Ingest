@@ -1,0 +1,118 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-09-25 18:44+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: fa\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+
+# Admin interface translations
+msgid "Log out"
+msgstr "خروج"
+
+msgid "View"
+msgstr "مشاهده"
+
+msgid "Change"
+msgstr "ویرایش"
+
+msgid "Users"
+msgstr "کاربران"
+
+msgid "Groups"
+msgstr "گروه‌های کاربری"
+
+msgid "Search"
+msgstr "جستجو"
+
+msgid "Save"
+msgstr "ذخیره"
+
+msgid "Save and add another"
+msgstr "ذخیره و افزودن مورد جدید"
+
+msgid "Save and continue editing"
+msgstr "ذخیره و ادامه ویرایش"
+
+msgid "Add"
+msgstr "افزودن"
+
+msgid "Delete"
+msgstr "حذف"
+
+msgid "Home"
+msgstr "خانه"
+
+msgid "Administration"
+msgstr "مدیریت"
+
+msgid "Recent actions"
+msgstr "اقدامات اخیر"
+
+msgid "My actions"
+msgstr "اقدامات من"
+
+msgid "None available"
+msgstr "موردی موجود نیست"
+
+msgid "Unknown content"
+msgstr "محتوای نامشخص"
+
+msgid "Yes"
+msgstr "بله"
+
+msgid "No"
+msgstr "خیر"
+
+msgid "Date/time"
+msgstr "تاریخ/زمان"
+
+msgid "User"
+msgstr "کاربر"
+
+msgid "Action"
+msgstr "عمل"
+
+msgid "Object"
+msgstr "شیء"
+
+msgid "Summary"
+msgstr "خلاصه"
+
+msgid "Description"
+msgstr "توضیحات"
+
+msgid "Filter"
+msgstr "فیلتر"
+
+msgid "All"
+msgstr "همه"
+
+msgid "Any date"
+msgstr "هر تاریخی"
+
+msgid "Today"
+msgstr "امروز"
+
+msgid "Past 7 days"
+msgstr "7 روز گذشته"
+
+msgid "This month"
+msgstr "این ماه"
+
+msgid "This year"
+msgstr "امسال"
+
+msgid "Clear all filters"
+msgstr "پاک کردن همه فیلترها"

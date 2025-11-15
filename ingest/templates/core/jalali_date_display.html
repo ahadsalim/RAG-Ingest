@@ -1,0 +1,12 @@
+{% load jalali %}
+{% if value %}
+    <span class="jalali-date-display" data-original="{{ value|date:'Y-m-d' }}">
+        {% if show_verbose %}
+            {{ jalali_verbose }}
+        {% else %}
+            {{ jalali_date }}
+        {% endif %}
+    </span>
+{% else %}
+    <span class="jalali-date-display empty">-</span>
+{% endif %}

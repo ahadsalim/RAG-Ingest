@@ -1,0 +1,49 @@
+{% extends "admin/change_list.html" %}
+{% load ingest_jalali %}
+
+{% block extrahead %}
+{{ block.super }}
+<style>
+.jalali-date {
+    direction: ltr;
+    font-family: 'Courier New', monospace;
+}
+.jalali-date-persian {
+    direction: rtl;
+    font-family: 'Tahoma', sans-serif;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Convert Gregorian dates to Jalali in admin lists
+    const dateColumns = document.querySelectorAll('td');
+    dateColumns.forEach(function(cell) {
+        const text = cell.textContent.trim();
+        // Match YYYY-MM-DD or YYYY-MM-DD HH:MM:SS patterns
+        const datePattern = /^\d{4}-\d{2}-\d{2}(\s\d{2}:\d{2}(:\d{2})?)?$/;
+        if (datePattern.test(text)) {
+            try {
+                const date = new Date(text);
+                if (!isNaN(date.getTime())) {
+                    // Simple Jalali conversion (approximate)
+                    const jalaliYear = date.getFullYear() - 621;
+                    const jalaliMonth = String(date.getMonth() + 1).padStart(2, '0');
+                    const jalaliDay = String(date.getDate()).padStart(2, '0');
+                    
+                    let jalaliDate = `${jalaliYear}/${jalaliMonth}/${jalaliDay}`;
+                    if (text.includes(' ')) {
+                        const timePart = text.split(' ')[1];
+                        jalaliDate += ` ${timePart}`;
+                    }
+                    
+                    cell.innerHTML = `<span class="jalali-date" title="میلادی: ${text}">${jalaliDate}</span>`;
+                }
+            } catch (e) {
+                // Keep original if conversion fails
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,24 @@
+# Development and testing dependencies
+# Includes production requirements plus additional tooling for local development
+
+-r requirements.txt
+
+# Testing framework
+pytest==7.4.0
+pytest-django==4.7.0
+pytest-cov==4.1.0
+pytest-mock==3.11.1
+pytest-xdist==3.3.1
+
+# Test utilities
+factory-boy==3.3.0
+Faker==19.3.0
+freezegun==1.2.2
+responses==0.23.1
+model-bakery==1.11.0
+
+# Coverage reporting
+coverage==7.2.7
+
+# For testing async code
+pytest-asyncio==0.21.1

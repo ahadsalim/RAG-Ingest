@@ -1,0 +1,10 @@
+{% extends "admin/change_form.html" %}
+
+{% block content %}
+<div style="background-color: #e8f4fd; padding: 15px; margin-bottom: 20px; border-radius: 5px; border-left: 4px solid #2196F3;">
+    <strong>راهنمای تکمیل فرم:</strong><br>
+    هر «سند حقوقی» ممکن است چند نسخه داشته باشد (نسخهٔ اولیه ، نسخه تجمیع شده با الحاقیات، نسخه حاشیه نویسی شده با توضیحات و یا نسخه به زبان های مختلف).<br>
+    در این بخش، برای هر سند، نسخه های مختلف آن را تعریف می کنیم. (زبان نسخه، تاریخ آن و سطح تجمیع (اصلی یا تلفیقی یا حاشیه نویسی)
+</div>
+{{ block.super }}
+{% endblock %}

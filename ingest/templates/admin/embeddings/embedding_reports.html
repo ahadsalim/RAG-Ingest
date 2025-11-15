@@ -1,0 +1,149 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content_title %}{% endblock %}
+
+{% block content %}
+<div class="module" style="direction: rtl; text-align: right;">
+    
+    <!-- Rebuild Button -->
+    <div style="background: #fff3cd; border: 2px solid #ffc107; padding: 20px; border-radius: 8px; margin: 20px 0;">
+        <h3 style="margin-top: 0; color: #856404;">🔄 بازسازی کامل Embeddings</h3>
+        <p style="margin: 10px 0; color: #856404;">
+            <strong>توجه:</strong> این عملیات تمام embeddings موجود را حذف کرده و با مدل فعلی در .env دوباره ساخته می‌شود.
+            این کار زمانی مفید است که:
+        </p>
+        <ul style="color: #856404; margin: 10px 0 15px 20px;">
+            <li>مدل embedding را در فایل .env تغییر داده‌اید</li>
+            <li>شک دارید که embeddings فعلی صحیح هستند</li>
+            <li>می‌خواهید همه را با تنظیمات جدید دوباره بسازید</li>
+        </ul>
+        <form method="post" onsubmit="return confirm('⚠️ آیا مطمئن هستید؟\n\nتمام {{ chunks_with_embeddings|default:0 }} embedding حذف می‌شود و بردارسازی مجدد شروع خواهد شد.\n\nاین عملیات ممکن است چند ساعت طول بکشد.');">
+            {% csrf_token %}
+            <button type="submit" name="rebuild_all_embeddings" style="background: #dc3545; color: white; padding: 12px 24px; border: none; border-radius: 5px; cursor: pointer; font-size: 14px; font-weight: bold;">
+                🔄 حذف و ساخت مجدد همه Embeddings
+            </button>
+        </form>
+    </div>
+
+    <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+        <h2>📊 آمار کلی سیستم</h2>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-top: 15px;">
+            <div style="background: white; padding: 15px; border-radius: 5px; border-right: 4px solid #4CAF50;">
+                <div style="color: #666; font-size: 12px;">Legal Units</div>
+                <div style="font-size: 24px; font-weight: bold; color: #333;">{{ total_legal_units|default:0 }}</div>
+            </div>
+            <div style="background: white; padding: 15px; border-radius: 5px; border-right: 4px solid #2196F3;">
+                <div style="color: #666; font-size: 12px;">چانک‌ها (Chunks)</div>
+                <div style="font-size: 24px; font-weight: bold; color: #333;">{{ total_chunks|default:0 }}</div>
+            </div>
+            <div style="background: white; padding: 15px; border-radius: 5px; border-right: 4px solid #FF9800;">
+                <div style="color: #666; font-size: 12px;">پرسش و پاسخ</div>
+                <div style="font-size: 24px; font-weight: bold; color: #333;">{{ total_qa|default:0 }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div style="background: #e3f2fd; padding: 20px; border-radius: 8px; margin: 20px 0;">
+        <h2>🔢 آمار Embedding</h2>
+        <table style="width: 100%; background: white; border-radius: 5px; margin-top: 15px;">
+            <tr style="background: #f5f5f5;">
+                <th style="padding: 12px; text-align: right; border-bottom: 2px solid #ddd;">نوع</th>
+                <th style="padding: 12px; text-align: center; border-bottom: 2px solid #ddd;">کل</th>
+                <th style="padding: 12px; text-align: center; border-bottom: 2px solid #ddd;">دارای Embedding</th>
+                <th style="padding: 12px; text-align: center; border-bottom: 2px solid #ddd;">بدون Embedding</th>
+                <th style="padding: 12px; text-align: center; border-bottom: 2px solid #ddd;">درصد تکمیل</th>
+            </tr>
+            <tr>
+                <td style="padding: 12px; border-bottom: 1px solid #eee;">چانک‌ها</td>
+                <td style="padding: 12px; text-align: center; border-bottom: 1px solid #eee;">{{ total_chunks|default:0 }}</td>
+                <td style="padding: 12px; text-align: center; border-bottom: 1px solid #eee; color: #4CAF50; font-weight: bold;">{{ chunks_with_embeddings|default:0 }}</td>
+                <td style="padding: 12px; text-align: center; border-bottom: 1px solid #eee; color: #f44336; font-weight: bold;">{{ chunks_missing|default:0 }}</td>
+                <td style="padding: 12px; text-align: center; border-bottom: 1px solid #eee;">
+                    {{ chunks_percentage|default:0 }}%
+                </td>
+            </tr>
+            <tr>
+                <td style="padding: 12px; border-bottom: 1px solid #eee;">پرسش و پاسخ</td>
+                <td style="padding: 12px; text-align: center; border-bottom: 1px solid #eee;">{{ total_qa|default:0 }}</td>
+                <td style="padding: 12px; text-align: center; border-bottom: 1px solid #eee; color: #4CAF50; font-weight: bold;">{{ qa_with_embeddings|default:0 }}</td>
+                <td style="padding: 12px; text-align: center; border-bottom: 1px solid #eee; color: #f44336; font-weight: bold;">{{ qa_missing|default:0 }}</td>
+                <td style="padding: 12px; text-align: center; border-bottom: 1px solid #eee;">
+                    {{ qa_percentage|default:0 }}%
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <div style="background: #fff3e0; padding: 20px; border-radius: 8px; margin: 20px 0;">
+        <h2>⚙️ تنظیمات فعلی</h2>
+        <table style="width: 100%; background: white; border-radius: 5px; margin-top: 15px;">
+            <tr>
+                <td style="padding: 12px; border-bottom: 1px solid #eee; font-weight: bold;">مدل Embedding</td>
+                <td style="padding: 12px; border-bottom: 1px solid #eee;">{{ current_model }}</td>
+            </tr>
+            <tr>
+                <td style="padding: 12px; border-bottom: 1px solid #eee; font-weight: bold;">Dimension</td>
+                <td style="padding: 12px; border-bottom: 1px solid #eee;">{{ current_dimension }}</td>
+            </tr>
+            <tr>
+                <td style="padding: 12px; border-bottom: 1px solid #eee; font-weight: bold;">Chunk Size</td>
+                <td style="padding: 12px; border-bottom: 1px solid #eee;">{{ chunk_size }} tokens</td>
+            </tr>
+            <tr>
+                <td style="padding: 12px; border-bottom: 1px solid #eee; font-weight: bold;">Chunk Overlap</td>
+                <td style="padding: 12px; border-bottom: 1px solid #eee;">{{ chunk_overlap }} tokens</td>
+            </tr>
+        </table>
+    </div>
+
+    <div style="background: #f3e5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
+        <h2>📈 فعالیت اخیر (24 ساعت گذشته)</h2>
+        <div style="background: white; padding: 15px; border-radius: 5px; margin-top: 15px;">
+            <p><strong>چانک‌های جدید:</strong> {{ recent_chunks|default:0 }}</p>
+            <p><strong>Embedding های جدید:</strong> {{ recent_embeddings|default:0 }}</p>
+        </div>
+    </div>
+
+    {% if embedding_by_model %}
+    <div style="background: #e8f5e9; padding: 20px; border-radius: 8px; margin: 20px 0;">
+        <h2>🤖 آمار به تفکیک مدل</h2>
+        <table style="width: 100%; background: white; border-radius: 5px; margin-top: 15px;">
+            <tr style="background: #f5f5f5;">
+                <th style="padding: 12px; text-align: right; border-bottom: 2px solid #ddd;">مدل</th>
+                <th style="padding: 12px; text-align: center; border-bottom: 2px solid #ddd;">تعداد</th>
+            </tr>
+            {% for model in embedding_by_model %}
+            <tr>
+                <td style="padding: 12px; border-bottom: 1px solid #eee;">{{ model.model_id }}</td>
+                <td style="padding: 12px; text-align: center; border-bottom: 1px solid #eee;">{{ model.count }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+    {% endif %}
+
+    <div style="background: #fce4ec; padding: 20px; border-radius: 8px; margin: 20px 0;">
+        <h2>🔄 فرآیندهای خودکار</h2>
+        <div style="background: white; padding: 15px; border-radius: 5px; margin-top: 15px;">
+            <p>✅ <strong>Chunking خودکار:</strong> هنگام ایجاد یا ویرایش Legal Unit</p>
+            <p>✅ <strong>Embedding خودکار:</strong> هنگام ایجاد Chunk یا QA Entry جدید</p>
+            <p>✅ <strong>بررسی دوره‌ای:</strong> هر ساعت چک می‌شود که آیا Chunk بدون Embedding وجود دارد</p>
+            <p>✅ <strong>پاکسازی خودکار:</strong> روزانه Embedding های orphan حذف می‌شوند</p>
+            <p>✅ <strong>حذف خودکار:</strong> با حذف Legal Unit یا QA Entry، Chunk ها و Embedding های مرتبط حذف می‌شوند</p>
+        </div>
+    </div>
+
+    <div style="margin-top: 30px; padding: 15px; background: #fff9c4; border-radius: 5px; border-right: 4px solid #FFC107;">
+        <h3>💡 نکات مهم</h3>
+        <ul>
+            <li>تمام فرآیندها به صورت خودکار اجرا می‌شوند</li>
+            <li>Embedding ها در background توسط Celery worker ساخته می‌شوند</li>
+            <li>در صورت مشاهده Chunk بدون Embedding، تا یک ساعت صبر کنید (task دوره‌ای اجرا می‌شود)</li>
+            <li>برای مشاهده لاگ‌های worker: <code>docker logs deployment-worker-1 -f</code></li>
+        </ul>
+    </div>
+</div>
+{% endblock %}

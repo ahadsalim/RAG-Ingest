@@ -1,0 +1,404 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% block extrahead %}
+{{ block.super }}
+<style>
+    .stats-container {
+        padding: 20px;
+        max-width: 1400px;
+    }
+    
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+    
+    .stat-card {
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .stat-card h3 {
+        margin-top: 0;
+        color: #417690;
+        font-size: 18px;
+        border-bottom: 2px solid #79aec8;
+        padding-bottom: 10px;
+        margin-bottom: 15px;
+    }
+    
+    .stat-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px solid #f0f0f0;
+    }
+    
+    .stat-row:last-child {
+        border-bottom: none;
+    }
+    
+    .stat-label {
+        color: #666;
+        font-weight: 500;
+    }
+    
+    .stat-value {
+        color: #333;
+        font-weight: bold;
+        direction: ltr;
+        text-align: left;
+    }
+    
+    .stat-value.large {
+        font-size: 24px;
+        color: #417690;
+    }
+    
+    .error-message {
+        background: #f8d7da;
+        border: 1px solid #f5c6cb;
+        border-radius: 8px;
+        padding: 20px;
+        color: #721c24;
+        margin: 20px 0;
+    }
+    
+    .success-message {
+        background: #d4edda;
+        border: 1px solid #c3e6cb;
+        border-radius: 8px;
+        padding: 20px;
+        color: #155724;
+        margin: 20px 0;
+    }
+    
+    .summary-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-bottom: 30px;
+    }
+    
+    .summary-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 8px;
+        text-align: center;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    
+    .summary-card.green {
+        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    }
+    
+    .summary-card.blue {
+        background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    }
+    
+    .summary-card.orange {
+        background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+    }
+    
+    .summary-card.purple {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    
+    .summary-card.red {
+        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    }
+    
+    .summary-value {
+        font-size: 32px;
+        font-weight: bold;
+        margin: 10px 0;
+    }
+    
+    .summary-label {
+        font-size: 14px;
+        opacity: 0.9;
+    }
+    
+    .refresh-button {
+        background: #417690;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 14px;
+        margin-bottom: 20px;
+    }
+    
+    .refresh-button:hover {
+        background: #2e5266;
+    }
+    
+    .timestamp {
+        color: #666;
+        font-size: 13px;
+        margin-bottom: 20px;
+    }
+    
+    .rating-stars {
+        color: #ffc107;
+        font-size: 18px;
+    }
+    
+    .status-badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: bold;
+    }
+    
+    .status-green {
+        background: #d4edda;
+        color: #155724;
+    }
+    
+    .status-red {
+        background: #f8d7da;
+        color: #721c24;
+    }
+    
+    .tier-breakdown {
+        display: flex;
+        gap: 10px;
+        margin-top: 10px;
+    }
+    
+    .tier-item {
+        flex: 1;
+        text-align: center;
+        padding: 10px;
+        background: #f8f9fa;
+        border-radius: 5px;
+    }
+    
+    .tier-name {
+        font-size: 11px;
+        color: #666;
+        text-transform: uppercase;
+    }
+    
+    .tier-count {
+        font-size: 18px;
+        font-weight: bold;
+        color: #417690;
+    }
+</style>
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+    &rsaquo; <a href="{% url 'admin:index' %}#embeddings">Embeddings</a>
+    &rsaquo; گزارشات سیستم مرکزی
+</div>
+{% endblock %}
+
+{% block content_title %}{% endblock %}
+
+{% block content %}
+<div class="stats-container">
+    <h1>📊 گزارشات سیستم مرکزی (Core)</h1>
+    
+    <button class="refresh-button" onclick="location.reload()">🔄 بروزرسانی</button>
+    
+    {% if error %}
+        <div class="error-message">
+            <strong>❌ خطا:</strong> {{ error }}
+            <br><br>
+            <strong>آدرس Core:</strong> {{ core_url }}
+        </div>
+    {% elif stats %}
+        <div class="timestamp">
+            ⏰ آخرین بروزرسانی: {{ stats.timestamp }}
+        </div>
+        
+        <!-- Summary Cards -->
+        <div class="summary-cards">
+            <div class="summary-card green">
+                <div class="summary-label">👥 کاربران</div>
+                <div class="summary-value">{{ stats.summary.total_users|floatformat:0 }}</div>
+            </div>
+            
+            <div class="summary-card blue">
+                <div class="summary-label">💬 مکالمات</div>
+                <div class="summary-value">{{ stats.summary.total_conversations|floatformat:0 }}</div>
+            </div>
+            
+            <div class="summary-card orange">
+                <div class="summary-label">📝 پیام‌ها</div>
+                <div class="summary-value">{{ stats.summary.total_messages|floatformat:0 }}</div>
+            </div>
+            
+            <div class="summary-card purple">
+                <div class="summary-label">🎯 بردارها</div>
+                <div class="summary-value">{{ stats.summary.total_vectors_in_qdrant|floatformat:0 }}</div>
+            </div>
+            
+            <div class="summary-card red">
+                <div class="summary-label">⭐ رضایت کاربران</div>
+                <div class="summary-value">{{ stats.summary.avg_user_rating|floatformat:2 }}/5</div>
+                <div class="rating-stars">★★★★★</div>
+            </div>
+        </div>
+        
+        <!-- Detailed Stats Grid -->
+        <div class="stats-grid">
+            <!-- Users -->
+            <div class="stat-card">
+                <h3>👥 کاربران</h3>
+                <div class="stat-row">
+                    <span class="stat-label">کل کاربران</span>
+                    <span class="stat-value large">{{ stats.postgresql.users.total|floatformat:0 }}</span>
+                </div>
+                
+                <div class="tier-breakdown">
+                    <div class="tier-item">
+                        <div class="tier-name">Free</div>
+                        <div class="tier-count">{{ stats.postgresql.users.by_tier.free|floatformat:0 }}</div>
+                    </div>
+                    <div class="tier-item">
+                        <div class="tier-name">Basic</div>
+                        <div class="tier-count">{{ stats.postgresql.users.by_tier.basic|floatformat:0 }}</div>
+                    </div>
+                    <div class="tier-item">
+                        <div class="tier-name">Premium</div>
+                        <div class="tier-count">{{ stats.postgresql.users.by_tier.premium|floatformat:0 }}</div>
+                    </div>
+                    <div class="tier-item">
+                        <div class="tier-name">Enterprise</div>
+                        <div class="tier-count">{{ stats.postgresql.users.by_tier.enterprise|floatformat:0 }}</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Conversations -->
+            <div class="stat-card">
+                <h3>💬 مکالمات</h3>
+                <div class="stat-row">
+                    <span class="stat-label">کل مکالمات</span>
+                    <span class="stat-value">{{ stats.postgresql.conversations.total|floatformat:0 }}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">کل پیام‌ها در مکالمات</span>
+                    <span class="stat-value">{{ stats.postgresql.conversations.total_messages_in_conversations|floatformat:0 }}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">میانگین پیام/مکالمه</span>
+                    <span class="stat-value">{{ stats.postgresql.conversations.avg_messages_per_conversation|floatformat:1 }}</span>
+                </div>
+            </div>
+            
+            <!-- Messages -->
+            <div class="stat-card">
+                <h3>📝 پیام‌ها</h3>
+                <div class="stat-row">
+                    <span class="stat-label">کل پیام‌ها</span>
+                    <span class="stat-value">{{ stats.postgresql.messages.total|floatformat:0 }}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">از کاربر</span>
+                    <span class="stat-value">{{ stats.postgresql.messages.user_messages|floatformat:0 }}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">از دستیار</span>
+                    <span class="stat-value">{{ stats.postgresql.messages.assistant_messages|floatformat:0 }}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">کل توکن‌ها</span>
+                    <span class="stat-value">{{ stats.postgresql.messages.total_tokens|floatformat:0 }}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">زمان پردازش (میانگین)</span>
+                    <span class="stat-value">{{ stats.postgresql.messages.avg_processing_time_ms|floatformat:1 }} ms</span>
+                </div>
+            </div>
+            
+            <!-- Cache -->
+            <div class="stat-card">
+                <h3>💾 کش</h3>
+                <div class="stat-row">
+                    <span class="stat-label">کل کش شده</span>
+                    <span class="stat-value">{{ stats.postgresql.cache.total_cached_queries|floatformat:0 }}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">کل استفاده از کش</span>
+                    <span class="stat-value">{{ stats.postgresql.cache.total_cache_hits|floatformat:0 }}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">کش‌های فعال</span>
+                    <span class="stat-value">{{ stats.postgresql.cache.active_cache_entries|floatformat:0 }}</span>
+                </div>
+                {% if stats.postgresql.cache.total_cached_queries > 0 %}
+                <div class="stat-row">
+                    <span class="stat-label">نرخ استفاده</span>
+                    <span class="stat-value">{{ stats.postgresql.cache.total_cache_hits|floatformat:0 }} / {{ stats.postgresql.cache.total_cached_queries|floatformat:0 }}</span>
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- Feedback -->
+            <div class="stat-card">
+                <h3>⭐ بازخورد کاربران</h3>
+                <div class="stat-row">
+                    <span class="stat-label">کل بازخوردها</span>
+                    <span class="stat-value">{{ stats.postgresql.feedback.total|floatformat:0 }}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">میانگین امتیاز</span>
+                    <span class="stat-value large">{{ stats.postgresql.feedback.avg_rating|floatformat:2 }}/5</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">پردازش شده</span>
+                    <span class="stat-value">{{ stats.postgresql.feedback.processed|floatformat:0 }}</span>
+                </div>
+            </div>
+            
+            <!-- Qdrant -->
+            <div class="stat-card">
+                <h3>🎯 Qdrant Vector Database</h3>
+                <div class="stat-row">
+                    <span class="stat-label">کل بردارها</span>
+                    <span class="stat-value large">{{ stats.qdrant.total_points|floatformat:0 }}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Index شده</span>
+                    <span class="stat-value">{{ stats.qdrant.indexed_vectors|floatformat:0 }}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">وضعیت</span>
+                    <span class="stat-value">
+                        <span class="status-badge status-{{ stats.qdrant.status }}">
+                            {{ stats.qdrant.status|upper }}
+                        </span>
+                    </span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Collection</span>
+                    <span class="stat-value">{{ stats.qdrant.collection_name }}</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="success-message">
+            ✅ داده‌ها با موفقیت از Core دریافت شدند
+        </div>
+    {% else %}
+        <div class="error-message">
+            ⚠️ در حال دریافت داده‌ها...
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

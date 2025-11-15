@@ -1,0 +1,62 @@
+# =============================================================================
+# Ingest System Requirements (Production)
+# Complete dependency list for the legal document ingestion system
+# =============================================================================
+
+# Core Django packages
+Django==5.0.8
+djangorestframework==3.14.0
+django-filter==23.3
+django-simple-history==3.4.0
+django-mptt==0.15.0
+whitenoise==6.5.0
+
+# Database
+psycopg[binary]==3.1.19
+pgvector==0.2.5
+
+# Celery and Redis for background tasks
+celery==5.3.4
+django-celery-beat==2.6.0
+redis==5.0.7
+django-redis==5.4.0
+
+# Web server
+gunicorn==21.2.0
+python-dotenv==1.0.0
+
+# Basic utilities
+Pillow==10.4.0
+requests==2.31.0
+
+# File storage (S3/MinIO)
+boto3==1.34.162
+botocore==1.34.162
+django-storages==1.14.2
+
+# Persian/Jalali date support
+jdatetime>=4.1.1
+
+# CORS headers
+django-cors-headers==4.3.1
+
+# Monitoring and logging
+prometheus-client==0.20.0
+
+# =============================================================================
+# Machine Learning Dependencies (for embedding generation)
+# =============================================================================
+
+# Core ML libraries
+torch>=2.0.0,<3.0.0
+transformers>=4.30.0
+sentence-transformers>=2.2.0
+huggingface_hub>=0.23.0
+
+# Persian NLP
+hazm>=0.7.0
+
+# Additional ML utilities
+scikit-learn>=1.3.0
+scipy>=1.11.0
+numpy>=1.24.0

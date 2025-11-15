@@ -1,0 +1,11 @@
+{% extends "admin/change_list.html" %}
+{% load i18n admin_urls static %}
+
+{% block object-tools-items %}
+    {{ block.super }}
+    <li>
+        <a href="/admin/accounts/user-activity-report/" class="addlink">
+            📊 گزارش کامل فعالیت کاربران
+        </a>
+    </li>
+{% endblock %}

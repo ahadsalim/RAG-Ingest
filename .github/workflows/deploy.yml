@@ -1,0 +1,262 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Validate Code
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Check Python syntax
+      run: |
+        python3 -m py_compile manage.py
+        find ingest -name "*.py" -type f -exec python3 -m py_compile {} \;
+    
+    - name: Check YAML syntax
+      run: |
+        python3 -c "import yaml; yaml.safe_load(open('deployment/docker-compose.ingest.yml'))"
+    
+    - name: Validate requirements.txt
+      run: |
+        test -f deployment/requirements.txt
+        echo "✅ requirements.txt exists"
+
+  backup:
+    name: Backup Before Deploy
+    needs: test
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: SSH and Backup
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        script: |
+          # Create backup directory
+          BACKUP_DIR="/srv/backups/auto-$(date +%Y%m%d-%H%M%S)"
+          mkdir -p "$BACKUP_DIR"
+          
+          # Backup database
+          docker exec deployment-db-1 pg_dump -U ingest ingest > "$BACKUP_DIR/database.sql"
+          
+          # Backup code
+          tar -czf "$BACKUP_DIR/code.tar.gz" /srv/ingest/
+          
+          # Keep only last 7 days
+          find /srv/backups/ -type d -mtime +7 -exec rm -rf {} + 2>/dev/null || true
+          
+          echo "✅ Backup completed: $BACKUP_DIR"
+
+  deploy:
+    name: Deploy to Docker Containers
+    needs: backup
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: SSH and Deploy to Docker
+      id: deploy
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        script: |
+          set -e  # Exit on any error
+          cd /srv
+          
+          # Save current commit for potential rollback
+          PREVIOUS_COMMIT=$(git rev-parse HEAD)
+          echo "Previous commit: $PREVIOUS_COMMIT"
+          echo "$PREVIOUS_COMMIT" > /tmp/previous_commit.txt
+          
+          # Pull latest changes from Git
+          echo "📥 Pulling latest changes..."
+          git pull origin main
+          CURRENT_COMMIT=$(git rev-parse HEAD)
+          echo "Current commit: $CURRENT_COMMIT"
+          
+          # Check if requirements.txt changed
+          if git diff --name-only $PREVIOUS_COMMIT $CURRENT_COMMIT | grep -q "deployment/requirements.txt"; then
+            echo "📦 Requirements changed - Rebuilding containers..."
+            cd /srv/deployment
+            docker compose -f docker-compose.ingest.yml build --no-cache web worker beat
+            docker compose -f docker-compose.ingest.yml up -d web worker beat
+            echo "⏳ Waiting for containers to start..."
+            sleep 30
+          else
+            echo "📦 No requirements changes - Using hot reload..."
+            # Copy updated code to running Docker containers
+            echo "📦 Copying files to containers..."
+            for container in deployment-web-1 deployment-worker-1 deployment-beat-1; do
+              if docker ps --format '{{.Names}}' | grep -q "^${container}$"; then
+                echo "  → Updating $container"
+                docker cp /srv/ingest/apps $container:/app/ingest/ 2>/dev/null || true
+                docker cp /srv/ingest/core $container:/app/ingest/ 2>/dev/null || true
+                docker cp /srv/ingest/templates $container:/app/ingest/ 2>/dev/null || true
+                docker cp /srv/ingest/api $container:/app/ingest/ 2>/dev/null || true
+                docker cp /srv/ingest/settings $container:/app/ingest/ 2>/dev/null || true
+              fi
+            done
+          fi
+          
+          # Run migrations inside Docker container
+          echo "🔄 Running migrations..."
+          docker exec deployment-web-1 python manage.py migrate --noinput || {
+            echo "❌ Migration failed!"
+            exit 1
+          }
+          
+          # Restart containers to apply changes
+          echo "♻️  Restarting containers..."
+          docker restart deployment-web-1 deployment-worker-1 deployment-beat-1
+          
+          # Wait for containers to be healthy
+          echo "⏳ Waiting for services to start..."
+          sleep 20
+          
+          # Verify deployment inside Docker
+          echo "✅ Running Django checks..."
+          docker exec deployment-web-1 python manage.py check || {
+            echo "❌ Django check failed!"
+            exit 1
+          }
+          
+          # Show container status
+          echo "📊 Container status:"
+          docker ps --filter "name=deployment-" --format "table {{.Names}}\t{{.Status}}"
+
+  health_check:
+    name: Health Check
+    needs: deploy
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Wait and Check Service Health
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        script: |
+          echo "🏥 Running health checks..."
+          
+          # Wait a bit more for full startup
+          sleep 10
+          
+          # Check if containers are running
+          for container in deployment-web-1 deployment-worker-1 deployment-beat-1; do
+            if ! docker ps --format '{{.Names}}' | grep -q "^${container}$"; then
+              echo "❌ Container $container is not running!"
+              exit 1
+            fi
+            echo "✅ Container $container is running"
+          done
+          
+          # Check web service health endpoint
+          echo "🌐 Checking web service health..."
+          MAX_RETRIES=10
+          RETRY_COUNT=0
+          
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            if docker exec deployment-web-1 curl -f http://localhost:8000/api/health/ > /dev/null 2>&1; then
+              echo "✅ Web service health check passed!"
+              
+              # Get detailed health info
+              docker exec deployment-web-1 curl -s http://localhost:8000/api/health/ || true
+              exit 0
+            fi
+            
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            echo "⏳ Health check attempt $RETRY_COUNT/$MAX_RETRIES failed, retrying..."
+            sleep 5
+          done
+          
+          echo "❌ Health check failed after $MAX_RETRIES attempts!"
+          
+          # Show logs for debugging
+          echo "📋 Last 50 lines of web container logs:"
+          docker logs --tail 50 deployment-web-1
+          
+          exit 1
+
+  rollback:
+    name: Rollback on Failure
+    needs: [deploy, health_check]
+    runs-on: ubuntu-latest
+    if: failure()
+    
+    steps:
+    - name: Automatic Rollback
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        script: |
+          echo "🔄 Starting automatic rollback..."
+          
+          cd /srv
+          
+          # Get previous commit
+          if [ -f /tmp/previous_commit.txt ]; then
+            PREVIOUS_COMMIT=$(cat /tmp/previous_commit.txt)
+            echo "Rolling back to commit: $PREVIOUS_COMMIT"
+            
+            # Rollback git
+            git reset --hard $PREVIOUS_COMMIT
+            
+            # Restore code to containers
+            for container in deployment-web-1 deployment-worker-1 deployment-beat-1; do
+              if docker ps --format '{{.Names}}' | grep -q "^${container}$"; then
+                echo "  → Restoring $container"
+                docker cp /srv/ingest/apps $container:/app/ingest/
+                docker cp /srv/ingest/core $container:/app/ingest/
+                docker cp /srv/ingest/templates $container:/app/ingest/
+                docker cp /srv/ingest/api $container:/app/ingest/
+                docker cp /srv/ingest/settings $container:/app/ingest/
+              fi
+            done
+            
+            # Restart containers
+            docker restart deployment-web-1 deployment-worker-1 deployment-beat-1
+            
+            echo "✅ Rollback completed!"
+            
+            # Restore from backup if needed
+            LATEST_BACKUP=$(ls -td /srv/backups/auto-* 2>/dev/null | head -1)
+            if [ -n "$LATEST_BACKUP" ]; then
+              echo "📦 Latest backup available at: $LATEST_BACKUP"
+              echo "To restore database: docker exec -i deployment-db-1 psql -U ingest ingest < $LATEST_BACKUP/database.sql"
+            fi
+          else
+            echo "⚠️  Previous commit not found, manual intervention required!"
+            exit 1
+          fi
+
+  notify:
+    name: Notify Deployment Status
+    needs: [deploy, health_check]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: Deployment Success
+      if: success()
+      run: |
+        echo "✅ Deployment successful!"
+        echo "All services are healthy and running."
+    
+    - name: Deployment Failed
+      if: failure()
+      run: |
+        echo "❌ Deployment failed!"
+        echo "Automatic rollback has been triggered."
+        echo "Check the rollback job for details."

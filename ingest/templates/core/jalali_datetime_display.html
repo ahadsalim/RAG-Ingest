@@ -1,0 +1,15 @@
+{% load jalali %}
+{% if value %}
+    <span class="jalali-datetime-display" data-original="{{ value|date:'c' }}">
+        {% if show_verbose %}
+            {{ jalali_verbose }}
+        {% else %}
+            {{ jalali_datetime }}
+        {% endif %}
+        {% if show_timezone %}
+            <small class="timezone-info">({{ DISPLAY_TIME_ZONE }})</small>
+        {% endif %}
+    </span>
+{% else %}
+    <span class="jalali-datetime-display empty">-</span>
+{% endif %}

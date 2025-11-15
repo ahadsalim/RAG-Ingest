@@ -1,0 +1,232 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static admin_list %}
+
+{% block title %}{{ title }} | {{ site_title|default:_('Django site admin') }}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+<a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+&rsaquo; <a href="{% url 'admin:app_list' app_label='embeddings' %}">Embeddings</a>
+&rsaquo; {{ title }}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="module">
+    <h1>🔍 {{ title }}</h1>
+    
+    <!-- Configuration Section -->
+    <div class="module">
+        <h2>📋 Current Configuration</h2>
+        <table class="table">
+            <tbody>
+                <tr>
+                    <th>Provider:</th>
+                    <td><strong>{{ provider }}</strong></td>
+                </tr>
+                {% for key, value in settings_info.items %}
+                <tr>
+                    <th>{{ key }}:</th>
+                    <td>{{ value }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Backend Information -->
+    <div class="module">
+        <h2>🔧 Backend Information</h2>
+        {% if backend_info.error %}
+            <div class="errornote">
+                <strong>Error:</strong> {{ backend_info.error }}
+            </div>
+        {% else %}
+            <table class="table">
+                <tbody>
+                    <tr>
+                        <th>Backend Class:</th>
+                        <td>{{ backend_info.backend_class|default:"Unknown" }}</td>
+                    </tr>
+                    <tr>
+                        <th>Model ID:</th>
+                        <td>{{ backend_info.model_id|default:"Unknown" }}</td>
+                    </tr>
+                    <tr>
+                        <th>Default Dimension:</th>
+                        <td>{{ backend_info.default_dim|default:"Unknown" }}</td>
+                    </tr>
+                    <tr>
+                        <th>Dual Encoder Support:</th>
+                        <td>
+                            {% if backend_info.supports_dual_encoder %}
+                                <span style="color: green;">✅ Yes</span>
+                            {% else %}
+                                <span style="color: orange;">⚠️ No</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% if backend_info.api_url %}
+                    <tr>
+                        <th>API URL:</th>
+                        <td>{{ backend_info.api_url }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if backend_info.model_name %}
+                    <tr>
+                        <th>Model Name:</th>
+                        <td>{{ backend_info.model_name }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if backend_info.device %}
+                    <tr>
+                        <th>Device:</th>
+                        <td>{{ backend_info.device }}</td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        {% endif %}
+    </div>
+    
+    <!-- Validation Status -->
+    <div class="module">
+        <h2>✅ Configuration Validation</h2>
+        {% if validation.valid %}
+            <div class="success">
+                <strong>✅ Configuration is valid</strong>
+            </div>
+        {% else %}
+            <div class="errornote">
+                <strong>❌ Configuration has issues</strong>
+            </div>
+        {% endif %}
+        
+        {% if validation.missing_config %}
+            <h3>❌ Missing Configuration:</h3>
+            <ul>
+                {% for missing in validation.missing_config %}
+                    <li>{{ missing }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+        
+        {% if validation.warnings %}
+            <h3>⚠️ Warnings:</h3>
+            <ul>
+                {% for warning in validation.warnings %}
+                    <li>{{ warning }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+    </div>
+    
+    <!-- Database Statistics -->
+    <div class="module">
+        <h2>📊 Database Statistics</h2>
+        {% if embedding_stats.error %}
+            <div class="errornote">
+                <strong>Error:</strong> {{ embedding_stats.error }}
+            </div>
+        {% else %}
+            {% if embedding_stats %}
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Model ID</th>
+                            <th>Total Embeddings</th>
+                            <th>Dimensions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for model_id, stats in embedding_stats.items %}
+                        <tr>
+                            <td><strong>{{ model_id }}</strong></td>
+                            <td>{{ stats.total|floatformat:0 }}</td>
+                            <td>
+                                {% for dim, count in stats.dimensions.items %}
+                                    {{ dim }}d ({{ count|floatformat:0 }}){% if not forloop.last %}, {% endif %}
+                                {% endfor %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p>No embeddings found in database.</p>
+            {% endif %}
+        {% endif %}
+    </div>
+    
+    <!-- Management Commands -->
+    <div class="module">
+        <h2>🛠️ Management Commands</h2>
+        <div class="help">
+            <h3>Available Commands:</h3>
+            <ul>
+                <li><code>python manage.py embeddings_status</code> - Show detailed system status</li>
+                <li><code>python manage.py reembed_chunks --provider hakim</code> - Re-embed all chunks with new model</li>
+                <li><code>python manage.py reembed_chunks --dry-run</code> - Preview what would be re-embedded</li>
+                <li><code>python manage.py reembed_chunks --truncate-existing --model-id hakim-v2</code> - Replace existing embeddings</li>
+            </ul>
+            
+            <h3>Blue/Green Deployment:</h3>
+            <ol>
+                <li>Set new <code>EMBEDDING_PROVIDER</code> and <code>EMBEDDING_MODEL_ID</code></li>
+                <li>Run <code>reembed_chunks</code> to create embeddings with new model</li>
+                <li>Set <code>EMBEDDINGS_READ_MODEL_ID</code> to switch queries to new model</li>
+                <li>Remove old embeddings when satisfied</li>
+            </ol>
+        </div>
+    </div>
+</div>
+
+<style>
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10px 0;
+}
+
+.table th, .table td {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    text-align: left;
+}
+
+.table th {
+    background-color: #f5f5f5;
+    font-weight: bold;
+    width: 200px;
+}
+
+.success {
+    background-color: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+    padding: 10px;
+    border-radius: 4px;
+    margin: 10px 0;
+}
+
+.help {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    padding: 15px;
+    border-radius: 4px;
+    margin: 10px 0;
+}
+
+.help h3 {
+    margin-top: 0;
+    color: #495057;
+}
+
+.help code {
+    background-color: #e9ecef;
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-family: monospace;
+}
+</style>
+{% endblock %}

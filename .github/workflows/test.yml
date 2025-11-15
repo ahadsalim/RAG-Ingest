@@ -1,0 +1,23 @@
+name: Test Workflow
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Say hello
+        run: echo "Hello from GitHub Actions!"
+      
+      - name: Check structure
+        run: |
+          echo "Repository structure:"
+          ls -la
+          echo "Ingest folder:"
+          ls -la ingest/

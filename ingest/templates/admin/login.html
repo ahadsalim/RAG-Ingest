@@ -1,0 +1,170 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>شرکت ما</title>
+    <style>
+        body {
+            background: #f0f2f5;
+            margin: 0;
+            padding: 0;
+            font-family: 'Vazirmatn', 'Tahoma', sans-serif;
+            direction: rtl;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .login-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+            overflow: hidden;
+            width: 100%;
+            max-width: 400px;
+            direction: rtl;
+        }
+        
+        .login-header {
+            background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
+            padding: 25px;
+            text-align: center;
+        }
+        
+        .login-header .company-name {
+            color: white;
+            font-size: 24px;
+            font-weight: 700;
+            margin: 0;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.2);
+            font-family: 'Vazirmatn', 'Tahoma', sans-serif;
+        }
+        
+        .login-header .company-name .highlight {
+            color: #ffd700 !important;
+            font-weight: 700;
+        }
+        
+        .login-header .system-title {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 16px;
+            font-weight: 400;
+            margin: 8px 0 0 0;
+            font-family: 'Vazirmatn', 'Tahoma', sans-serif;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+        
+        .login-form-container {
+            background: white;
+            padding: 30px;
+            direction: rtl;
+        }
+        
+        .form-row {
+            margin-bottom: 15px;
+            direction: rtl;
+            text-align: right;
+        }
+        
+        .form-row label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+            font-family: 'Vazirmatn', 'Tahoma', sans-serif;
+            text-align: right;
+        }
+        
+        .form-row input[type="text"],
+        .form-row input[type="password"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+            direction: rtl;
+            text-align: right;
+            font-family: 'Vazirmatn', 'Tahoma', sans-serif;
+        }
+        
+        .form-row input:focus {
+            border-color: #4a90e2;
+            outline: none;
+            box-shadow: 0 0 5px rgba(74, 144, 226, 0.3);
+        }
+        
+        .submit-row {
+            margin-top: 20px;
+            text-align: left;
+            direction: rtl;
+        }
+        
+        .submit-row input[type="submit"] {
+            background: #4a90e2;
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+            font-family: 'Vazirmatn', 'Tahoma', sans-serif;
+            font-weight: bold;
+        }
+        
+        .submit-row input[type="submit"]:hover {
+            background: #357abd;
+        }
+        
+        .errornote {
+            background: #ffeaa7;
+            border: 1px solid #fdcb6e;
+            color: #2d3436;
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+            direction: rtl;
+            text-align: right;
+            font-family: 'Vazirmatn', 'Tahoma', sans-serif;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-header">
+            <h1 class="company-name">شرکت <span class="highlight">ما</span></h1>
+            <p class="system-title">سیستم مدیریت اسناد</p>
+        </div>
+        
+        <div class="login-form-container">
+            <form action="{% url 'admin:login' %}" method="post" id="login-form">
+                {% csrf_token %}
+                
+                {% if form.errors or form.non_field_errors %}
+                    <div class="errornote">
+                        <p>نام کاربری یا رمز عبور اشتباه است. لطفاً دوباره تلاش کنید.</p>
+                    </div>
+                {% endif %}
+                
+                <div class="form-row">
+                    <label for="id_username" class="required">نام کاربری:</label>
+                    <input type="text" name="username" id="id_username" value="{{ form.username.value|default:'' }}" required>
+                </div>
+                <div class="form-row">
+                    <label for="id_password" class="required">رمز عبور:</label>
+                    <input type="password" name="password" id="id_password" required>
+                </div>
+                
+                <div class="submit-row">
+                    <input type="submit" value="ورود">
+                </div>
+                
+                <input type="hidden" name="next" value="{{ next }}">
+            </form>
+        </div>
+    </div>
+</body>
+</html>

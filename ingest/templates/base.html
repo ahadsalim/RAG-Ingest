@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}سیستم مدیریت اسناد {% endblock %}</title>
+    
+    {% load static %}
+    
+    <!-- Load RTL utility CSS for scoped RTL support -->
+    <link rel="stylesheet" type="text/css" href="{% static 'css/rtl-utility.css' %}">
+    
+    {% block extra_css %}{% endblock %}
+    
+    <style>
+        /* Persian RTL layout by default */
+        body {
+            font-family: 'Vazirmatn', 'Tahoma', sans-serif;
+            direction: rtl;
+            text-align: right;
+        }
+        
+        /* LTR content for specific elements that need it */
+        .ltr-content {
+            direction: ltr;
+            text-align: left;
+        }
+        
+        /* Jalali dates should stay LTR for proper formatting */
+        .jalali-date, .jalali-datetime {
+            direction: ltr;
+            text-align: left;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        {% block header %}
+        <header>
+            <h1>سیستم مدیریت اسناد </h1>
+        </header>
+        {% endblock %}
+        
+        <main>
+            {% block content %}{% endblock %}
+        </main>
+        
+        {% block footer %}
+        <footer>
+            <p>&copy; شرکت ما</p>
+        </footer>
+        {% endblock %}
+    </div>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

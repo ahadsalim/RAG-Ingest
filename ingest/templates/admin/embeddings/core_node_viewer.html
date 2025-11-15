@@ -1,0 +1,585 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block title %}مشاهده نود در سیستم مرکزی{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<style>
+    .node-viewer-container {
+        padding: 20px;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+    
+    .search-section {
+        background: #f8f9fa;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 30px;
+    }
+    
+    .search-form {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 15px;
+    }
+    
+    .search-form input[type="text"] {
+        flex: 1;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+    }
+    
+    .search-form button {
+        padding: 10px 20px;
+        background: #417690;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+    }
+    
+    .search-form button:hover {
+        background: #2c5467;
+    }
+    
+    .available-nodes {
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        padding: 15px;
+        max-height: 300px;
+        overflow-y: auto;
+    }
+    
+    .available-nodes h3 {
+        margin-top: 0;
+        color: #333;
+        font-size: 16px;
+    }
+    
+    .node-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+    
+    .node-list li {
+        padding: 8px;
+        margin: 5px 0;
+        background: #f8f9fa;
+        border-radius: 4px;
+        font-size: 13px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .node-list li:hover {
+        background: #e9ecef;
+    }
+    
+    .node-list a {
+        color: #417690;
+        text-decoration: none;
+        font-family: monospace;
+    }
+    
+    .node-list a:hover {
+        text-decoration: underline;
+    }
+    
+    .node-info {
+        font-size: 12px;
+        color: #666;
+    }
+    
+    .result-section {
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    
+    .alert {
+        padding: 15px;
+        border-radius: 4px;
+        margin-bottom: 20px;
+    }
+    
+    .alert-error {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+    
+    .alert-success {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+    
+    .data-display {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 15px;
+        margin-top: 15px;
+        direction: ltr;
+        text-align: left;
+    }
+    
+    .data-display pre {
+        margin: 0;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        font-size: 13px;
+        font-family: 'Courier New', monospace;
+    }
+    
+    .metadata-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 15px;
+        margin-top: 15px;
+    }
+    
+    .metadata-item {
+        background: #f8f9fa;
+        padding: 12px;
+        border-radius: 4px;
+        border: 1px solid #dee2e6;
+    }
+    
+    .metadata-item strong {
+        display: block;
+        color: #417690;
+        margin-bottom: 5px;
+    }
+    
+    .metadata-item code {
+        background: white;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 12px;
+    }
+    
+    .vector-preview {
+        background: #f8f9fa;
+        padding: 10px;
+        border-radius: 4px;
+        margin-top: 10px;
+        font-size: 12px;
+        font-family: monospace;
+    }
+    
+    .chunk-info-box {
+        background: #e7f3ff;
+        border: 1px solid #b3d9ff;
+        border-radius: 4px;
+        padding: 15px;
+        margin-bottom: 20px;
+    }
+    
+    .chunk-info-box h3 {
+        margin-top: 0;
+        color: #0056b3;
+    }
+    
+    .info-section {
+        background: white;
+        border: 1px solid #e0e0e0;
+        border-radius: 6px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+    
+    .info-section h3 {
+        margin-top: 0;
+        margin-bottom: 15px;
+        color: #333;
+        font-size: 18px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #f0f0f0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="node-viewer-container">
+    <div class="search-section">
+        <form method="get" class="search-form">
+            <input type="text" 
+                   name="node_id" 
+                   placeholder="Node ID را وارد کنید (UUID)" 
+                   value="{{ requested_node_id|default:'' }}"
+                   pattern="[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                   required>
+            <button type="submit">🔎 جستجو</button>
+        </form>
+        
+        <div class="available-nodes">
+            <h3>📋 لیست Node ID های موجود ({{ available_nodes.count }} عدد)</h3>
+            <ul class="node-list">
+                {% for chunk in available_nodes %}
+                <li>
+                    <a href="?node_id={{ chunk.node_id }}">{{ chunk.node_id }}</a>
+                    <span class="node-info">
+                        {% if chunk.unit %}
+                            از LegalUnit
+                        {% elif chunk.qaentry %}
+                            از QAEntry
+                        {% endif %}
+                        | {{ chunk.chunk_text|truncatechars:50 }}
+                    </span>
+                </li>
+                {% empty %}
+                <li style="color: #666;">هیچ Node با node_id یافت نشد</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    
+    {% if error %}
+    <div class="alert alert-error">
+        <strong>❌ خطا:</strong> {{ error }}
+    </div>
+    {% endif %}
+    
+    {% if node_data %}
+    <div class="alert alert-success">
+        ✅ Node با موفقیت از Core دریافت شد
+    </div>
+    
+    {% if chunk %}
+    <div class="chunk-info-box">
+        <h3>📦 اطلاعات Chunk مرتبط (محلی)</h3>
+        <div class="metadata-grid">
+            <div class="metadata-item">
+                <strong>Chunk ID:</strong>
+                <code>{{ chunk.id }}</code>
+            </div>
+            {% if chunk.unit %}
+            <div class="metadata-item">
+                <strong>منبع:</strong>
+                LegalUnit: <code>{{ chunk.unit_id }}</code>
+            </div>
+            {% elif chunk.qaentry %}
+            <div class="metadata-item">
+                <strong>منبع:</strong>
+                QAEntry: <code>{{ chunk.qaentry_id }}</code>
+            </div>
+            {% endif %}
+            <div class="metadata-item">
+                <strong>تعداد کاراکتر:</strong>
+                {{ chunk.chunk_text|length }}
+            </div>
+            <div class="metadata-item">
+                <strong>تاریخ ایجاد:</strong>
+                {{ chunk.created_at|date:"Y-m-d H:i" }}
+            </div>
+        </div>
+        <div class="data-display" style="margin-top: 10px;">
+            <strong>متن Chunk:</strong>
+            <p>{{ chunk.chunk_text }}</p>
+        </div>
+    </div>
+    {% endif %}
+    
+    <div class="result-section">
+        <h2>☁️ اطلاعات Node در Core</h2>
+        {% with core=node_data.node payload=node_data.node.payload metadata=node_data.node.payload.metadata vectors=node_data.node.vectors %}
+        
+        <!-- Basic IDs & status -->
+        <div class="info-section">
+            <h3>🆔 شناسه‌ها و وضعیت</h3>
+            <div class="metadata-grid">
+                <div class="metadata-item">
+                    <strong>وضعیت پاسخ:</strong>
+                    {{ node_data.status|default:"-" }}
+                </div>
+                <div class="metadata-item">
+                    <strong>Node ID:</strong>
+                    <code>{{ core.id }}</code>
+                </div>
+                {% if payload.document_id %}
+                <div class="metadata-item">
+                    <strong>Document ID:</strong>
+                    <code>{{ payload.document_id }}</code>
+                </div>
+                {% endif %}
+                {% if metadata.work_id %}
+                <div class="metadata-item">
+                    <strong>Work ID:</strong>
+                    <code>{{ metadata.work_id }}</code>
+                </div>
+                {% endif %}
+                {% if metadata.unit_id %}
+                <div class="metadata-item">
+                    <strong>Unit ID:</strong>
+                    <code>{{ metadata.unit_id }}</code>
+                </div>
+                {% endif %}
+                {% if metadata.chunk_id %}
+                <div class="metadata-item">
+                    <strong>Chunk ID:</strong>
+                    <code>{{ metadata.chunk_id }}</code>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Document & content info -->
+        <div class="info-section">
+            <h3>📄 اطلاعات سند و محتوا</h3>
+            <div class="metadata-grid">
+                {% if metadata.work_title %}
+                <div class="metadata-item" style="grid-column: 1 / -1;">
+                    <strong>عنوان سند:</strong>
+                    {{ metadata.work_title }}
+                </div>
+                {% endif %}
+                {% if payload.document_type %}
+                <div class="metadata-item">
+                    <strong>نوع سند:</strong>
+                    {{ payload.document_type|default:"-" }}
+                </div>
+                {% endif %}
+                {% if metadata.urn_lex %}
+                <div class="metadata-item">
+                    <strong>URN LEX:</strong>
+                    <code>{{ metadata.urn_lex }}</code>
+                </div>
+                {% endif %}
+                {% if payload.language %}
+                <div class="metadata-item">
+                    <strong>زبان:</strong>
+                    {{ payload.language }}
+                </div>
+                {% endif %}
+                {% if metadata.path_label %}
+                <div class="metadata-item">
+                    <strong>Path Label:</strong>
+                    {{ metadata.path_label }}
+                </div>
+                {% endif %}
+                {% if metadata.unit_type or metadata.unit_number %}
+                <div class="metadata-item">
+                    <strong>واحد:</strong>
+                    {{ metadata.unit_type|default:"" }} {{ metadata.unit_number|default:"" }}
+                </div>
+                {% endif %}
+                {% if payload.chunk_index %}
+                <div class="metadata-item">
+                    <strong>Chunk Index:</strong>
+                    {{ payload.chunk_index }}
+                </div>
+                {% endif %}
+                {% if payload.created_at %}
+                <div class="metadata-item">
+                    <strong>تاریخ ایجاد در Core:</strong>
+                    {{ payload.created_at }}
+                </div>
+                {% endif %}
+            </div>
+            {% if payload.text %}
+            <div class="data-display">
+                <strong>متن:</strong>
+                <p style="background: #f8f9fa; padding: 15px; border-radius: 4px; line-height: 1.8;">{{ payload.text }}</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Legal & validity info -->
+        {% if metadata.jurisdiction or metadata.authority or metadata.valid_from or metadata.valid_to or metadata.in_force_from or metadata.in_force_to or metadata.repeal_status %}
+        <div class="info-section">
+            <h3>⚖️ اعتبار و اطلاعات حقوقی</h3>
+            <div class="metadata-grid">
+                {% if metadata.jurisdiction %}
+                <div class="metadata-item">
+                    <strong>حوزه قضایی:</strong>
+                    {{ metadata.jurisdiction }}
+                </div>
+                {% endif %}
+                {% if metadata.authority %}
+                <div class="metadata-item">
+                    <strong>مرجع:</strong>
+                    {{ metadata.authority }}
+                </div>
+                {% endif %}
+                {% if metadata.valid_from %}
+                <div class="metadata-item">
+                    <strong>معتبر از:</strong>
+                    {{ metadata.valid_from }}
+                </div>
+                {% endif %}
+                {% if metadata.valid_to %}
+                <div class="metadata-item">
+                    <strong>معتبر تا:</strong>
+                    {{ metadata.valid_to }}
+                </div>
+                {% endif %}
+                {% if metadata.in_force_from %}
+                <div class="metadata-item">
+                    <strong>لازم‌الاجرا از:</strong>
+                    {{ metadata.in_force_from }}
+                </div>
+                {% endif %}
+                {% if metadata.in_force_to %}
+                <div class="metadata-item">
+                    <strong>لازم‌الاجرا تا:</strong>
+                    {{ metadata.in_force_to }}
+                </div>
+                {% endif %}
+                {% if metadata.repeal_status %}
+                <div class="metadata-item">
+                    <strong>وضعیت نسخ:</strong>
+                    {{ metadata.repeal_status }}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Technical & embedding info -->
+        {% if metadata.token_count or metadata.chunk_hash or metadata.embedding_model or metadata.embedding_dimension or metadata.content_type or payload.source %}
+        <div class="info-section">
+            <h3>🔧 اطلاعات تکنیکال و Embedding</h3>
+            <div class="metadata-grid">
+                {% if metadata.token_count %}
+                <div class="metadata-item">
+                    <strong>تعداد Token:</strong>
+                    {{ metadata.token_count }}
+                </div>
+                {% endif %}
+                {% if metadata.overlap_prev %}
+                <div class="metadata-item">
+                    <strong>Overlap با قبلی:</strong>
+                    {{ metadata.overlap_prev }}
+                </div>
+                {% endif %}
+                {% if metadata.chunk_hash %}
+                <div class="metadata-item">
+                    <strong>Chunk Hash:</strong>
+                    <code>{{ metadata.chunk_hash|truncatechars:32 }}</code>
+                </div>
+                {% endif %}
+                {% if payload.source %}
+                <div class="metadata-item">
+                    <strong>منبع سیستم:</strong>
+                    {{ payload.source }}
+                </div>
+                {% endif %}
+                {% if metadata.content_type %}
+                <div class="metadata-item">
+                    <strong>نوع محتوا:</strong>
+                    {{ metadata.content_type }}
+                </div>
+                {% endif %}
+                {% if metadata.embedding_model %}
+                <div class="metadata-item" style="grid-column: 1 / -1;">
+                    <strong>مدل Embedding:</strong>
+                    <code>{{ metadata.embedding_model }}</code>
+                </div>
+                {% endif %}
+                {% if metadata.embedding_dimension %}
+                <div class="metadata-item">
+                    <strong>ابعاد بردار:</strong>
+                    {{ metadata.embedding_dimension }}
+                </div>
+                {% endif %}
+                {% if metadata.embedding_created_at %}
+                <div class="metadata-item">
+                    <strong>تاریخ ایجاد Embedding:</strong>
+                    {{ metadata.embedding_created_at }}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Metadata dump as generic table -->
+        {% if metadata %}
+        <div class="info-section">
+            <h3>📦 سایر فیلدهای Metadata</h3>
+            <div class="data-display">
+                <table style="width:100%; border-collapse: collapse; font-size: 13px;">
+                    <thead>
+                        <tr style="background:#f0f0f0;">
+                            <th style="padding:8px; border:1px solid #ddd; text-align:right;">کلید</th>
+                            <th style="padding:8px; border:1px solid #ddd; text-align:left;">مقدار</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for key, value in metadata.items %}
+                            {% if value %}
+                            <tr>
+                                <td style="padding:6px; border:1px solid #eee; text-align:right; white-space:nowrap;">{{ key }}</td>
+                                <td style="padding:6px; border:1px solid #eee; text-align:left; direction:ltr;">
+                                    {{ value }}
+                                </td>
+                            </tr>
+                            {% endif %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Vectors summary -->
+        {% if vectors %}
+        <div class="info-section">
+            <h3>🔢 اطلاعات Vectorها</h3>
+            <div class="data-display">
+                <table style="width:100%; border-collapse: collapse; font-size: 13px;">
+                    <thead>
+                        <tr style="background:#f0f0f0;">
+                            <th style="padding:8px; border:1px solid #ddd; text-align:right;">نام بردار</th>
+                            <th style="padding:8px; border:1px solid #ddd; text-align:left;">تعداد ابعاد</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for vname, vvals in vectors.items %}
+                        <tr>
+                            <td style="padding:6px; border:1px solid #eee; text-align:right;">{{ vname }}</td>
+                            <td style="padding:6px; border:1px solid #eee; text-align:left;">{{ vvals|length }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Raw JSON Section -->
+        <div class="info-section">
+            <h3>🔍 JSON خام (برای توسعه‌دهندگان)</h3>
+            <details>
+                <summary style="cursor: pointer; padding: 10px; background: #f0f0f0; border-radius: 4px;">
+                    <strong>▶ نمایش JSON کامل</strong>
+                </summary>
+                <div class="data-display" style="margin-top: 10px;">
+                    <pre style="background: #1e1e1e; color: #d4d4d4; padding: 20px; border-radius: 4px; max-height: 600px; overflow: auto; font-size: 12px;">{{ node_json|default:node_data|safe }}</pre>
+                </div>
+            </details>
+        </div>
+        {% endwith %}
+    </div>
+    {% endif %}
+    
+    {% if not requested_node_id %}
+    <div class="result-section">
+        <p style="text-align: center; color: #666; font-size: 16px;">
+            👆 یک Node ID از لیست بالا انتخاب کنید یا وارد نمایید
+        </p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

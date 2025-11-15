@@ -1,0 +1,397 @@
+{% extends "admin/base_site.html" %}
+{% load static jalali %}
+
+{% block title %}{{ title }} | {{ site_title|default:"Django site admin" }}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">خانه</a>
+    &rsaquo; {{ title }}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="module">
+    <h1>📊 {{ title }}</h1>
+    
+    <!-- Filters Section -->
+    <div class="module filtered" style="margin-bottom: 20px;">
+        <h2>🔍 فیلترها</h2>
+        <form method="get" class="form-horizontal" style="padding: 15px;">
+            {% csrf_token %}
+            <div class="form-row">
+                <div class="field-box">
+                    <label for="id_from">از تاریخ:</label>
+                    <input type="date" name="from" id="id_from" value="{{ from_date }}" class="vDateField">
+                </div>
+                <div class="field-box">
+                    <label for="id_to">تا تاریخ:</label>
+                    <input type="date" name="to" id="id_to" value="{{ to_date }}" class="vDateField">
+                </div>
+                <div class="field-box">
+                    <label for="id_user_id">کاربر:</label>
+                    <select name="user_id" id="id_user_id">
+                        <option value="">همه کاربران</option>
+                        {% for user in all_users %}
+                            <option value="{{ user.id }}" {% if user.id|stringformat:"s" == user_id %}selected{% endif %}>
+                                {{ user.username }} ({{ user.get_full_name|default:user.username }})
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <input type="submit" value="🔍 نمایش گزارش" class="default">
+                <input type="submit" name="export" value="csv" class="default" style="margin-left: 10px;" title="دانلود CSV">
+            </div>
+        </form>
+    </div>
+
+    <!-- Summary Stats -->
+    <div class="module" style="margin-bottom: 20px;">
+        <h2>📈 خلاصه آمار</h2>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; padding: 15px;">
+            <div class="dashboard-stat">
+                <div class="stat-number">{{ user_count }}</div>
+                <div class="stat-label">تعداد کاربران</div>
+            </div>
+            <div class="dashboard-stat">
+                <div class="stat-number">{{ total_activities }}</div>
+                <div class="stat-label">کل فعالیت‌ها</div>
+            </div>
+            <div class="dashboard-stat">
+                <div class="stat-number">{{ total_work_hours }}</div>
+                <div class="stat-label">کل ساعات کار</div>
+            </div>
+            <div class="dashboard-stat">
+                <div class="stat-number">{{ avg_work_hours }}</div>
+                <div class="stat-label">میانگین ساعات کار</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results Table -->
+    {% if report_data %}
+    <div class="module">
+        <h2>📋 نتایج گزارش ({{ report_data|length }} رکورد)</h2>
+        <div class="results">
+            <table id="result_list">
+                <thead>
+                    <tr>
+                        <th scope="col">کاربر</th>
+                        <th scope="col">تاریخ میلادی</th>
+                        <th scope="col">تاریخ شمسی</th>
+                        <th scope="col">ساعات کار</th>
+                        <th scope="col">فعالیت‌ها</th>
+                        <th scope="col">تعداد ورود</th>
+                        <th scope="col">اولین ورود</th>
+                        <th scope="col">آخرین خروج</th>
+                        <th scope="col">مدت کل</th>
+                        <th scope="col">جزئیات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in report_data %}
+                    <tr class="{% cycle 'row1' 'row2' %}">
+                        <td><strong>{{ row.user }}</strong></td>
+                        <td>{{ row.date_str }}</td>
+                        <td class="jalali-date">{{ row.date|jalali }}</td>
+                        <td class="work-hours">
+                            <span class="hours-badge {% if row.work_hours >= 8 %}full-time{% elif row.work_hours >= 4 %}part-time{% else %}minimal{% endif %}">
+                                {{ row.work_hours }} ساعت
+                            </span>
+                        </td>
+                        <td>{{ row.activities }}</td>
+                        <td>{{ row.login_count }}</td>
+                        <td>{{ row.first_login }}</td>
+                        <td>{{ row.last_logout }}</td>
+                        <td>{{ row.total_duration_str }}</td>
+                        <td>
+                            {% if row.sessions_detail %}
+                                <button class="session-details-btn" onclick="toggleDetails('{{ row.user }}_{{ row.date }}')">
+                                    نمایش جزئیات
+                                </button>
+                                <div id="details_{{ row.user }}_{{ row.date }}" class="session-details" style="display: none;">
+                                    {% for session in row.sessions_detail %}
+                                        <div class="session-item">
+                                            <strong>جلسه {{ forloop.counter }}:</strong><br>
+                                            ورود: {{ session.login|date:"H:i" }}<br>
+                                            {% if session.logout %}
+                                                خروج: {{ session.logout|date:"H:i" }}<br>
+                                                مدت: {{ session.duration|default:"محاسبه نشده" }}<br>
+                                            {% else %}
+                                                خروج: ثبت نشده<br>
+                                            {% endif %}
+                                            فعالیت‌ها: {{ session.activities }}
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <span class="no-sessions">بدون جلسه</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Export Actions -->
+        <div class="actions" style="margin-top: 15px;">
+            <form method="post" style="display: inline;">
+                {% csrf_token %}
+                <input type="hidden" name="from" value="{{ from_date }}">
+                <input type="hidden" name="to" value="{{ to_date }}">
+                <input type="hidden" name="user_id" value="{{ user_id }}">
+                <input type="submit" name="export" value="csv" class="default" title="دانلود فایل CSV">
+            </form>
+        </div>
+    </div>
+    {% else %}
+    <div class="module">
+        <div style="text-align: center; padding: 60px 20px; background: #f8f9fa; border-radius: 8px; margin: 20px 0;">
+            <div style="font-size: 64px; margin-bottom: 20px;">📊</div>
+            <h3 style="color: #666; margin-bottom: 10px;">هیچ داده‌ای برای نمایش وجود ندارد</h3>
+            <p style="color: #999; margin-bottom: 20px;">
+                در بازه زمانی انتخاب شده ({{ from_date }} تا {{ to_date }})
+                {% if selected_user %}
+                    برای کاربر <strong>{{ selected_user.username }}</strong>
+                {% endif %}
+                هیچ فعالیتی ثبت نشده است.
+            </p>
+            <div style="background: white; padding: 20px; border-radius: 8px; max-width: 600px; margin: 0 auto; text-align: right;">
+                <h4 style="margin-top: 0; color: #333;">💡 راهنمایی:</h4>
+                <ul style="color: #666; line-height: 1.8;">
+                    <li>بازه زمانی دیگری را انتخاب کنید</li>
+                    <li>فیلتر کاربر را بردارید تا همه کاربران نمایش داده شوند</li>
+                    <li>اطمینان حاصل کنید که سیستم ثبت فعالیت فعال است</li>
+                    <li>داده‌های فعالیت کاربران در جداول "جلسات کاری" و "لاگ‌های فعالیت" ذخیره می‌شوند</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.dashboard-stat {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    text-align: center;
+    border: 1px solid #ddd;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.stat-number {
+    font-size: 32px;
+    font-weight: bold;
+    color: #007cba;
+    margin-bottom: 5px;
+}
+
+.stat-label {
+    color: #666;
+    font-size: 14px;
+}
+
+.form-horizontal .form-row {
+    display: flex;
+    gap: 15px;
+    align-items: end;
+    flex-wrap: wrap;
+    margin-bottom: 15px;
+}
+
+.form-horizontal .field-box {
+    display: flex;
+    flex-direction: column;
+    min-width: 150px;
+}
+
+.form-horizontal .field-box label {
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+.form-horizontal input, .form-horizontal select {
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+/* Work Hours Badges */
+.hours-badge {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-weight: bold;
+    font-size: 12px;
+}
+
+.hours-badge.full-time {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.hours-badge.part-time {
+    background-color: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeaa7;
+}
+
+.hours-badge.minimal {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+/* Session Details */
+.session-details-btn {
+    background: #007cba;
+    color: white;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+}
+
+.session-details-btn:hover {
+    background: #005a87;
+}
+
+.session-details {
+    margin-top: 10px;
+    padding: 10px;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.session-item {
+    margin-bottom: 8px;
+    padding: 6px;
+    background: white;
+    border-radius: 3px;
+    border-left: 3px solid #007cba;
+}
+
+.no-sessions {
+    color: #6c757d;
+    font-style: italic;
+    font-size: 12px;
+}
+
+/* Table Improvements */
+#result_list th {
+    background-color: #f8f9fa;
+    font-weight: bold;
+    text-align: center;
+    padding: 12px 8px;
+}
+
+#result_list td {
+    text-align: center;
+    padding: 10px 8px;
+    vertical-align: middle;
+}
+
+#result_list .work-hours {
+    font-weight: bold;
+}
+
+/* Responsive Table */
+@media (max-width: 1200px) {
+    #result_list {
+        font-size: 12px;
+    }
+    
+    #result_list th, #result_list td {
+        padding: 6px 4px;
+    }
+}
+</style>
+
+<script>
+function toggleDetails(id) {
+    const detailsDiv = document.getElementById('details_' + id);
+    const button = event.target;
+    
+    if (detailsDiv.style.display === 'none') {
+        detailsDiv.style.display = 'block';
+        button.textContent = 'مخفی کردن جزئیات';
+        button.style.backgroundColor = '#dc3545';
+    } else {
+        detailsDiv.style.display = 'none';
+        button.textContent = 'نمایش جزئیات';
+        button.style.backgroundColor = '#007cba';
+    }
+}
+
+// Add summary row functionality
+document.addEventListener('DOMContentLoaded', function() {
+    // Calculate totals for each user
+    const userTotals = {};
+    const rows = document.querySelectorAll('#result_list tbody tr');
+    
+    rows.forEach(row => {
+        const cells = row.cells;
+        const user = cells[0].textContent.trim();
+        const hours = parseFloat(cells[2].textContent.replace(' ساعت', '')) || 0;
+        const activities = parseInt(cells[3].textContent) || 0;
+        
+        if (!userTotals[user]) {
+            userTotals[user] = { hours: 0, activities: 0, days: 0 };
+        }
+        
+        userTotals[user].hours += hours;
+        userTotals[user].activities += activities;
+        userTotals[user].days += 1;
+    });
+    
+    // Add summary info to page
+    if (Object.keys(userTotals).length > 0) {
+        const summaryDiv = document.createElement('div');
+        summaryDiv.className = 'module';
+        summaryDiv.style.marginTop = '20px';
+        summaryDiv.innerHTML = '<h2>📊 خلاصه کاربران</h2>';
+        
+        const summaryTable = document.createElement('table');
+        summaryTable.className = 'summary-table';
+        summaryTable.innerHTML = `
+            <thead>
+                <tr>
+                    <th>کاربر</th>
+                    <th>کل ساعات</th>
+                    <th>کل فعالیت‌ها</th>
+                    <th>تعداد روزها</th>
+                    <th>میانگین روزانه</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        `;
+        
+        const tbody = summaryTable.querySelector('tbody');
+        
+        Object.entries(userTotals).forEach(([user, totals]) => {
+            const avgHours = (totals.hours / totals.days).toFixed(2);
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td><strong>${user}</strong></td>
+                <td>${totals.hours.toFixed(2)} ساعت</td>
+                <td>${totals.activities}</td>
+                <td>${totals.days} روز</td>
+                <td>${avgHours} ساعت/روز</td>
+            `;
+            tbody.appendChild(row);
+        });
+        
+        summaryDiv.appendChild(summaryTable);
+        document.querySelector('.module:last-of-type').after(summaryDiv);
+    }
+});
+</script>
+
+{% endblock %}

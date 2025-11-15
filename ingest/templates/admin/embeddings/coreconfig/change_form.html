@@ -1,0 +1,128 @@
+{% extends "admin/change_form.html" %}
+{% load i18n admin_urls static %}
+
+{% block submit_buttons_bottom %}
+<div class="submit-row">
+    {% if show_test_button %}
+    <button type="button" id="test-connection-btn" class="button" style="background-color: #417690; margin-left: 10px;">
+        🔌 تست اتصال
+    </button>
+    {% endif %}
+    
+    <input type="submit" value="{% translate 'Save' %}" class="default" name="_save">
+    <input type="submit" value="{% translate 'Save and continue editing' %}" name="_continue">
+</div>
+
+<!-- Result message area -->
+<div id="test-result" style="display: none; margin: 15px 0; padding: 15px; border-radius: 4px;"></div>
+
+<style>
+    .submit-row {
+        padding: 12px 14px;
+        margin: 0 0 15px;
+        background: #f8f8f8;
+        border: 1px solid #eee;
+        border-radius: 4px;
+        text-align: left;
+        overflow: hidden;
+    }
+    
+    .submit-row .button {
+        padding: 10px 15px;
+        font-size: 13px;
+        line-height: normal;
+        border: none;
+        border-radius: 4px;
+        color: #fff;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+    
+    .submit-row .button:hover:not(:disabled) {
+        opacity: 0.8;
+        transform: translateY(-1px);
+    }
+    
+    .submit-row .button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+    
+    .submit-row input[type="submit"] {
+        margin-left: 10px;
+    }
+    
+    #test-result {
+        white-space: pre-wrap;
+        font-family: monospace;
+        font-size: 13px;
+        line-height: 1.6;
+    }
+    
+    #test-result.success {
+        background-color: #d4edda;
+        border: 1px solid #c3e6cb;
+        color: #155724;
+    }
+    
+    #test-result.error {
+        background-color: #f8d7da;
+        border: 1px solid #f5c6cb;
+        color: #721c24;
+    }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const testBtn = document.getElementById('test-connection-btn');
+    const testResult = document.getElementById('test-result');
+    
+    if (testBtn) {
+        testBtn.addEventListener('click', async function(e) {
+            e.preventDefault();
+            
+            // Disable button and show loading state
+            testBtn.disabled = true;
+            testBtn.textContent = '⏳ در حال تست...';
+            testResult.style.display = 'none';
+            
+            try {
+                // Get CSRF token
+                const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+                
+                // Make AJAX request
+                const response = await fetch('{% url "admin:coreconfig_test_connection" %}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken,
+                    },
+                });
+                
+                const data = await response.json();
+                
+                // Show result
+                testResult.style.display = 'block';
+                if (data.success) {
+                    testResult.className = 'success';
+                    testResult.textContent = data.message;
+                } else {
+                    testResult.className = 'error';
+                    testResult.textContent = data.error;
+                }
+                
+            } catch (error) {
+                // Show error
+                testResult.style.display = 'block';
+                testResult.className = 'error';
+                testResult.textContent = '❌ خطا در ارسال درخواست:\n\n' + error.message;
+            } finally {
+                // Re-enable button
+                testBtn.disabled = false;
+                testBtn.textContent = '🔌 تست اتصال';
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

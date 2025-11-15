@@ -1,0 +1,116 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block extrahead %}
+{{ block.super }}
+<style>
+    /* RTL Login Form */
+    .login {
+        direction: rtl !important;
+        text-align: right !important;
+    }
+    
+    .login #container {
+        direction: rtl !important;
+        text-align: right !important;
+    }
+    
+    .login #content {
+        direction: rtl !important;
+        text-align: right !important;
+        padding: 40px 20px;
+    }
+    
+    .login #content-main {
+        direction: rtl !important;
+        text-align: right !important;
+    }
+    
+    .login .form-row {
+        direction: rtl !important;
+        text-align: right !important;
+    }
+    
+    .login .form-row label {
+        float: right !important;
+        text-align: right !important;
+        font-family: 'Vazirmatn', 'Tahoma', sans-serif;
+    }
+    
+    .login .form-row input {
+        direction: rtl !important;
+        text-align: right !important;
+        margin-right: 0 !important;
+        margin-left: 10px !important;
+    }
+    
+    .login .submit-row {
+        direction: rtl !important;
+        text-align: right !important;
+    }
+    
+    .login .submit-row input {
+        font-family: 'Vazirmatn', 'Tahoma', sans-serif;
+    }
+    
+    .company-branding {
+        text-align: center;
+        margin-bottom: 30px;
+        padding: 20px 0;
+    }
+    
+    .company-name {
+        font-family: 'Vazirmatn', 'Tahoma', sans-serif;
+        font-size: 28px;
+        font-weight: 700;
+        color: #2c3e50;
+        margin-bottom: 8px;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        letter-spacing: 0.5px;
+    }
+    
+    #login-form {
+        border-radius: 12px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        padding: 30px;
+        direction: rtl !important;
+        text-align: right !important;
+    }
+</style>
+{% endblock %}
+
+{% block bodyclass %}{{ block.super }} login{% endblock %}
+
+{% block usertools %}{% endblock %}
+
+{% block nav-global %}{% endblock %}
+
+{% block content %}
+<div class="company-branding">
+    <h1 class="company-name">شرکت ما</h1>
+</div>
+
+<form action="{{ app_path }}" method="post" id="login-form">
+    {% csrf_token %}
+    <div class="form-row">
+        <label for="id_username" class="required">نام کاربری:</label>
+        <input type="text" name="username" id="id_username" required>
+    </div>
+    <div class="form-row">
+        <label for="id_password" class="required">رمز عبور:</label>
+        <input type="password" name="password" id="id_password" required>
+    </div>
+    
+    {% if form.errors %}
+        <div class="errornote">
+            {{ form.errors }}
+        </div>
+    {% endif %}
+    
+    <div class="submit-row">
+        <input type="submit" value="ورود">
+    </div>
+    
+    <input type="hidden" name="next" value="{{ next }}">
+</form>
+{% endblock %}
