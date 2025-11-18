@@ -44,11 +44,16 @@ SECURE_HSTS_PRELOAD = os.getenv('SECURE_HSTS_PRELOAD', 'true').lower() == 'true'
 
 # Database connection pooling for production
 DATABASES['default'].update({
-    'CONN_MAX_AGE': 60,
+    'CONN_MAX_AGE': 600,  # 10 minutes
+    'CONN_HEALTH_CHECKS': True,
 })
 
-# Static files
-STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
+# Static files with compression and caching
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# Whitenoise optimization
+WHITENOISE_MAX_AGE = 31536000  # 1 year
+WHITENOISE_ALLOW_ALL_ORIGINS = False
 
 # Force Django to serve static files in production
 STATIC_URL = '/static/'
