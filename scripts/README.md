@@ -1,62 +1,85 @@
-# 🔧 Scripts - اسکریپت‌های کمکی
+# 📁 Scripts Directory
 
-این پوشه شامل اسکریپت‌های utility و ابزارهای کمکی پروژه است.
+اسکریپت‌های مدیریت سیستم RAG-Ingest
 
 ---
 
-## 📋 فهرست اسکریپت‌ها
+## 🚀 اسکریپت اصلی: `manage.sh`
 
-### 1️⃣ **create_models.py**
-**هدف:** ایجاد EmbeddingModel های پیش‌فرض در دیتابیس
+اسکریپت جامع مدیریت سیستم با قابلیت‌های:
 
-**استفاده:**
+- ✅ رفع مشکل حذف LegalUnit
+- 🗑️ حذف LegalUnit با Work ID
+- ⚡ اعمال بهینه‌سازی‌ها
+- 📊 ایجاد Database Indexes
+- 📈 مانیتورینگ عملکرد
+- 🔄 Restart سرویس‌ها
+- 📋 نمایش وضعیت سیستم
+- �� راه‌اندازی کامل
+
+### استفاده:
+
+#### حالت منو (Interactive):
 ```bash
-docker cp scripts/create_models.py deployment-web-1:/app/
-docker exec deployment-web-1 python3 /app/create_models.py
+bash /srv/scripts/manage.sh
 ```
 
-**نتیجه:**
-```
-Base model: created (or already exists)
-Large model: created (or already exists)
-Default embedding models setup completed!
+#### حالت Command Line:
+```bash
+# رفع مشکل SyncLog
+bash /srv/scripts/manage.sh fix
+
+# حذف LegalUnit
+bash /srv/scripts/manage.sh delete <work_id>
+
+# اعمال بهینه‌سازی‌ها
+bash /srv/scripts/manage.sh optimize
+
+# ایجاد Indexes
+bash /srv/scripts/manage.sh index
+
+# مانیتورینگ
+bash /srv/scripts/manage.sh monitor
+
+# Restart
+bash /srv/scripts/manage.sh restart
+
+# وضعیت
+bash /srv/scripts/manage.sh status
+
+# راه‌اندازی کامل
+bash /srv/scripts/manage.sh setup
+
+# راهنما
+bash /srv/scripts/manage.sh help
 ```
 
-**مدل‌های ایجاد شده:**
-- `intfloat/multilingual-e5-base` (768 dimensions)
-- `intfloat/multilingual-e5-large` (1024 dimensions)
+#### مثال‌ها:
+```bash
+# حذف LegalUnit با Work ID
+bash /srv/scripts/manage.sh delete 75a28f9c-099b-4b52-92c7-7edf7d006230
+
+# راه‌اندازی کامل سیستم
+bash /srv/scripts/manage.sh setup
+```
 
 ---
 
-## 🚀 اضافه کردن اسکریپت جدید
+## 📝 فایل‌های کمکی
 
-Template برای اسکریپت جدید:
+### `create_models.py`
+ایجاد EmbeddingModel های پیش‌فرض در دیتابیس
 
-```python
-#!/usr/bin/env python3
-import os
-import sys
-import django
-
-sys.path.insert(0, '/app')
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'ingest.settings.production')
-
-django.setup()
-
-# Your script code here
-
-print('Script completed!')
+```bash
+docker cp /srv/scripts/create_models.py deployment-web-1:/app/
+docker exec deployment-web-1 python /app/create_models.py
 ```
 
 ---
 
-## 💡 نکات
+## 📚 مستندات کامل
 
-- همه اسکریپت‌ها باید `django.setup()` را فراخوانی کنند
-- از `/app` به عنوان root path استفاده کنید
-- خروجی‌های واضح برای debugging ارائه دهید
-- اسکریپت‌ها را idempotent طراحی کنید (اجرای چندباره مشکل ایجاد نکند)
-
----
-
-**آخرین به‌روزرسانی:** 2025-11-01
+برای اطلاعات بیشتر:
+```bash
+cat /srv/Documentation/README.md
+```

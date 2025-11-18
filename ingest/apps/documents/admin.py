@@ -323,14 +323,26 @@ class LegalUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin)
     search_fields = ('content', 'path_label', 'eli_fragment', 'xml_id')
     mptt_level_indent = 20
     readonly_fields = ('path_label', 'created_at', 'updated_at')
-    inlines = [LegalUnitVocabularyTermInline, LegalUnitChangeInline, FileAssetInline, EmbeddingInline]
+    inlines = [LegalUnitVocabularyTermInline, LegalUnitChangeInline]  # حذف inline های سنگین
     actions = ['mark_as_repealed', 'mark_as_active']
+    list_per_page = 50  # کاهش تعداد آیتم در هر صفحه
     
     def get_queryset(self, request):
-        """Optimize queryset with select_related and prefetch_related."""
-        return super().get_queryset(request).select_related(
+        """Optimize queryset with select_related, prefetch_related and annotate."""
+        from django.db.models import Count
+        
+        qs = super().get_queryset(request).select_related(
             'work', 'expr', 'expr__work', 'manifestation', 'parent'
-        ).prefetch_related('vocabulary_terms')
+        )
+        
+        # Add chunk count annotation to avoid N+1 queries
+        qs = qs.annotate(chunks_count=Count('chunks'))
+        
+        # Only prefetch in change view to avoid loading too much data in list view
+        if request.resolver_match and '_change' in request.resolver_match.url_name:
+            qs = qs.prefetch_related('vocabulary_terms', 'chunks')
+        
+        return qs
     
     fieldsets = (
         ('اطلاعات اصلی', {
@@ -375,6 +387,10 @@ class LegalUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin)
     get_source_ref.short_description = 'مرجع'
 
     def chunk_count(self, obj):
+        # Use annotated count if available (from optimized queryset)
+        if hasattr(obj, 'chunks_count'):
+            return obj.chunks_count
+        # Fallback to direct count (slower)
         return obj.chunks.count() if hasattr(obj, 'chunks') else 0
     chunk_count.short_description = 'تعداد چانک‌ها'
     
