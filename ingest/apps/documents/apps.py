@@ -8,5 +8,6 @@ class DocumentsConfig(AppConfig):
     
     def ready(self):
         """Import signals when the app is ready."""
-        # Use new complete signals that handle all auto-chunking and embedding
+        # Import both signal modules
+        import ingest.apps.documents.signals  # noqa: F401
         import ingest.apps.documents.signals_complete  # noqa: F401

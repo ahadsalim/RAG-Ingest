@@ -1,6 +1,8 @@
 """Production settings for ingest project."""
 
 from .base import *
+# Import performance optimizations
+from .performance import *
 
 # Helper function for parsing comma-separated environment variables
 def csv_env(name, default=""):

@@ -17,6 +17,7 @@ from ingest.apps.documents.upload_service import file_upload_service
 from .serializers import (
     LegalUnitSerializer, FileAssetSerializer, QAEntrySerializer, QAEntryListSerializer
 )
+from ingest.api.mixins import FullyOptimizedViewMixin
 
 
 """Legacy LegalDocument API removed. Use FRBR endpoints (Work/Expression/Manifestation) if needed."""
@@ -29,7 +30,7 @@ from .serializers import (
 #     update=extend_schema(summary="Update legal unit", tags=["Documents"]),
 #     destroy=extend_schema(summary="Delete legal unit", tags=["Documents"]),
 # )
-class LegalUnitViewSet(viewsets.ModelViewSet):
+class LegalUnitViewSet(FullyOptimizedViewMixin, viewsets.ModelViewSet):
     queryset = LegalUnit.objects.all()
     serializer_class = LegalUnitSerializer
     permission_classes = [IsAuthenticated]
@@ -120,7 +121,7 @@ class LegalUnitViewSet(viewsets.ModelViewSet):
 #     update=extend_schema(summary="Update file asset", tags=["Documents"]),
 #     destroy=extend_schema(summary="Delete file asset", tags=["Documents"]),
 # )
-class FileAssetViewSet(viewsets.ModelViewSet):
+class FileAssetViewSet(FullyOptimizedViewMixin, viewsets.ModelViewSet):
     queryset = FileAsset.objects.all()
     serializer_class = FileAssetSerializer
     permission_classes = [IsAuthenticated]
@@ -199,7 +200,7 @@ class FileAssetViewSet(viewsets.ModelViewSet):
 #     update=extend_schema(summary="Update QA entry", tags=["Documents"]),
 #     destroy=extend_schema(summary="Delete QA entry", tags=["Documents"]),
 # )
-class QAEntryViewSet(viewsets.ModelViewSet):
+class QAEntryViewSet(FullyOptimizedViewMixin, viewsets.ModelViewSet):
     """
     ViewSet for QAEntry with permission-based access.
     
