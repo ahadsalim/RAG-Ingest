@@ -123,6 +123,8 @@ CACHE_MIDDLEWARE_KEY_PREFIX = 'page'
 
 # Cache template loading
 if not DEBUG:
+    # When using loaders, APP_DIRS must be False
+    TEMPLATES[0]['APP_DIRS'] = False
     TEMPLATES[0]['OPTIONS']['loaders'] = [
         ('django.template.loaders.cached.Loader', [
             'django.template.loaders.filesystem.Loader',
@@ -130,9 +132,10 @@ if not DEBUG:
         ]),
     ]
     # Remove debug context processor in production
-    TEMPLATES[0]['OPTIONS']['context_processors'].remove(
-        'django.template.context_processors.debug'
-    )
+    if 'django.template.context_processors.debug' in TEMPLATES[0]['OPTIONS']['context_processors']:
+        TEMPLATES[0]['OPTIONS']['context_processors'].remove(
+            'django.template.context_processors.debug'
+        )
 
 # =======================
 # Static Files Optimization
