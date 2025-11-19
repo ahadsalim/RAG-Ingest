@@ -36,17 +36,17 @@ CACHES = {
         'LOCATION': os.getenv('REDIS_URL', 'redis://redis:6379/1'),
         'OPTIONS': {
             'CLIENT_CLASS': 'django_redis.client.DefaultClient',
-            # HiredisParser removed - not compatible with redis-py >= 5.0
+            # PARSER_CLASS removed - not compatible with redis-py >= 5.0
             'CONNECTION_POOL_CLASS': 'redis.BlockingConnectionPool',
             'CONNECTION_POOL_CLASS_KWARGS': {
                 'max_connections': 50,
                 'timeout': 20,
             },
-            'KEEPALIVE_OPTIONS': {
-                'keepalives': 1,
-                'keepalives_idle': 30,
-                'keepalives_interval': 5,
-                'keepalives_count': 3,
+            'SOCKET_KEEPALIVE': True,
+            'SOCKET_KEEPALIVE_OPTIONS': {
+                1: 1,   # TCP_KEEPIDLE
+                2: 5,   # TCP_KEEPINTVL
+                3: 3,   # TCP_KEEPCNT
             },
             'PICKLE_VERSION': -1,
             'COMPRESSOR': 'django_redis.compressors.zlib.ZlibCompressor',  # Compress cached data
