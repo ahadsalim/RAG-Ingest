@@ -59,3 +59,7 @@ temp/
 
 # Documentation build
 docs/_build/
+
+
+*.gz
+*.tar.gz
