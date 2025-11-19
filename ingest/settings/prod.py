@@ -49,7 +49,8 @@ DATABASES['default'].update({
 })
 
 # Static files with compression and caching
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+# Use CompressedStaticFilesStorage instead of Manifest version to avoid missing file errors
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 
 # Whitenoise optimization
 WHITENOISE_MAX_AGE = 31536000  # 1 year
