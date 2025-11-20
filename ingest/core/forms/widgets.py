@@ -29,13 +29,13 @@ class JalaliDateInput(forms.TextInput):
         return Media(
             css={
                 'all': [
-                    'vendor/persian-datepicker/persian-datepicker.min.css',
+                    'https://cdn.jsdelivr.net/npm/persian-datepicker@1.2.0/dist/css/persian-datepicker.min.css',
                     'css/jalali-widgets.css',
                 ]
             },
             js=[
-                'vendor/persian-date/persian-date.min.js',
-                'vendor/persian-datepicker/persian-datepicker.min.js',
+                'https://cdn.jsdelivr.net/npm/persian-date@1.1.0/dist/persian-date.min.js',
+                'https://cdn.jsdelivr.net/npm/persian-datepicker@1.2.0/dist/js/persian-datepicker.min.js',
                 'js/jalali-init.js',
             ]
         )
@@ -65,13 +65,13 @@ class JalaliDateTimeInput(forms.TextInput):
         return Media(
             css={
                 'all': [
-                    'vendor/persian-datepicker/persian-datepicker.min.css',
+                    'https://cdn.jsdelivr.net/npm/persian-datepicker@1.2.0/dist/css/persian-datepicker.min.css',
                     'css/jalali-widgets.css',
                 ]
             },
             js=[
-                'vendor/persian-date/persian-date.min.js',
-                'vendor/persian-datepicker/persian-datepicker.min.js',
+                'https://cdn.jsdelivr.net/npm/persian-date@1.1.0/dist/persian-date.min.js',
+                'https://cdn.jsdelivr.net/npm/persian-datepicker@1.2.0/dist/js/persian-datepicker.min.js',
                 'js/jalali-init.js',
             ]
         )
