@@ -376,11 +376,9 @@ class LegalUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin)
                         
                         if deleted_count > 0:
                             logger.info(f'Deleted {deleted_count} SyncLog entries before deleting LegalUnit {obj.id}')
-                            self.message_user(request, f'✅ پاک‌سازی {deleted_count} SyncLog انجام شد', level='success')
                 
-                # Now delete the object
+                # Now delete the object (parent will show success message)
                 super().delete_model(request, obj)
-                self.message_user(request, f'✅ LegalUnit با موفقیت حذف شد', level='success')
                 
         except Exception as e:
             logger.error(f'Error deleting LegalUnit {obj.id}: {e}', exc_info=True)
@@ -412,12 +410,9 @@ class LegalUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin)
                         
                         if deleted_count > 0:
                             logger.info(f'Deleted {deleted_count} SyncLog entries before bulk delete')
-                            self.message_user(request, f'✅ پاک‌سازی {deleted_count} SyncLog انجام شد', level='success')
                 
-                # Now delete the queryset
-                count = queryset.count()
+                # Now delete the queryset (parent will show success message)
                 super().delete_queryset(request, queryset)
-                self.message_user(request, f'✅ {count} LegalUnit با موفقیت حذف شد', level='success')
                 
         except Exception as e:
             logger.error(f'Error in bulk delete: {e}', exc_info=True)
