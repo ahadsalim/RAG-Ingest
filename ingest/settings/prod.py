@@ -1,8 +1,6 @@
 """Production settings for ingest project."""
 
 from .base import *
-# Import performance optimizations
-from .performance import *
 
 # Helper function for parsing comma-separated environment variables
 def csv_env(name, default=""):
@@ -44,17 +42,11 @@ SECURE_HSTS_PRELOAD = os.getenv('SECURE_HSTS_PRELOAD', 'true').lower() == 'true'
 
 # Database connection pooling for production
 DATABASES['default'].update({
-    'CONN_MAX_AGE': 600,  # 10 minutes
-    'CONN_HEALTH_CHECKS': True,
+    'CONN_MAX_AGE': 60,  # Keep connections alive for 1 minute
 })
 
-# Static files with compression and caching
-# Use CompressedStaticFilesStorage instead of Manifest version to avoid missing file errors
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
-
-# Whitenoise optimization
-WHITENOISE_MAX_AGE = 31536000  # 1 year
-WHITENOISE_ALLOW_ALL_ORIGINS = False
+# Static files - simple configuration without aggressive caching
+STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
 
 # Force Django to serve static files in production
 STATIC_URL = '/static/'
