@@ -339,7 +339,7 @@ class LegalUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin)
             manifestations = InstrumentManifestation.objects.select_related(
                 'expr', 'expr__work'
             ).annotate(
-                legalunit_count=models.Count('legalunits')
+                legalunit_count=models.Count('units')
             ).order_by('-created_at')
             
             context = {
