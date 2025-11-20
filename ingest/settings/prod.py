@@ -56,8 +56,7 @@ WHITENOISE_MAX_AGE = 600
 STATIC_URL = '/static/'
 STATIC_ROOT = '/app/staticfiles'
 
-# Whitenoise for static files serving
-MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
+# Whitenoise is already in base.py MIDDLEWARE, no need to insert again
 
 # Email settings
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
