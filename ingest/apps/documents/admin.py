@@ -445,6 +445,11 @@ class LegalUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin)
                 obj.work = obj.expr.work
         
         super().save_model(request, obj, form, change)
+    
+    def response_add(self, request, obj, post_url_continue=None):
+        """Override to prevent duplicate success messages."""
+        # Don't show message here, let parent handle it
+        return super().response_add(request, obj, post_url_continue)
 
     def get_source_ref(self, obj):
         if obj.work:

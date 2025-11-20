@@ -2,60 +2,60 @@
 /* Force RTL layout for entire site */
 
 html, body {
-    direction: rtl !important;
-    text-align: right !important;
-    font-family: 'Vazirmatn', 'Tahoma', 'Arial', sans-serif !important;
+    direction: rtl \!important;
+    text-align: right \!important;
+    font-family: 'Vazirmatn', 'Tahoma', 'Arial', sans-serif \!important;
 }
 
 /* Admin interface RTL */
 #header, #branding, #user-tools, #content, #content-main, #content-related {
-    direction: rtl !important;
-    text-align: right !important;
+    direction: rtl \!important;
+    text-align: right \!important;
 }
 
 /* Navigation and sidebar */
 #nav-sidebar, .breadcrumbs {
-    direction: rtl !important;
-    text-align: right !important;
+    direction: rtl \!important;
+    text-align: right \!important;
 }
 
 /* Forms and inputs */
 .form-row, .field-box, .aligned label, .form-group {
-    direction: rtl !important;
-    text-align: right !important;
+    direction: rtl \!important;
+    text-align: right \!important;
 }
 
 /* Tables */
 table, th, td, .results {
-    direction: rtl !important;
-    text-align: right !important;
+    direction: rtl \!important;
+    text-align: right \!important;
 }
 
 /* Buttons and actions */
 .submit-row, .object-tools, .actions {
-    direction: rtl !important;
-    text-align: right !important;
+    direction: rtl \!important;
+    text-align: right \!important;
 }
 
 /* Login form */
 .login #container, .login #content, .login #content-main {
-    direction: rtl !important;
-    text-align: right !important;
+    direction: rtl \!important;
+    text-align: right \!important;
 }
 
 .login .form-row {
-    direction: rtl !important;
-    text-align: right !important;
+    direction: rtl \!important;
+    text-align: right \!important;
 }
 
 .login .form-row label {
-    float: right !important;
-    text-align: right !important;
+    float: right \!important;
+    text-align: right \!important;
 }
 
 .login .form-row input {
-    margin-right: 0 !important;
-    margin-left: 10px !important;
+    margin-right: 0 \!important;
+    margin-left: 10px \!important;
 }
 
 /* Special handling for date and time fields - keep LTR for proper formatting */
@@ -71,8 +71,8 @@ input[type="time"],
 .datetime input,
 .date input,
 .time input {
-    direction: ltr !important;
-    text-align: left !important;
+    direction: ltr \!important;
+    text-align: left \!important;
 }
 
 /* Persian number formatting */
@@ -82,84 +82,84 @@ input[type="time"],
 
 /* Fix for admin widgets */
 .selector, .selector-available, .selector-chosen {
-    direction: rtl !important;
-    text-align: right !important;
+    direction: rtl \!important;
+    text-align: right \!important;
 }
 
 /* Pagination */
 .paginator {
-    direction: rtl !important;
-    text-align: right !important;
+    direction: rtl \!important;
+    text-align: right \!important;
 }
 
 /* Messages */
 .messagelist {
-    direction: rtl !important;
-    text-align: right !important;
+    direction: rtl \!important;
+    text-align: right \!important;
 }
 
 /* Fieldsets */
 fieldset {
-    direction: rtl !important;
-    text-align: right !important;
+    direction: rtl \!important;
+    text-align: right \!important;
 }
 
 fieldset h2 {
-    direction: rtl !important;
-    text-align: right !important;
+    direction: rtl \!important;
+    text-align: right \!important;
 }
 
 /* Help text */
 .help {
-    direction: rtl !important;
-    text-align: right !important;
+    direction: rtl \!important;
+    text-align: right \!important;
 }
 
 /* Error messages */
 .errorlist {
-    direction: rtl !important;
-    text-align: right !important;
+    direction: rtl \!important;
+    text-align: right \!important;
 }
 
 /* Change list */
 .change-list {
-    direction: rtl !important;
-    text-align: right !important;
+    direction: rtl \!important;
+    text-align: right \!important;
 }
 
 /* Filters */
 #changelist-filter {
-    direction: rtl !important;
-    text-align: right !important;
+    direction: rtl \!important;
+    text-align: right \!important;
 }
 
 /* Search */
 #changelist-search {
-    direction: rtl !important;
-    text-align: right !important;
+    direction: rtl \!important;
+    text-align: right \!important;
 }
 
 /* Inline forms */
 .inline-group {
-    direction: rtl !important;
-    text-align: right !important;
+    direction: rtl \!important;
+    text-align: right \!important;
 }
 
 .tabular {
-    direction: rtl !important;
-    text-align: right !important;
+    direction: rtl \!important;
+    text-align: right \!important;
 }
 
 /* Calendar widget */
 .calendar, .calendarbox {
-    direction: ltr !important;
-    text-align: left !important;
+    direction: ltr \!important;
+    text-align: left \!important;
 }
 
 /* Clock widget */
 .clockbox {
-    direction: ltr !important;
-    text-align: left !important;
+    direction: ltr \!important;
+    text-align: left \!important;
 }
 
 /* Sidebar font improvements - ظریف‌تر و زیباتر */

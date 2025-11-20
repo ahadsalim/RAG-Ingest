@@ -31,7 +31,7 @@ class InstrumentExpressionForm(forms.ModelForm):
     """ModelForm for InstrumentExpression."""
     
     expression_date = JalaliDateField(
-        label='تاریخ تصویب/ابلاغ (شمسی)' if JALALI_AVAILABLE else 'تاریخ تصویب/ابلاغ',
+        label='تاریخ تصویب/ابلاغ',
         required=False,
         help_text='فرمت: 1402/01/15' if JALALI_AVAILABLE else 'فرمت: YYYY-MM-DD'
     )
@@ -50,21 +50,21 @@ class InstrumentManifestationForm(forms.ModelForm):
     """ModelForm for InstrumentManifestation."""
     
     publication_date = JalaliDateField(
-        label='تاریخ انتشار (شمسی)' if JALALI_AVAILABLE else 'تاریخ انتشار',
+        label='تاریخ انتشار ' if JALALI_AVAILABLE else 'تاریخ انتشار',
         required=True,
-        help_text='فرمت: 1402/01/15' if JALALI_AVAILABLE else 'فرمت: YYYY-MM-DD'
+        help_text='فرمت: 1404/07/05' if JALALI_AVAILABLE else 'فرمت: YYYY-MM-DD'
     )
     
     in_force_from = JalaliDateField(
-        label='اجرا از تاریخ (شمسی)' if JALALI_AVAILABLE else 'اجرا از تاریخ',
+        label='اجرا از تاریخ ' if JALALI_AVAILABLE else 'اجرا از تاریخ',
         required=False,
-        help_text='فرمت: 1402/01/15' if JALALI_AVAILABLE else 'فرمت: YYYY-MM-DD'
+        help_text='فرمت: 1404/07/05' if JALALI_AVAILABLE else 'فرمت: YYYY-MM-DD'
     )
     
     in_force_to = JalaliDateField(
-        label='اجرا تا تاریخ (شمسی)' if JALALI_AVAILABLE else 'اجرا تا تاریخ',
+        label='اجرا تا تاریخ ' if JALALI_AVAILABLE else 'اجرا تا تاریخ',
         required=False,
-        help_text='در صورتی که وضعیت سند "لغو یا منسوخ شده" باشد، این فیلد الزامی است. فرمت: 1402/01/15' if JALALI_AVAILABLE else 'در صورتی که وضعیت سند "لغو یا منسوخ شده" باشد، این فیلد الزامی است. فرمت: YYYY-MM-DD'
+        help_text='در صورتی که وضعیت سند "لغو یا منسوخ شده" باشد، این فیلد الزامی است. فرمت: 1404/07/05' if JALALI_AVAILABLE else 'در صورتی که وضعیت سند "لغو یا منسوخ شده" باشد، این فیلد الزامی است. فرمت: YYYY-MM-DD'
     )
     
     def __init__(self, *args, **kwargs):
@@ -104,9 +104,9 @@ class InstrumentRelationForm(forms.ModelForm):
     """ModelForm for InstrumentRelation with Jalali date support."""
     
     effective_date = JalaliDateField(
-        label='تاریخ اجرا (شمسی)' if JALALI_AVAILABLE else 'تاریخ اجرا',
+        label='تاریخ اجرا ' if JALALI_AVAILABLE else 'تاریخ اجرا',
         required=False,
-        help_text='فرمت: 1402/01/15' if JALALI_AVAILABLE else 'فرمت: YYYY-MM-DD'
+        help_text='فرمت: 1404/07/05' if JALALI_AVAILABLE else 'فرمت: YYYY-MM-DD'
     )
     
     def __init__(self, *args, **kwargs):
@@ -241,9 +241,9 @@ class LegalUnitChangeForm(forms.ModelForm):
     """Form for LegalUnitChange with Jalali date support."""
     
     effective_date = JalaliDateField(
-        label='تاریخ اجرای قانونی تغییر (شمسی)' if JALALI_AVAILABLE else 'تاریخ اجرای قانونی تغییر',
+        label='تاریخ اجرای قانونی تغییر ' if JALALI_AVAILABLE else 'تاریخ اجرای قانونی تغییر',
         required=False,
-        help_text='فرمت: 1402/01/15' if JALALI_AVAILABLE else 'فرمت: YYYY-MM-DD'
+        help_text='فرمت: 1404/07/05' if JALALI_AVAILABLE else 'فرمت: YYYY-MM-DD'
     )
     
     class Meta:
