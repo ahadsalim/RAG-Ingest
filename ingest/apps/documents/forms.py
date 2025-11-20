@@ -150,18 +150,22 @@ class LegalUnitForm(forms.ModelForm):
         
         # Filter parent field based on manifestation
         if 'parent' in self.fields and 'manifestation' in self.fields:
-            # Add CSS class and data attributes for JavaScript filtering
-            self.fields['manifestation'].widget.attrs.update({
-                'class': 'manifestation-selector',
-                'data-target': 'id_parent'
-            })
-            self.fields['parent'].widget.attrs.update({
-                'class': 'parent-selector'
-            })
-            
-            # Always start with all LegalUnits to avoid validation issues
-            # The actual filtering will be done in JavaScript and validation
-            self.fields['parent'].queryset = LegalUnit.objects.all()
+            # If instance exists (editing), filter by its manifestation
+            if self.instance and self.instance.pk and self.instance.manifestation:
+                self.fields['parent'].queryset = LegalUnit.objects.filter(
+                    manifestation=self.instance.manifestation
+                ).exclude(pk=self.instance.pk)
+            # If manifestation is set (from initial data), filter by it
+            elif self.initial.get('manifestation'):
+                manifestation_id = self.initial.get('manifestation')
+                self.fields['parent'].queryset = LegalUnit.objects.filter(
+                    manifestation_id=manifestation_id
+                )
+            else:
+                # No manifestation yet, show empty queryset
+                # User must select manifestation first
+                self.fields['parent'].queryset = LegalUnit.objects.none()
+                self.fields['parent'].help_text = 'ابتدا نسخه سند را انتخاب کنید'
     
     def clean_parent(self):
         """Custom validation for parent field to allow dynamic filtering."""

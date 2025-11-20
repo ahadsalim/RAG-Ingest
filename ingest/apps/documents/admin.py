@@ -323,9 +323,54 @@ class LegalUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin)
     search_fields = ('content', 'path_label', 'eli_fragment', 'xml_id')
     mptt_level_indent = 20
     readonly_fields = ('path_label', 'created_at', 'updated_at')
-    inlines = [LegalUnitVocabularyTermInline, LegalUnitChangeInline]  # حذف inline های سنگین
+    inlines = [LegalUnitVocabularyTermInline, LegalUnitChangeInline]
     actions = ['mark_as_repealed', 'mark_as_active']
-    list_per_page = 100  # تعداد آیتم در هر صفحه
+    list_per_page = 100
+    
+    def changelist_view(self, request, extra_context=None):
+        """Override to show manifestation list if no manifestation filter."""
+        manifestation_id = request.GET.get('manifestation__id__exact')
+        
+        if not manifestation_id:
+            # Show manifestation selection page
+            from django.shortcuts import render
+            from ingest.apps.documents.models import InstrumentManifestation
+            
+            manifestations = InstrumentManifestation.objects.select_related(
+                'expr', 'expr__work'
+            ).annotate(
+                legalunit_count=models.Count('legalunits')
+            ).order_by('-created_at')
+            
+            context = {
+                **self.admin_site.each_context(request),
+                'title': 'انتخاب نسخه سند',
+                'manifestations': manifestations,
+                'opts': self.model._meta,
+                'has_view_permission': self.has_view_permission(request),
+            }
+            return render(request, 'admin/documents/legalunit_manifestation_list.html', context)
+        
+        # Normal changelist with manifestation filter
+        # Add manifestation info to context
+        if not extra_context:
+            extra_context = {}
+        
+        try:
+            from ingest.apps.documents.models import InstrumentManifestation
+            manifestation = InstrumentManifestation.objects.select_related(
+                'expr', 'expr__work'
+            ).get(id=manifestation_id)
+            extra_context['manifestation'] = manifestation
+            extra_context['manifestation_title'] = (
+                manifestation.expr.work.title_official 
+                if manifestation.expr and manifestation.expr.work 
+                else f'نسخه سند #{manifestation.id}'
+            )
+        except:
+            pass
+        
+        return super().changelist_view(request, extra_context)
     
     def get_deleted_objects(self, objs, request):
         """
@@ -427,6 +472,11 @@ class LegalUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin)
             'work', 'expr', 'expr__work', 'manifestation', 'parent'
         )
         
+        # Filter by manifestation if provided
+        manifestation_id = request.GET.get('manifestation__id__exact')
+        if manifestation_id:
+            qs = qs.filter(manifestation_id=manifestation_id)
+        
         # Add chunk count annotation to avoid N+1 queries
         qs = qs.annotate(chunks_count=Count('chunks'))
         
@@ -435,6 +485,14 @@ class LegalUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin)
             qs = qs.prefetch_related('vocabulary_terms', 'chunks')
         
         return qs
+    
+    def add_view(self, request, form_url='', extra_context=None):
+        """Override add view to pass manifestation to form."""
+        extra_context = extra_context or {}
+        manifestation_id = request.GET.get('manifestation')
+        if manifestation_id:
+            extra_context['manifestation_id'] = manifestation_id
+        return super().add_view(request, form_url, extra_context)
     
     fieldsets = (
         ('اطلاعات اصلی', {
@@ -455,7 +513,26 @@ class LegalUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin)
     def get_form(self, request, obj=None, **kwargs):
         # Exclude non-editable fields and hide work/expr since they're auto-populated
         kwargs.setdefault('exclude', []).extend(['id', 'created_at', 'updated_at', 'path_label', 'work', 'expr'])
-        return super().get_form(request, obj, **kwargs)
+        form = super().get_form(request, obj, **kwargs)
+        
+        # If manifestation is provided in URL, set it and make it readonly
+        manifestation_id = request.GET.get('manifestation')
+        if manifestation_id and 'manifestation' in form.base_fields:
+            from ingest.apps.documents.models import InstrumentManifestation
+            try:
+                manifestation = InstrumentManifestation.objects.get(id=manifestation_id)
+                form.base_fields['manifestation'].initial = manifestation
+                form.base_fields['manifestation'].disabled = True
+                form.base_fields['manifestation'].help_text = 'نسخه سند از URL انتخاب شده است'
+            except InstrumentManifestation.DoesNotExist:
+                pass
+        
+        # If editing existing object, make manifestation readonly
+        if obj and 'manifestation' in form.base_fields:
+            form.base_fields['manifestation'].disabled = True
+            form.base_fields['manifestation'].help_text = 'نسخه سند قابل تغییر نیست'
+        
+        return form
 
     def save_model(self, request, obj, form, change):
         """Auto-populate work and expr based on manifestation selection."""
