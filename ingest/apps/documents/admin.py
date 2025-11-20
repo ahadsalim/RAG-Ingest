@@ -325,7 +325,7 @@ class LegalUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin)
     readonly_fields = ('path_label', 'created_at', 'updated_at')
     inlines = [LegalUnitVocabularyTermInline, LegalUnitChangeInline]  # حذف inline های سنگین
     actions = ['mark_as_repealed', 'mark_as_active']
-    list_per_page = 50  # کاهش تعداد آیتم در هر صفحه
+    list_per_page = 100  # تعداد آیتم در هر صفحه
     
     def delete_model(self, request, obj):
         """Override delete to clean up SyncLogs first."""
