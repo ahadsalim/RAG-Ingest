@@ -519,18 +519,31 @@ class LegalUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin)
         manifestation_id = request.GET.get('manifestation')
         if manifestation_id and 'manifestation' in form.base_fields:
             from ingest.apps.documents.models import InstrumentManifestation
+            from django import forms as django_forms
             try:
                 manifestation = InstrumentManifestation.objects.get(id=manifestation_id)
                 form.base_fields['manifestation'].initial = manifestation
                 form.base_fields['manifestation'].disabled = True
-                form.base_fields['manifestation'].help_text = 'نسخه سند از URL انتخاب شده است'
+                form.base_fields['manifestation'].help_text = ''
+                # Use a simple select widget without the add/change/delete buttons
+                form.base_fields['manifestation'].widget = django_forms.Select(
+                    attrs={'disabled': 'disabled'},
+                    choices=[(manifestation.id, str(manifestation))]
+                )
             except InstrumentManifestation.DoesNotExist:
                 pass
         
         # If editing existing object, make manifestation readonly
         if obj and 'manifestation' in form.base_fields:
+            from django import forms as django_forms
             form.base_fields['manifestation'].disabled = True
-            form.base_fields['manifestation'].help_text = 'نسخه سند قابل تغییر نیست'
+            form.base_fields['manifestation'].help_text = ''
+            # Use a simple select widget without the add/change/delete buttons
+            if obj.manifestation:
+                form.base_fields['manifestation'].widget = django_forms.Select(
+                    attrs={'disabled': 'disabled'},
+                    choices=[(obj.manifestation.id, str(obj.manifestation))]
+                )
         
         return form
 
