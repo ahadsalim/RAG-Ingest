@@ -678,8 +678,7 @@ class ChunkAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
     chunk_preview.short_description = 'پیش‌نمای متن'
 
 
-# Register Chunk model directly
-@admin.register(Chunk, site=admin_site)
+# ChunkAdminRegistered will be registered after QAEntry for proper sidebar ordering
 class ChunkAdminRegistered(ChunkAdmin):
     def has_module_permission(self, request):
         """Override to ensure proper view-only permissions"""
@@ -805,3 +804,4 @@ admin_site.register(InstrumentRelation, InstrumentRelationAdmin)
 admin_site.register(PinpointCitation, PinpointCitationAdmin)
 admin_site.register(FileAsset, FileAssetAdmin)
 admin_site.register(QAEntry, QAEntryAdmin)
+admin_site.register(Chunk, ChunkAdminRegistered)  # Register after QAEntry for sidebar ordering

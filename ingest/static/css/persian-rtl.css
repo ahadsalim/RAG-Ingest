@@ -1,0 +1,190 @@
+/* Persian RTL Styles for Django Admin */
+/* Force RTL layout for entire site */
+
+html, body {
+    direction: rtl !important;
+    text-align: right !important;
+    font-family: 'Vazirmatn', 'Tahoma', 'Arial', sans-serif !important;
+}
+
+/* Admin interface RTL */
+#header, #branding, #user-tools, #content, #content-main, #content-related {
+    direction: rtl !important;
+    text-align: right !important;
+}
+
+/* Navigation and sidebar */
+#nav-sidebar, .breadcrumbs {
+    direction: rtl !important;
+    text-align: right !important;
+}
+
+/* Forms and inputs */
+.form-row, .field-box, .aligned label, .form-group {
+    direction: rtl !important;
+    text-align: right !important;
+}
+
+/* Tables */
+table, th, td, .results {
+    direction: rtl !important;
+    text-align: right !important;
+}
+
+/* Buttons and actions */
+.submit-row, .object-tools, .actions {
+    direction: rtl !important;
+    text-align: right !important;
+}
+
+/* Login form */
+.login #container, .login #content, .login #content-main {
+    direction: rtl !important;
+    text-align: right !important;
+}
+
+.login .form-row {
+    direction: rtl !important;
+    text-align: right !important;
+}
+
+.login .form-row label {
+    float: right !important;
+    text-align: right !important;
+}
+
+.login .form-row input {
+    margin-right: 0 !important;
+    margin-left: 10px !important;
+}
+
+/* Special handling for date and time fields - keep LTR for proper formatting */
+.jalali-date, 
+.field-created_at, 
+.field-updated_at, 
+.field-timestamp,
+.field-login_time, 
+.field-logout_time,
+input[type="date"], 
+input[type="datetime-local"],
+input[type="time"],
+.datetime input,
+.date input,
+.time input {
+    direction: ltr !important;
+    text-align: left !important;
+}
+
+/* Persian number formatting */
+.persian-numbers {
+    font-family: 'Vazirmatn', 'Tahoma', sans-serif;
+}
+
+/* Fix for admin widgets */
+.selector, .selector-available, .selector-chosen {
+    direction: rtl !important;
+    text-align: right !important;
+}
+
+/* Pagination */
+.paginator {
+    direction: rtl !important;
+    text-align: right !important;
+}
+
+/* Messages */
+.messagelist {
+    direction: rtl !important;
+    text-align: right !important;
+}
+
+/* Fieldsets */
+fieldset {
+    direction: rtl !important;
+    text-align: right !important;
+}
+
+fieldset h2 {
+    direction: rtl !important;
+    text-align: right !important;
+}
+
+/* Help text */
+.help {
+    direction: rtl !important;
+    text-align: right !important;
+}
+
+/* Error messages */
+.errorlist {
+    direction: rtl !important;
+    text-align: right !important;
+}
+
+/* Change list */
+.change-list {
+    direction: rtl !important;
+    text-align: right !important;
+}
+
+/* Filters */
+#changelist-filter {
+    direction: rtl !important;
+    text-align: right !important;
+}
+
+/* Search */
+#changelist-search {
+    direction: rtl !important;
+    text-align: right !important;
+}
+
+/* Inline forms */
+.inline-group {
+    direction: rtl !important;
+    text-align: right !important;
+}
+
+.tabular {
+    direction: rtl !important;
+    text-align: right !important;
+}
+
+/* Calendar widget */
+.calendar, .calendarbox {
+    direction: ltr !important;
+    text-align: left !important;
+}
+
+/* Clock widget */
+.clockbox {
+    direction: ltr !important;
+    text-align: left !important;
+}
+
+/* Sidebar font improvements - ظریف‌تر و زیباتر */
+#nav-sidebar {
+    font-size: 13px \!important;
+    font-weight: 400 \!important;
+    line-height: 1.6 \!important;
+}
+
+#nav-sidebar a {
+    font-size: 13px \!important;
+    font-weight: 400 \!important;
+    padding: 8px 12px \!important;
+}
+
+#nav-sidebar .caption {
+    font-size: 12px \!important;
+    font-weight: 500 \!important;
+    letter-spacing: 0.3px;
+}
+
+#nav-sidebar .current-app {
+    font-weight: 500 \!important;
+}
+
+#nav-sidebar .current-model {
+    font-weight: 500 \!important;
+}

@@ -139,7 +139,7 @@ class InstrumentExpression(BaseModel):
         default=ConsolidationLevel.BASE,
         verbose_name='سطح تلفیق'
     )
-    expression_date = models.DateField(verbose_name='تاریخ نسخه', null=True, blank=True)
+    expression_date = models.DateField(verbose_name='تاریخ تصویب/ابلاغ', null=True, blank=True)
     eli_uri_expr = models.URLField(blank=True, verbose_name='ELI URI بیان')
     
     history = HistoricalRecords()
@@ -890,8 +890,8 @@ class QAEntry(BaseModel):
     history = HistoricalRecords()
     
     class Meta:
-        verbose_name = 'ورودی پرسش و پاسخ'
-        verbose_name_plural = 'ورودی‌های پرسش و پاسخ'
+        verbose_name = 'پرسش و پاسخ'
+        verbose_name_plural = 'پرسش و پاسخ'
         ordering = ['-created_at']
         indexes = [
             models.Index(fields=['status', 'created_at']),

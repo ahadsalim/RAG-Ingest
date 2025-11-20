@@ -31,7 +31,7 @@ class InstrumentExpressionForm(forms.ModelForm):
     """ModelForm for InstrumentExpression."""
     
     expression_date = JalaliDateField(
-        label='تاریخ نسخه (شمسی)' if JALALI_AVAILABLE else 'تاریخ نسخه',
+        label='تاریخ تصویب/ابلاغ (شمسی)' if JALALI_AVAILABLE else 'تاریخ تصویب/ابلاغ',
         required=False,
         help_text='فرمت: 1402/01/15' if JALALI_AVAILABLE else 'فرمت: YYYY-MM-DD'
     )
