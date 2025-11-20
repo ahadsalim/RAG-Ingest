@@ -45,8 +45,12 @@ DATABASES['default'].update({
     'CONN_MAX_AGE': 60,  # Keep connections alive for 1 minute
 })
 
-# Static files - simple configuration without aggressive caching
-STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
+# Static files with Whitenoise but WITHOUT aggressive caching
+# Use CompressedStaticFilesStorage for serving but with short cache time
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
+
+# Short cache time (10 minutes instead of 1 year)
+WHITENOISE_MAX_AGE = 600
 
 # Force Django to serve static files in production
 STATIC_URL = '/static/'
