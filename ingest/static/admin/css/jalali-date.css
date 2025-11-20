@@ -1,0 +1,41 @@
+/* Jalali Date Input Styles */
+.jalali-date-input, .jalali-datetime-input {
+    direction: ltr;
+    text-align: left;
+    font-family: 'Courier New', monospace;
+}
+
+.jalali-date-input:focus, .jalali-datetime-input:focus {
+    border-color: #007cba;
+    box-shadow: 0 0 0 2px rgba(0, 124, 186, 0.2);
+}
+
+.jalali-date-help {
+    font-size: 11px;
+    color: #666;
+    margin-top: 2px;
+    direction: rtl;
+}
+
+/* Date picker calendar icon */
+.jalali-date-input::after {
+    content: "📅";
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+}
+
+/* Error styling for invalid dates */
+.jalali-date-input.error, .jalali-datetime-input.error {
+    border-color: #dc3545;
+    background-color: #fff5f5;
+}
+
+.jalali-date-error {
+    color: #dc3545;
+    font-size: 11px;
+    margin-top: 2px;
+    direction: rtl;
+}

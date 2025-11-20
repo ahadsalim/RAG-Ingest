@@ -1,0 +1,205 @@
+/* استایل‌های مخصوص بخش تغییرات LegalUnit */
+
+.changes-toggle-container {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border: 2px solid #417690;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 20px;
+    font-family: 'Vazirmatn', 'Tahoma', sans-serif;
+    direction: rtl;
+    text-align: right;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.changes-toggle-container label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-weight: bold;
+    color: #2c3e50;
+    font-size: 16px;
+    margin: 0;
+}
+
+.changes-toggle-container input[type="checkbox"] {
+    margin-left: 10px;
+    transform: scale(1.3);
+    accent-color: #417690;
+}
+
+.changes-toggle-container p {
+    margin: 10px 0 0 0;
+    font-size: 13px;
+    color: #6c757d;
+    line-height: 1.5;
+    padding: 8px 12px;
+    background: rgba(255,255,255,0.7);
+    border-radius: 4px;
+    border-right: 3px solid #17a2b8;
+}
+
+/* استایل‌های بهبود یافته برای inline forms */
+.inline-group[id*="legalunitchange"] {
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+.inline-group[id*="legalunitchange"] h2 {
+    background: linear-gradient(135deg, #417690 0%, #2c5282 100%);
+    color: white;
+    padding: 15px 20px;
+    margin: 0;
+    font-family: 'Vazirmatn', 'Tahoma', sans-serif;
+    font-size: 18px;
+    font-weight: 600;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+
+.inline-group[id*="legalunitchange"] .module {
+    border-radius: 0;
+    border: none;
+}
+
+/* استایل‌های فرم‌های تغییرات */
+.change-form {
+    border: 1px solid #e1e4e8;
+    border-radius: 6px;
+    margin-bottom: 15px;
+    background: #ffffff;
+    transition: box-shadow 0.2s ease;
+}
+
+.change-form:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.change-form h3 {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    color: #495057;
+    padding: 12px 15px;
+    margin: 0;
+    font-family: 'Vazirmatn', 'Tahoma', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    border-bottom: 1px solid #dee2e6;
+    border-radius: 6px 6px 0 0;
+}
+
+.change-form .form-row {
+    direction: rtl;
+    text-align: right;
+    padding: 10px 15px;
+}
+
+.change-form label {
+    font-family: 'Vazirmatn', 'Tahoma', sans-serif;
+    font-weight: 500;
+    color: #495057;
+    margin-bottom: 5px;
+    display: block;
+}
+
+.change-form select,
+.change-form input[type="date"],
+.change-form textarea {
+    font-family: 'Vazirmatn', 'Tahoma', sans-serif;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    padding: 8px 12px;
+    width: 100%;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.change-form select:focus,
+.change-form input[type="date"]:focus,
+.change-form textarea:focus {
+    border-color: #417690;
+    box-shadow: 0 0 0 2px rgba(65, 118, 144, 0.2);
+    outline: none;
+}
+
+/* استایل‌های fieldset */
+.change-form fieldset {
+    border: 1px solid #e9ecef;
+    border-radius: 4px;
+    margin: 10px 0;
+    padding: 0;
+}
+
+.change-form fieldset h2 {
+    background: #f8f9fa;
+    color: #495057;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 12px;
+    margin: 0;
+    border-bottom: 1px solid #e9ecef;
+    font-family: 'Vazirmatn', 'Tahoma', sans-serif;
+}
+
+.change-form fieldset.collapse {
+    border: none;
+}
+
+.change-form fieldset.collapse h2 {
+    cursor: pointer;
+    background: #e9ecef;
+    transition: background-color 0.2s ease;
+}
+
+.change-form fieldset.collapse h2:hover {
+    background: #dee2e6;
+}
+
+/* استایل‌های دکمه‌های حذف و اضافه */
+.inline-deletelink {
+    background: #dc3545;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 4px;
+    text-decoration: none;
+    font-size: 12px;
+    font-family: 'Vazirmatn', 'Tahoma', sans-serif;
+    transition: background-color 0.2s ease;
+}
+
+.inline-deletelink:hover {
+    background: #c82333;
+    color: white;
+    text-decoration: none;
+}
+
+.add-row a {
+    background: #28a745;
+    color: white;
+    padding: 8px 16px;
+    border-radius: 4px;
+    text-decoration: none;
+    font-family: 'Vazirmatn', 'Tahoma', sans-serif;
+    font-size: 14px;
+    transition: background-color 0.2s ease;
+}
+
+.add-row a:hover {
+    background: #218838;
+    color: white;
+    text-decoration: none;
+}
+
+/* تنظیمات responsive */
+@media (max-width: 768px) {
+    .changes-toggle-container {
+        padding: 12px;
+    }
+    
+    .changes-toggle-container label {
+        font-size: 14px;
+    }
+    
+    .change-form .form-row {
+        padding: 8px 12px;
+    }
+}

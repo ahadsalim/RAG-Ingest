@@ -327,6 +327,33 @@ class LegalUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin)
     actions = ['mark_as_repealed', 'mark_as_active']
     list_per_page = 100  # تعداد آیتم در هر صفحه
     
+    def get_deleted_objects(self, objs, request):
+        """
+        Override to bypass SyncLog permission check.
+        Delete SyncLogs before checking cascade deletion.
+        """
+        from django.db import connection
+        
+        # If objs is a single object, make it a list
+        if not hasattr(objs, '__iter__'):
+            objs = [objs]
+        
+        # Collect all chunk IDs
+        all_chunk_ids = []
+        for obj in objs:
+            chunk_ids = list(obj.chunks.values_list('id', flat=True))
+            all_chunk_ids.extend(chunk_ids)
+        
+        # Delete SyncLogs using raw SQL to bypass permissions
+        if all_chunk_ids:
+            with connection.cursor() as cursor:
+                placeholders = ','.join(['%s'] * len(all_chunk_ids))
+                query = f"DELETE FROM embeddings_synclog WHERE chunk_id IN ({placeholders})"
+                cursor.execute(query, all_chunk_ids)
+        
+        # Now call parent to get deleted objects (SyncLogs already deleted)
+        return super().get_deleted_objects(objs, request)
+    
     def delete_model(self, request, obj):
         """Override delete to clean up SyncLogs first."""
         from django.db import transaction, connection

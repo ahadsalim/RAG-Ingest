@@ -1,0 +1,46 @@
+/* Custom CSS for Django Admin Inline Forms */
+
+/* Style for Jalali date fields in inline */
+.inline-group .readonly {
+    direction: ltr !important;
+    text-align: left !important;
+    font-family: 'Courier New', monospace !important;
+    background-color: #f5f5f5 !important;
+    padding: 4px 8px !important;
+    border-radius: 3px !important;
+    font-size: 11px !important;
+}
+
+/* RTL support for Persian content in inline */
+.inline-group .tabular .field-term {
+    direction: rtl !important;
+    text-align: right !important;
+}
+
+/* Better spacing for inline forms */
+.inline-group .tabular tbody tr td {
+    padding: 8px 10px !important;
+    vertical-align: middle !important;
+}
+
+/* Header styling */
+.inline-group .tabular thead th {
+    background-color: #f8f9fa !important;
+    color: #495057 !important;
+    font-weight: 600 !important;
+    text-align: center !important;
+    padding: 10px 8px !important;
+    border-bottom: 2px solid #dee2e6 !important;
+}
+
+/* Hover effect for rows */
+.inline-group .tabular tbody tr:hover {
+    background-color: #f8f9fa !important;
+}
+
+/* Focus styles for better accessibility */
+.inline-group .tabular input:focus,
+.inline-group .tabular select:focus {
+    outline: 2px solid #007bff !important;
+    outline-offset: 2px !important;
+}

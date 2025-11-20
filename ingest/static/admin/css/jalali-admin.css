@@ -1,0 +1,115 @@
+/* Jalali Admin Styles */
+
+.jalali-date {
+    direction: ltr !important;
+    font-family: 'Courier New', 'Monaco', monospace;
+    font-size: 13px;
+    color: #2c5aa0;
+    background-color: #f8f9fa;
+    padding: 2px 6px;
+    border-radius: 3px;
+    border: 1px solid #e9ecef;
+    display: inline-block;
+}
+
+.jalali-date:hover {
+    background-color: #e9ecef;
+    border-color: #2c5aa0;
+}
+
+/* RTL support for Persian text */
+.field-jalali_created_at_auto,
+.field-jalali_updated_at_auto {
+    text-align: center;
+}
+
+/* Form field styles */
+.jalali-date-input,
+.jalali-datetime-input {
+    direction: ltr !important;
+    font-family: 'Courier New', 'Monaco', monospace;
+    text-align: center;
+    background-color: #fff8dc;
+    border: 2px solid #ffd700;
+}
+
+.jalali-date-input:focus,
+.jalali-datetime-input:focus {
+    border-color: #ff6b35;
+    box-shadow: 0 0 5px rgba(255, 107, 53, 0.3);
+}
+
+/* Help text for Jalali fields */
+.help-jalali {
+    color: #666;
+    font-size: 11px;
+    direction: rtl;
+    text-align: right;
+    margin-top: 2px;
+}
+
+/* Admin list table improvements */
+.admin-list .jalali-date {
+    white-space: nowrap;
+}
+
+/* Date picker styles */
+.jalali-date-picker {
+    position: absolute;
+    background: white;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    z-index: 1000;
+    display: none;
+    direction: rtl;
+    font-family: Tahoma, Arial, sans-serif;
+    min-width: 200px;
+}
+
+.jalali-calendar-icon {
+    cursor: pointer;
+    margin-left: 5px;
+    font-size: 16px;
+    user-select: none;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.jalali-calendar-icon:hover {
+    opacity: 0.7;
+}
+
+/* Error styling */
+.jalali-date-input.error,
+.jalali-datetime-input.error {
+    border-color: #dc3545 !important;
+    background-color: #fff5f5;
+}
+
+.jalali-date-error {
+    color: #dc3545;
+    font-size: 11px;
+    margin-top: 2px;
+    direction: rtl;
+}
+
+/* Input container */
+.jalali-input-container {
+    position: relative;
+    display: inline-block;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .jalali-date {
+        font-size: 11px;
+        padding: 1px 4px;
+    }
+    
+    .jalali-date-picker {
+        min-width: 180px;
+        padding: 8px;
+    }
+}

@@ -1,0 +1,98 @@
+/* --- Fix Django admin actions dropdown --- */
+/* این فایل فقط برای حل مشکل actions dropdown در admin است */
+
+/* خنثی‌سازی کامل استایل‌های global که با dropdown تداخل می‌کنند */
+.rtl-admin select,
+.rtl-admin select[name="action"] {
+    appearance: auto !important;
+    -webkit-appearance: menulist !important;
+    -moz-appearance: menulist !important;
+}
+
+/* اصلاح اصلی برای actions dropdown */
+.rtl-admin #changelist-form .actions select[name="action"],
+.rtl-admin .actions select[name="action"],
+body.rtl-admin #changelist-form .actions select[name="action"],
+body.rtl-admin .actions select[name="action"] {
+    appearance: auto !important;
+    -webkit-appearance: menulist !important;
+    -moz-appearance: menulist !important;
+    position: static !important;
+    opacity: 1 !important;
+    display: inline-block !important;
+    visibility: visible !important;
+    border: 1px solid #c3c3c3 !important;
+    background-color: #fff !important;
+    background-image: none !important;
+    background: #fff !important;
+    padding: 2px 24px 2px 6px !important;
+    direction: rtl;
+    text-align: right;
+    min-width: 200px;
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    height: auto !important;
+    width: auto !important;
+    min-height: 22px !important;
+}
+
+.rtl-admin #changelist-form .actions label {
+    display: inline-block !important;
+    margin-inline-end: .5rem;
+    font-family: 'Vazirmatn', 'Tahoma', sans-serif;
+}
+
+/* خنثی‌سازی هر استایل قبلی که dropdown را مخفی/غیراستاندارد می‌کرد */
+.rtl-admin #changelist-form .actions select[name="action"],
+.rtl-admin #changelist-form .actions select[name="action"] *,
+.rtl-admin .actions select[name="action"],
+.rtl-admin .actions select[name="action"] * {
+    background-image: none !important;
+    transform: none !important;
+    clip: none !important;
+    clip-path: none !important;
+    overflow: visible !important;
+    text-indent: 0 !important;
+}
+
+/* خنثی‌سازی استایل‌های global که ممکن است مشکل ایجاد کنند */
+.rtl-admin select[name="action"] {
+    appearance: auto !important;
+    -webkit-appearance: menulist !important;
+    -moz-appearance: menulist !important;
+}
+
+/* اطمینان از عملکرد صحیح در تمام حالات */
+body.rtl-admin select[name="action"],
+html.rtl-admin select[name="action"] {
+    appearance: auto !important;
+    -webkit-appearance: menulist !important;
+    -moz-appearance: menulist !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    display: inline-block !important;
+}
+
+/* اطمینان از نمایش صحیح دکمه Go */
+.rtl-admin #changelist-form .actions button[type="submit"],
+.rtl-admin #changelist-form .actions input[type="submit"] {
+    margin-right: 10px;
+    padding: 5px 15px;
+    font-family: 'Vazirmatn', 'Tahoma', sans-serif;
+}
+
+/* اطمینان از نمایش صحیح متن انتخاب */
+.rtl-admin #changelist-form .actions .action-counter {
+    font-family: 'Vazirmatn', 'Tahoma', sans-serif;
+    margin-left: 10px;
+}
+
+/* حفظ layout کلی actions */
+.rtl-admin #changelist-form .actions {
+    direction: rtl;
+    text-align: right;
+    padding: 10px;
+    background-color: #f8f8f8;
+    border-top: 1px solid #ddd;
+}

@@ -1,0 +1,131 @@
+/**
+ * Styles for Jalali date/datetime widgets
+ */
+
+/* Base styles for Jalali inputs */
+.jalali-date-input,
+.jalali-datetime-input,
+.jalali-time-input {
+    direction: ltr;
+    text-align: left;
+    font-family: 'Vazirmatn', 'Tahoma', monospace;
+}
+
+/* Jalali datepicker input styling */
+.jalali-datepicker-input {
+    position: relative;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%23666' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5zM1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4H1z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: calc(100% - 8px) center;
+    background-size: 16px 16px;
+    padding-right: 32px;
+}
+
+/* RTL support for Persian interface */
+[dir="rtl"] .jalali-datepicker-input {
+    background-position: 8px center;
+    padding-right: 8px;
+    padding-left: 32px;
+}
+
+/* Date display components */
+.jalali-date-display,
+.jalali-datetime-display {
+    font-family: 'Vazirmatn', 'Tahoma', sans-serif;
+    direction: rtl;
+    text-align: right;
+}
+
+.jalali-date-display.empty,
+.jalali-datetime-display.empty {
+    color: #999;
+    font-style: italic;
+}
+
+.timezone-info {
+    color: #666;
+    font-size: 0.85em;
+    margin-right: 8px;
+}
+
+/* Admin interface specific styles */
+.admin .jalali-date-input,
+.admin .jalali-datetime-input {
+    width: 200px;
+}
+
+.admin .jalali-datetime-input {
+    width: 250px;
+}
+
+/* Form field help text for Jalali fields */
+.jalali-help-text {
+    font-size: 0.85em;
+    color: #666;
+    margin-top: 4px;
+    direction: rtl;
+    text-align: right;
+}
+
+/* Error styling for Jalali fields */
+.jalali-date-input.error,
+.jalali-datetime-input.error {
+    border-color: #dc3545;
+    box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
+}
+
+/* Focus styling */
+.jalali-date-input:focus,
+.jalali-datetime-input:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    outline: 0;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .admin .jalali-date-input,
+    .admin .jalali-datetime-input {
+        width: 100%;
+        max-width: 300px;
+    }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    .jalali-date-display,
+    .jalali-datetime-display {
+        color: #e9ecef;
+    }
+    
+    .jalali-date-display.empty,
+    .jalali-datetime-display.empty {
+        color: #6c757d;
+    }
+    
+    .timezone-info {
+        color: #adb5bd;
+    }
+}
+
+/* Persian datepicker customization */
+.pwt-datepicker-input-element {
+    font-family: 'Vazirmatn', 'Tahoma', sans-serif !important;
+}
+
+.pwt-datepicker {
+    font-family: 'Vazirmatn', 'Tahoma', sans-serif !important;
+    direction: rtl !important;
+}
+
+/* Ensure proper RTL layout for datepicker */
+.pwt-datepicker .pwt-datepicker-days-name,
+.pwt-datepicker .pwt-datepicker-days {
+    direction: rtl !important;
+}
+
+/* Style for today button and other controls */
+.pwt-datepicker .pwt-datepicker-toolbox {
+    direction: rtl !important;
+    text-align: right !important;
+}
