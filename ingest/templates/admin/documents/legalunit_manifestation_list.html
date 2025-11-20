@@ -3,111 +3,38 @@
 
 {% block extrahead %}
 {{ block.super }}
-<style>
-    .manifestation-list {
-        margin: 20px 0;
-    }
-    
-    .manifestation-card {
-        background: white;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        padding: 15px 20px;
-        margin-bottom: 10px;
-        transition: all 0.2s;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-    
-    .manifestation-card:hover {
-        background: #f8f9fa;
-        border-color: #417690;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    
-    .manifestation-info {
-        flex: 1;
-    }
-    
-    .manifestation-title {
-        font-size: 16px;
-        font-weight: bold;
-        color: #333;
-        margin-bottom: 5px;
-    }
-    
-    .manifestation-meta {
-        font-size: 13px;
-        color: #666;
-    }
-    
-    .manifestation-count {
-        background: #417690;
-        color: white;
-        padding: 5px 15px;
-        border-radius: 20px;
-        font-weight: bold;
-        margin-left: 10px;
-    }
-    
-    .manifestation-link {
-        text-decoration: none;
-        color: inherit;
-        display: block;
-    }
-    
-    .no-manifestations {
-        text-align: center;
-        padding: 40px;
-        color: #999;
-    }
-    
-    .page-header {
-        margin-bottom: 20px;
-    }
-</style>
 {% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <h1>{{ title }}</h1>
-    <p>لطفاً یک نسخه سند را انتخاب کنید تا بندهای قانونی آن را مشاهده کنید.</p>
-</div>
+<p>لطفاً یک نسخه سند را انتخاب کنید تا بندهای قانونی آن را مشاهده کنید.</p>
 
 {% if manifestations %}
-<div class="manifestation-list">
-    {% for manifestation in manifestations %}
-    <a href="?manifestation__id__exact={{ manifestation.id }}" class="manifestation-link">
-        <div class="manifestation-card">
-            <div class="manifestation-info">
-                <div class="manifestation-title">
+<table id="result_list">
+    <thead>
+        <tr>
+            <th scope="col">عنوان سند</th>
+            <th scope="col" style="text-align: center;">تعداد بندها</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for manifestation in manifestations %}
+        <tr>
+            <td>
+                <a href="?manifestation__id__exact={{ manifestation.id }}">
                     {% if manifestation.expr and manifestation.expr.work %}
                         {{ manifestation.expr.work.title_official }}
                     {% else %}
                         نسخه سند #{{ manifestation.id }}
                     {% endif %}
-                </div>
-                <div class="manifestation-meta">
-                    {% if manifestation.publication_date %}
-                        تاریخ انتشار: {{ manifestation.publication_date|date:"Y/m/d" }}
-                    {% endif %}
-                    {% if manifestation.expr %}
-                        | نسخه: {{ manifestation.expr.expression_date|date:"Y/m/d" }}
-                    {% endif %}
-                </div>
-            </div>
-            <div class="manifestation-count">
-                {{ manifestation.legalunit_count }} بند
-            </div>
-        </div>
-    </a>
-    {% endfor %}
-</div>
+                </a>
+            </td>
+            <td style="text-align: center;">{{ manifestation.legalunit_count }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
 {% else %}
-<div class="no-manifestations">
-    <p>هیچ نسخه سندی یافت نشد.</p>
-</div>
+<p class="no-manifestations">هیچ نسخه سندی یافت نشد.</p>
 {% endif %}
 
 {% endblock %}

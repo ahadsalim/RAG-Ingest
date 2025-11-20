@@ -318,8 +318,8 @@ class InstrumentManifestationAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
 class LegalUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
     """Admin for LegalUnit with MPTT support and Jalali dates."""
     form = LegalUnitForm
-    list_display = ('unit_type', 'get_source_ref', 'parent', 'order_index', 'is_active_display', 'jalali_valid_from_display', 'jalali_valid_to_display', 'chunk_count', 'jalali_created_at_display')
-    list_filter = ('unit_type', 'work', 'expr', ActiveTodayListFilter, HasExpiryListFilter, 'created_at')
+    list_display = ('unit_type', 'parent', 'order_index', 'is_active_display', 'jalali_valid_from_display', 'jalali_valid_to_display', 'chunk_count', 'jalali_created_at_display')
+    list_filter = ('unit_type', ActiveTodayListFilter, HasExpiryListFilter, 'created_at')
     search_fields = ('content', 'path_label', 'eli_fragment', 'xml_id')
     mptt_level_indent = 20
     readonly_fields = ('path_label', 'created_at', 'updated_at')
@@ -344,7 +344,7 @@ class LegalUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin)
             
             context = {
                 **self.admin_site.each_context(request),
-                'title': 'انتخاب نسخه سند',
+                'title': 'بندهای قانونی',
                 'manifestations': manifestations,
                 'opts': self.model._meta,
                 'has_view_permission': self.has_view_permission(request),

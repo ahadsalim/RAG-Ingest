@@ -164,27 +164,27 @@ fieldset h2 {
 
 /* Sidebar font improvements - ظریف‌تر و زیباتر */
 #nav-sidebar {
-    font-size: 13px \!important;
-    font-weight: 400 \!important;
-    line-height: 1.6 \!important;
+    font-size: 13px !important;
+    font-weight: 400 !important;
+    line-height: 1.6 !important;
 }
 
 #nav-sidebar a {
-    font-size: 13px \!important;
-    font-weight: 400 \!important;
-    padding: 8px 12px \!important;
+    font-size: 13px !important;
+    font-weight: 400 !important;
+    padding: 8px 12px !important;
 }
 
 #nav-sidebar .caption {
-    font-size: 12px \!important;
-    font-weight: 500 \!important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
     letter-spacing: 0.3px;
 }
 
 #nav-sidebar .current-app {
-    font-weight: 500 \!important;
+    font-weight: 500 !important;
 }
 
 #nav-sidebar .current-model {
-    font-weight: 500 \!important;
+    font-weight: 500 !important;
 }
