@@ -327,6 +327,76 @@ class LegalUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin)
     actions = ['mark_as_repealed', 'mark_as_active']
     list_per_page = 50  # کاهش تعداد آیتم در هر صفحه
     
+    def delete_model(self, request, obj):
+        """Override delete to clean up SyncLogs first."""
+        from django.db import transaction, connection
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        
+        try:
+            with transaction.atomic():
+                # Get chunk IDs
+                chunk_ids = list(obj.chunks.values_list('id', flat=True))
+                
+                if chunk_ids:
+                    # Delete SyncLogs using raw SQL to bypass permissions
+                    with connection.cursor() as cursor:
+                        placeholders = ','.join(['%s'] * len(chunk_ids))
+                        query = f"DELETE FROM embeddings_synclog WHERE chunk_id IN ({placeholders})"
+                        cursor.execute(query, chunk_ids)
+                        deleted_count = cursor.rowcount
+                        
+                        if deleted_count > 0:
+                            logger.info(f'Deleted {deleted_count} SyncLog entries before deleting LegalUnit {obj.id}')
+                            self.message_user(request, f'✅ پاک‌سازی {deleted_count} SyncLog انجام شد', level='success')
+                
+                # Now delete the object
+                super().delete_model(request, obj)
+                self.message_user(request, f'✅ LegalUnit با موفقیت حذف شد', level='success')
+                
+        except Exception as e:
+            logger.error(f'Error deleting LegalUnit {obj.id}: {e}', exc_info=True)
+            self.message_user(request, f'❌ خطا در حذف: {e}', level='error')
+            raise
+    
+    def delete_queryset(self, request, queryset):
+        """Override delete queryset to clean up SyncLogs first."""
+        from django.db import transaction, connection
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        
+        try:
+            with transaction.atomic():
+                # Collect all chunk IDs from all LegalUnits
+                all_chunk_ids = []
+                for obj in queryset:
+                    chunk_ids = list(obj.chunks.values_list('id', flat=True))
+                    all_chunk_ids.extend(chunk_ids)
+                
+                if all_chunk_ids:
+                    # Delete SyncLogs using raw SQL to bypass permissions
+                    with connection.cursor() as cursor:
+                        placeholders = ','.join(['%s'] * len(all_chunk_ids))
+                        query = f"DELETE FROM embeddings_synclog WHERE chunk_id IN ({placeholders})"
+                        cursor.execute(query, all_chunk_ids)
+                        deleted_count = cursor.rowcount
+                        
+                        if deleted_count > 0:
+                            logger.info(f'Deleted {deleted_count} SyncLog entries before bulk delete')
+                            self.message_user(request, f'✅ پاک‌سازی {deleted_count} SyncLog انجام شد', level='success')
+                
+                # Now delete the queryset
+                count = queryset.count()
+                super().delete_queryset(request, queryset)
+                self.message_user(request, f'✅ {count} LegalUnit با موفقیت حذف شد', level='success')
+                
+        except Exception as e:
+            logger.error(f'Error in bulk delete: {e}', exc_info=True)
+            self.message_user(request, f'❌ خطا در حذف دسته‌جمعی: {e}', level='error')
+            raise
+    
     def get_queryset(self, request):
         """Optimize queryset with select_related, prefetch_related and annotate."""
         from django.db.models import Count

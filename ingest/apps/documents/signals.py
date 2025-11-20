@@ -8,19 +8,20 @@ from django.dispatch import receiver
 from django.db import transaction
 import logging
 
-from .models import LegalUnit, Chunk, FileAsset
-from ingest.apps.embeddings.models_synclog import SyncLog
-
 logger = logging.getLogger(__name__)
 
 
-@receiver(pre_delete, sender=LegalUnit)
+# Use string reference to avoid circular import
+@receiver(pre_delete, sender='documents.LegalUnit')
 def handle_legalunit_pre_delete(sender, instance, **kwargs):
     """
     قبل از حذف LegalUnit، ابتدا SyncLog های مرتبط را پاکسازی می‌کنیم.
     این مشکل cascade deletion را حل می‌کند.
     """
     try:
+        # Import here to avoid circular import
+        from ingest.apps.embeddings.models_synclog import SyncLog
+        
         # Get all chunks related to this legal unit
         chunk_ids = list(instance.chunks.values_list('id', flat=True))
         
@@ -47,7 +48,7 @@ def handle_legalunit_pre_delete(sender, instance, **kwargs):
         # Don't prevent deletion even if cleanup fails
 
 
-@receiver(post_delete, sender=Chunk)
+@receiver(post_delete, sender='documents.Chunk')
 def handle_chunk_post_delete(sender, instance, **kwargs):
     """
     بعد از حذف Chunk، اطلاعات مرتبط را لاگ می‌کنیم.
@@ -58,7 +59,7 @@ def handle_chunk_post_delete(sender, instance, **kwargs):
     )
 
 
-@receiver(pre_delete, sender=FileAsset)
+@receiver(pre_delete, sender='documents.FileAsset')
 def handle_fileasset_pre_delete(sender, instance, **kwargs):
     """
     قبل از حذف FileAsset، فایل فیزیکی را از MinIO پاک می‌کنیم.
@@ -108,6 +109,7 @@ def cleanup_orphaned_synclogs():
     این تابع را می‌توان به صورت دوره‌ای اجرا کرد.
     """
     from django.db.models import Q
+    from ingest.apps.embeddings.models_synclog import SyncLog
     
     # Find SyncLogs with no related chunk
     orphaned_logs = SyncLog.objects.filter(
