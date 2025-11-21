@@ -513,10 +513,18 @@ class LegalUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin)
     def get_form(self, request, obj=None, **kwargs):
         # Exclude non-editable fields and hide work/expr since they're auto-populated
         kwargs.setdefault('exclude', []).extend(['id', 'created_at', 'updated_at', 'path_label', 'work', 'expr'])
+        
+        # If manifestation is provided in URL, set it as initial data
+        manifestation_id = request.GET.get('manifestation')
+        if manifestation_id and not obj:
+            # Set initial data for the form so LegalUnitForm.__init__ can access it
+            if 'initial' not in kwargs:
+                kwargs['initial'] = {}
+            kwargs['initial']['manifestation'] = manifestation_id
+        
         form = super().get_form(request, obj, **kwargs)
         
-        # If manifestation is provided in URL, set it and make it readonly
-        manifestation_id = request.GET.get('manifestation')
+        # If manifestation is provided in URL, make it readonly
         if manifestation_id and 'manifestation' in form.base_fields:
             from ingest.apps.documents.models import InstrumentManifestation
             from django import forms as django_forms
