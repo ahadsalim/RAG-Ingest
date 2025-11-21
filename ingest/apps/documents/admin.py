@@ -489,7 +489,20 @@ class LegalUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin)
     def add_view(self, request, form_url='', extra_context=None):
         """Override add view to pass manifestation to form."""
         extra_context = extra_context or {}
+        
+        # Check for manifestation in URL
         manifestation_id = request.GET.get('manifestation')
+        
+        # If not found, try to parse from _changelist_filters
+        if not manifestation_id:
+            changelist_filters = request.GET.get('_changelist_filters')
+            if changelist_filters and 'manifestation__id__exact' in changelist_filters:
+                # Parse: manifestation__id__exact=<uuid>
+                import re
+                match = re.search(r'manifestation__id__exact[=%]([a-f0-9-]+)', changelist_filters)
+                if match:
+                    manifestation_id = match.group(1)
+        
         if manifestation_id:
             extra_context['manifestation_id'] = manifestation_id
         return super().add_view(request, form_url, extra_context)
@@ -514,8 +527,19 @@ class LegalUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin)
         # Exclude non-editable fields and hide work/expr since they're auto-populated
         kwargs.setdefault('exclude', []).extend(['id', 'created_at', 'updated_at', 'path_label', 'work', 'expr'])
         
-        # If manifestation is provided in URL, set it as initial data
+        # Get manifestation from URL
         manifestation_id = request.GET.get('manifestation')
+        
+        # If not found, try to parse from _changelist_filters
+        if not manifestation_id:
+            changelist_filters = request.GET.get('_changelist_filters')
+            if changelist_filters and 'manifestation__id__exact' in changelist_filters:
+                import re
+                match = re.search(r'manifestation__id__exact[=%]([a-f0-9-]+)', changelist_filters)
+                if match:
+                    manifestation_id = match.group(1)
+        
+        # If manifestation is provided in URL, set it as initial data
         if manifestation_id and not obj:
             # Set initial data for the form so LegalUnitForm.__init__ can access it
             if 'initial' not in kwargs:
