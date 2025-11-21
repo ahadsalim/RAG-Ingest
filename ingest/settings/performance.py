@@ -258,9 +258,9 @@ EMBEDDING_BATCH_SIZE = 32  # Increase batch size for better GPU utilization
 EMBEDDING_MAX_WORKERS = 4  # Parallel processing workers
 EMBEDDING_CACHE_TTL = 3600  # Cache embeddings for 1 hour
 
-# Chunking optimizations
-DEFAULT_CHUNK_SIZE = 500  # Slightly larger chunks
-DEFAULT_CHUNK_OVERLAP = 50  # Maintain overlap
+# Chunking optimizations - Read from environment or use defaults
+DEFAULT_CHUNK_SIZE = int(os.getenv('DEFAULT_CHUNK_SIZE', '350'))
+DEFAULT_CHUNK_OVERLAP = int(os.getenv('DEFAULT_CHUNK_OVERLAP', '80'))
 
 # =======================
 # Memory Management

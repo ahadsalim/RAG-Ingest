@@ -711,8 +711,8 @@ class Chunk(BaseModel):
     history = HistoricalRecords()
 
     class Meta:
-        verbose_name = 'چانک متن'
-        verbose_name_plural = 'چانک‌های متن'
+        verbose_name = 'قطعه متن (Chunk)'
+        verbose_name_plural = 'قطعات متن (Chunks)'
         ordering = ['expr', 'unit', 'id']
         unique_together = ['expr', 'hash']
         indexes = [

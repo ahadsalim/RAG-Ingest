@@ -19,8 +19,9 @@ class TextNormalizer:
         if self._normalizer is None:
             try:
                 from hazm import Normalizer
-                self._normalizer = Normalizer()
-                logger.info("Hazm normalizer initialized successfully")
+                # persian_numbers=False to keep English numbers for better search
+                self._normalizer = Normalizer(persian_numbers=False)
+                logger.info("Hazm normalizer initialized successfully (English numbers preserved)")
             except ImportError:
                 logger.warning("hazm library not available - text normalization disabled")
                 self._normalizer = False
@@ -62,6 +63,10 @@ class TextNormalizer:
             # Apply hazm normalization
             normalized = normalizer.normalize(text)
             
+            # Convert any remaining Persian numbers to English
+            # (in case hazm didn't convert them or input had Persian numbers)
+            normalized = self._convert_persian_to_english_numbers(normalized)
+            
             # Optional stemming for better embedding quality
             if apply_stemming:
                 stemmer = self._get_stemmer()
@@ -83,6 +88,34 @@ class TextNormalizer:
         except Exception as e:
             logger.warning(f"Text normalization failed: {e}, falling back to basic normalization")
             return self._basic_normalize(text)
+    
+    def _convert_persian_to_english_numbers(self, text: str) -> str:
+        """
+        Convert Persian/Arabic numbers to English numbers.
+        
+        Args:
+            text: Input text
+            
+        Returns:
+            Text with English numbers
+        """
+        if not text:
+            return ""
+        
+        # Persian to English number mapping
+        persian_to_english = {
+            '۰': '0', '۱': '1', '۲': '2', '۳': '3', '۴': '4',
+            '۵': '5', '۶': '6', '۷': '7', '۸': '8', '۹': '9',
+            # Arabic-Indic numbers
+            '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
+            '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9',
+        }
+        
+        result = text
+        for persian, english in persian_to_english.items():
+            result = result.replace(persian, english)
+        
+        return result
     
     def _basic_normalize(self, text: str) -> str:
         """
@@ -112,6 +145,9 @@ class TextNormalizer:
         normalized = text
         for old, new in replacements.items():
             normalized = normalized.replace(old, new)
+        
+        # Convert Persian numbers to English
+        normalized = self._convert_persian_to_english_numbers(normalized)
         
         # Clean up multiple spaces
         import re

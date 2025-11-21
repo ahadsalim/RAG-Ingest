@@ -809,8 +809,7 @@ class SyncLogAdmin(SimpleJalaliAdminMixin, admin.ModelAdmin):
         return False
     
     def has_delete_permission(self, request, obj=None):
-        """Allow all staff users to delete SyncLog (needed for cascade deletion)"""
-        return request.user.is_staff
+        return False
     
     actions = ['verify_selected']
     
