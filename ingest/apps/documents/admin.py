@@ -507,6 +507,27 @@ class LegalUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin)
             extra_context['manifestation_id'] = manifestation_id
         return super().add_view(request, form_url, extra_context)
     
+    def get_changeform_initial_data(self, request):
+        """Set initial data for the form."""
+        initial = super().get_changeform_initial_data(request)
+        
+        # Get manifestation from URL
+        manifestation_id = request.GET.get('manifestation')
+        
+        # If not found, try to parse from _changelist_filters
+        if not manifestation_id:
+            changelist_filters = request.GET.get('_changelist_filters')
+            if changelist_filters and 'manifestation__id__exact' in changelist_filters:
+                import re
+                match = re.search(r'manifestation__id__exact[=%]([a-f0-9-]+)', changelist_filters)
+                if match:
+                    manifestation_id = match.group(1)
+        
+        if manifestation_id:
+            initial['manifestation'] = manifestation_id
+        
+        return initial
+    
     fieldsets = (
         ('اطلاعات اصلی', {
             'fields': ('manifestation','parent', 'unit_type', 'number', 'order_index', 'content'),
@@ -539,12 +560,8 @@ class LegalUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin)
                 if match:
                     manifestation_id = match.group(1)
         
-        # If manifestation is provided in URL, set it as initial data
-        if manifestation_id and not obj:
-            # Set initial data for the form so LegalUnitForm.__init__ can access it
-            if 'initial' not in kwargs:
-                kwargs['initial'] = {}
-            kwargs['initial']['manifestation'] = manifestation_id
+        # Store manifestation_id for later use
+        request._manifestation_id = manifestation_id
         
         form = super().get_form(request, obj, **kwargs)
         
