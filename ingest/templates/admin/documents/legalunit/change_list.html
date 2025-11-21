@@ -13,13 +13,15 @@
 {% endif %}
 {% endblock %}
 
-{% block object-tools-items %}
+{% block object-tools %}
 {% if manifestation %}
-    <li>
-        <a href="{% url 'admin:documents_legalunit_add' %}?manifestation={{ manifestation.id }}" class="addlink">
-            {% trans 'Add' %} {{ opts.verbose_name }}
-        </a>
-    </li>
+    <ul class="object-tools">
+        <li>
+            <a href="{% url 'admin:documents_legalunit_add' %}?manifestation={{ manifestation.id }}" class="addlink">
+                {% trans 'Add' %} {{ opts.verbose_name }}
+            </a>
+        </li>
+    </ul>
 {% else %}
     {{ block.super }}
 {% endif %}
