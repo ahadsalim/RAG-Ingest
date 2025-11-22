@@ -157,7 +157,51 @@ admin_site = CustomAdminSite(name='custom_admin')
 from django.contrib.auth.models import User, Group
 from django.contrib.auth.admin import UserAdmin, GroupAdmin
 
-admin_site.register(User, UserAdmin)
+
+class CustomUserAdmin(UserAdmin):
+    """
+    سفارشی‌سازی UserAdmin برای نمایش فقط لینک تغییر رمز
+    """
+    
+    def get_readonly_fields(self, request, obj=None):
+        """Add custom password display to readonly fields when editing."""
+        readonly = list(super().get_readonly_fields(request, obj))
+        if obj:  # در حال ویرایش
+            if 'password_display' not in readonly:
+                readonly.append('password_display')
+        return readonly
+    
+    def get_fieldsets(self, request, obj=None):
+        """Override fieldsets to replace password with password_display."""
+        fieldsets = super().get_fieldsets(request, obj)
+        
+        if obj:  # در حال ویرایش
+            fieldsets = list(fieldsets)
+            for i, (name, data) in enumerate(fieldsets):
+                if 'password' in data.get('fields', []):
+                    # جایگزین کردن password با password_display
+                    fields = list(data['fields'])
+                    if 'password' in fields:
+                        idx = fields.index('password')
+                        fields[idx] = 'password_display'
+                    fieldsets[i] = (name, {**data, 'fields': tuple(fields)})
+        
+        return fieldsets
+    
+    def password_display(self, obj):
+        """Display only password change link."""
+        from django.urls import reverse
+        from django.utils.html import format_html
+        
+        change_password_url = reverse('admin:auth_user_password_change', args=[obj.pk])
+        return format_html(
+            '<a href="{}">تغییر رمز عبور</a>',
+            change_password_url
+        )
+    password_display.short_description = 'گذرواژه'
+
+
+admin_site.register(User, CustomUserAdmin)
 admin_site.register(Group, GroupAdmin)
 
 # Django Celery Beat models are now registered through proxy models in accounts app

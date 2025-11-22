@@ -31,9 +31,9 @@ class InstrumentExpressionForm(forms.ModelForm):
     """ModelForm for InstrumentExpression."""
     
     expression_date = JalaliDateField(
-        label='تاریخ تصویب/ابلاغ',
+        label='تاریخ نسخه/تصویب',
         required=False,
-        help_text='فرمت: 1402/01/15' if JALALI_AVAILABLE else 'فرمت: YYYY-MM-DD'
+        help_text='فرمت: 1404/07/05' if JALALI_AVAILABLE else 'فرمت: YYYY-MM-DD'
     )
     
     def __init__(self, *args, **kwargs):
@@ -150,8 +150,16 @@ class LegalUnitForm(forms.ModelForm):
         
         # Filter parent field based on manifestation
         if 'parent' in self.fields and 'manifestation' in self.fields:
+            # غیرفعال کردن validation خودکار Django برای parent
+            # چون queryset را به صورت پویا تغییر می‌دهیم
+            self.fields['parent'].required = False
+            # همه LegalUnit ها را در queryset قرار بده تا validation خودکار Django مشکلی ایجاد نکند
+            # validation واقعی در clean_parent انجام می‌شود
+            self.fields['parent'].queryset = LegalUnit.objects.all()
+            
             # If instance exists (editing), filter by its manifestation
             if self.instance and self.instance.pk and self.instance.manifestation:
+                # برای نمایش در dropdown، فیلتر کن
                 self.fields['parent'].queryset = LegalUnit.objects.filter(
                     manifestation=self.instance.manifestation
                 ).exclude(pk=self.instance.pk)
@@ -162,15 +170,27 @@ class LegalUnitForm(forms.ModelForm):
                     manifestation_id=manifestation_id
                 )
             else:
-                # No manifestation yet, show empty queryset
-                # User must select manifestation first
-                self.fields['parent'].queryset = LegalUnit.objects.none()
+                # No manifestation yet, show empty queryset for display
+                # اما validation را با queryset کامل انجام بده
                 self.fields['parent'].help_text = 'ابتدا نسخه سند را انتخاب کنید'
     
     def clean_parent(self):
         """Custom validation for parent field to allow dynamic filtering."""
-        parent = self.cleaned_data.get('parent')
+        # دریافت parent_id از داده‌های خام (قبل از validation)
+        parent_id = self.data.get('parent')
         manifestation = self.cleaned_data.get('manifestation')
+        
+        # اگر parent_id خالی است، parent را None برگردان
+        if not parent_id:
+            return None
+        
+        # تلاش برای دریافت parent از دیتابیس
+        try:
+            parent = LegalUnit.objects.get(pk=parent_id)
+        except (LegalUnit.DoesNotExist, ValueError):
+            raise forms.ValidationError(
+                'والد انتخاب شده معتبر نیست.'
+            )
         
         if parent and manifestation:
             # Check if parent belongs to the same manifestation
