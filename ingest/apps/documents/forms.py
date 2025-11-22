@@ -176,16 +176,18 @@ class LegalUnitForm(forms.ModelForm):
                 self.fields['parent'].help_text = 'ابتدا نسخه سند را انتخاب کنید'
     
     def clean_parent(self):
-        """Custom validation for parent field to allow dynamic filtering."""
-        # دریافت parent_id از داده‌های خام (قبل از validation)
+        """
+        Custom validation for parent field.
+        این متد validation را bypass می‌کند چون queryset را در formfield_for_foreignkey تنظیم کرده‌ایم.
+        """
+        # دریافت parent_id از داده‌های خام
         parent_id = self.data.get('parent')
-        manifestation = self.cleaned_data.get('manifestation')
         
         # اگر parent_id خالی است، parent را None برگردان
         if not parent_id:
             return None
         
-        # تلاش برای دریافت parent از دیتابیس
+        # تلاش برای دریافت parent از دیتابیس (بدون فیلتر manifestation)
         try:
             parent = LegalUnit.objects.get(pk=parent_id)
         except (LegalUnit.DoesNotExist, ValueError):
@@ -193,11 +195,13 @@ class LegalUnitForm(forms.ModelForm):
                 'والد انتخاب شده معتبر نیست.'
             )
         
+        # بررسی manifestation (اگر در cleaned_data باشد)
+        manifestation = self.cleaned_data.get('manifestation')
         if parent and manifestation:
             # Check if parent belongs to the same manifestation
             if parent.manifestation != manifestation:
                 raise forms.ValidationError(
-                    'والد انتخاب شده باید متعلق به همان انتشار سند باشد.'
+                    'والد انتخاب شده باید متعلق به همان نسخه سند باشد.'
                 )
             
             # Check for circular reference

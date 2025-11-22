@@ -575,12 +575,22 @@ class LegalUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin)
             
             # اعمال فیلتر اگر manifestation پیدا شد
             if manifestation_id:
-                kwargs["queryset"] = LegalUnit.objects.filter(
+                # استفاده از همان queryset که در form استفاده می‌شود
+                queryset = LegalUnit.objects.filter(
                     manifestation_id=manifestation_id
                 ).order_by('order_index', 'number')
+                
+                # اگر در حال ویرایش هستیم، خود object را exclude کن
+                if hasattr(request, 'resolver_match') and request.resolver_match:
+                    object_id = request.resolver_match.kwargs.get('object_id')
+                    if object_id:
+                        queryset = queryset.exclude(pk=object_id)
+                
+                kwargs["queryset"] = queryset
             else:
-                # اگر manifestation نداریم، queryset خالی
-                kwargs["queryset"] = LegalUnit.objects.none()
+                # اگر manifestation نداریم، همه را نشان بده (برای validation)
+                # اما در form این محدود می‌شود
+                kwargs["queryset"] = LegalUnit.objects.all()
         
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
     
