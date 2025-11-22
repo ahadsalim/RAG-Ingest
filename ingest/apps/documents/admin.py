@@ -318,10 +318,13 @@ class InstrumentManifestationAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
 class LegalUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
     """Admin for LegalUnit with MPTT support and Jalali dates."""
     form = LegalUnitForm
-    list_display = ('unit_type', 'parent', 'order_index', 'is_active_display', 'jalali_valid_from_display', 'jalali_valid_to_display', 'chunk_count', 'jalali_created_at_display')
+    # اولین فیلد باید با indent نمایش داده شود برای tree view
+    list_display = ('indented_title', 'unit_type', 'order_index', 'is_active_display', 'jalali_valid_from_display', 'jalali_valid_to_display', 'chunk_count', 'jalali_created_at_display')
     list_filter = ('unit_type', ActiveTodayListFilter, HasExpiryListFilter, 'created_at')
     search_fields = ('content', 'path_label', 'eli_fragment', 'xml_id')
     mptt_level_indent = 20
+    # برای نمایش درختی، باید list_display_links را تنظیم کنیم
+    list_display_links = ('indented_title',)
     readonly_fields = ('path_label', 'created_at', 'updated_at')
     inlines = [LegalUnitVocabularyTermInline, LegalUnitChangeInline]
     actions = ['mark_as_repealed', 'mark_as_active']
@@ -650,6 +653,18 @@ class LegalUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin)
         """Override to prevent duplicate success messages."""
         # Don't show message here, let parent handle it
         return super().response_add(request, obj, post_url_continue)
+    
+    def indented_title(self, obj):
+        """
+        نمایش عنوان با indent برای tree view.
+        این متد توسط MPTTModelAdmin به صورت خودکار indent می‌شود.
+        """
+        # نمایش شماره و محتوا (تا 50 کاراکتر)
+        content = obj.content[:50] if obj.content else ''
+        if obj.number:
+            return f"{obj.number} - {content}"
+        return content
+    indented_title.short_description = 'عنوان'
 
     def get_source_ref(self, obj):
         if obj.work:
