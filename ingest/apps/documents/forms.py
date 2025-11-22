@@ -151,27 +151,28 @@ class LegalUnitForm(forms.ModelForm):
         # Filter parent field based on manifestation
         if 'parent' in self.fields and 'manifestation' in self.fields:
             # غیرفعال کردن validation خودکار Django برای parent
-            # چون queryset را به صورت پویا تغییر می‌دهیم
             self.fields['parent'].required = False
-            # همه LegalUnit ها را در queryset قرار بده تا validation خودکار Django مشکلی ایجاد نکند
-            # validation واقعی در clean_parent انجام می‌شود
-            self.fields['parent'].queryset = LegalUnit.objects.all()
             
             # If instance exists (editing), filter by its manifestation
             if self.instance and self.instance.pk and self.instance.manifestation:
-                # برای نمایش در dropdown، فیلتر کن
+                # فیلتر parent به LegalUnit های همان manifestation
+                # استفاده از .none() و سپس union برای جلوگیری از cache
                 self.fields['parent'].queryset = LegalUnit.objects.filter(
                     manifestation=self.instance.manifestation
-                ).exclude(pk=self.instance.pk)
+                ).exclude(pk=self.instance.pk).order_by('order_index', 'number')
             # If manifestation is set (from initial data), filter by it
             elif self.initial.get('manifestation'):
                 manifestation_id = self.initial.get('manifestation')
+                # تبدیل به string اگر UUID object است
+                if hasattr(manifestation_id, 'hex'):
+                    manifestation_id = str(manifestation_id)
+                # استفاده از filter بدون cache
                 self.fields['parent'].queryset = LegalUnit.objects.filter(
                     manifestation_id=manifestation_id
-                )
+                ).order_by('order_index', 'number')
             else:
-                # No manifestation yet, show empty queryset for display
-                # اما validation را با queryset کامل انجام بده
+                # No manifestation yet, show empty queryset
+                self.fields['parent'].queryset = LegalUnit.objects.none()
                 self.fields['parent'].help_text = 'ابتدا نسخه سند را انتخاب کنید'
     
     def clean_parent(self):

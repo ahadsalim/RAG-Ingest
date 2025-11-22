@@ -544,6 +544,46 @@ class LegalUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin)
         }),
     )
     
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        """
+        بهینه‌سازی parent field برای نمایش فقط LegalUnit های همان manifestation.
+        این متد بهترین روش Django برای فیلتر کردن ForeignKey است.
+        """
+        if db_field.name == "parent":
+            # دریافت manifestation از URL یا object
+            manifestation_id = request.GET.get('manifestation')
+            
+            # اگر در URL نبود، از _changelist_filters بخوان
+            if not manifestation_id:
+                changelist_filters = request.GET.get('_changelist_filters')
+                if changelist_filters and 'manifestation__id__exact' in changelist_filters:
+                    import re
+                    match = re.search(r'manifestation__id__exact[=%]([a-f0-9-]+)', changelist_filters)
+                    if match:
+                        manifestation_id = match.group(1)
+            
+            # اگر در حال ویرایش هستیم، از object بخوان
+            if not manifestation_id and hasattr(request, 'resolver_match'):
+                object_id = request.resolver_match.kwargs.get('object_id')
+                if object_id:
+                    try:
+                        obj = self.model.objects.get(pk=object_id)
+                        if obj.manifestation:
+                            manifestation_id = str(obj.manifestation.id)
+                    except self.model.DoesNotExist:
+                        pass
+            
+            # اعمال فیلتر اگر manifestation پیدا شد
+            if manifestation_id:
+                kwargs["queryset"] = LegalUnit.objects.filter(
+                    manifestation_id=manifestation_id
+                ).order_by('order_index', 'number')
+            else:
+                # اگر manifestation نداریم، queryset خالی
+                kwargs["queryset"] = LegalUnit.objects.none()
+        
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+    
     def get_form(self, request, obj=None, **kwargs):
         # Exclude non-editable fields and hide work/expr since they're auto-populated
         kwargs.setdefault('exclude', []).extend(['id', 'created_at', 'updated_at', 'path_label', 'work', 'expr'])
@@ -560,39 +600,28 @@ class LegalUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin)
                 if match:
                     manifestation_id = match.group(1)
         
-        # Store manifestation_id for later use
+        # Store manifestation_id for later use in formfield_for_foreignkey
         request._manifestation_id = manifestation_id
         
         form = super().get_form(request, obj, **kwargs)
         
-        # If manifestation is provided in URL, make it readonly
+        # If manifestation is provided in URL, set it as initial (not disabled)
         if manifestation_id and 'manifestation' in form.base_fields:
             from ingest.apps.documents.models import InstrumentManifestation
-            from django import forms as django_forms
             try:
                 manifestation = InstrumentManifestation.objects.get(id=manifestation_id)
                 form.base_fields['manifestation'].initial = manifestation
-                form.base_fields['manifestation'].disabled = True
-                form.base_fields['manifestation'].help_text = ''
-                # Use a simple select widget without the add/change/delete buttons
-                form.base_fields['manifestation'].widget = django_forms.Select(
-                    attrs={'disabled': 'disabled'},
-                    choices=[(manifestation.id, str(manifestation))]
-                )
+                # نباید disabled کنیم چون در POST data نخواهد بود
+                form.base_fields['manifestation'].help_text = 'نسخه سند از URL انتخاب شده'
             except InstrumentManifestation.DoesNotExist:
                 pass
         
-        # If editing existing object, make manifestation readonly
+        # If editing existing object, make manifestation readonly با HiddenInput
         if obj and 'manifestation' in form.base_fields:
             from django import forms as django_forms
-            form.base_fields['manifestation'].disabled = True
-            form.base_fields['manifestation'].help_text = ''
-            # Use a simple select widget without the add/change/delete buttons
-            if obj.manifestation:
-                form.base_fields['manifestation'].widget = django_forms.Select(
-                    attrs={'disabled': 'disabled'},
-                    choices=[(obj.manifestation.id, str(obj.manifestation))]
-                )
+            # استفاده از HiddenInput + readonly text برای نمایش
+            form.base_fields['manifestation'].widget = django_forms.HiddenInput()
+            form.base_fields['manifestation'].initial = obj.manifestation
         
         return form
 
