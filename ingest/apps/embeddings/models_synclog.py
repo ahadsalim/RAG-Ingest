@@ -165,6 +165,164 @@ class SyncLog(BaseModel):
         self.save(update_fields=['status', 'retry_count', 'updated_at'])
 
 
+class DeletionLog(BaseModel):
+    """
+    Log برای track کردن حذف chunks و embeddings از هر دو سیستم Ingest و Core.
+    """
+    
+    DELETION_STATUS_CHOICES = [
+        ('pending', 'در انتظار حذف از Core'),
+        ('success', 'حذف موفق از Core'),
+        ('failed', 'خطا در حذف از Core'),
+        ('local_only', 'فقط از Ingest حذف شد (به Core sync نشده بود)'),
+    ]
+    
+    # IDs
+    chunk_id = models.UUIDField(
+        verbose_name='Chunk ID (حذف شده)',
+        db_index=True,
+        help_text='ID چانکی که حذف شده'
+    )
+    
+    embedding_id = models.UUIDField(
+        verbose_name='Embedding ID (حذف شده)',
+        db_index=True,
+        help_text='ID embedding که حذف شده'
+    )
+    
+    node_id = models.UUIDField(
+        null=True,
+        blank=True,
+        verbose_name='Node ID در Core',
+        db_index=True,
+        help_text='ID نود در Core/Qdrant که باید حذف شود'
+    )
+    
+    # Status
+    deletion_status = models.CharField(
+        max_length=20,
+        choices=DELETION_STATUS_CHOICES,
+        default='pending',
+        db_index=True,
+        verbose_name='وضعیت حذف'
+    )
+    
+    # Timestamps
+    deleted_from_ingest_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='زمان حذف از Ingest'
+    )
+    
+    deleted_from_core_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='زمان حذف از Core'
+    )
+    
+    # Retry
+    retry_count = models.PositiveIntegerField(
+        default=0,
+        verbose_name='تعداد تلاش مجدد'
+    )
+    
+    last_retry_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='آخرین تلاش'
+    )
+    
+    # Error tracking
+    error_message = models.TextField(
+        blank=True,
+        verbose_name='پیام خطا'
+    )
+    
+    # Metadata
+    chunk_metadata = models.JSONField(
+        null=True,
+        blank=True,
+        verbose_name='اطلاعات Chunk',
+        help_text='اطلاعات chunk برای reference'
+    )
+    
+    class Meta:
+        verbose_name = 'لاگ حذف'
+        verbose_name_plural = 'لاگ‌های حذف'
+        ordering = ['-deleted_from_ingest_at']
+        indexes = [
+            models.Index(fields=['deletion_status', 'retry_count']),
+            models.Index(fields=['node_id', 'deletion_status']),
+            models.Index(fields=['deleted_from_ingest_at']),
+        ]
+    
+    def __str__(self):
+        return f"DeletionLog Chunk {self.chunk_id} - {self.deletion_status}"
+    
+    @classmethod
+    def get_pending_deletions(cls, max_retries: int = 5):
+        """دریافت حذف‌های pending که باید retry شوند."""
+        return cls.objects.filter(
+            deletion_status__in=['pending', 'failed'],
+            retry_count__lt=max_retries,
+            node_id__isnull=False
+        ).order_by('deleted_from_ingest_at')
+    
+    @classmethod
+    def get_failed_deletions(cls):
+        """دریافت حذف‌های failed که نیاز به بررسی دارند."""
+        return cls.objects.filter(
+            deletion_status='failed',
+            retry_count__gte=5
+        ).order_by('-deleted_from_ingest_at')
+    
+    def mark_success(self):
+        """علامت‌گذاری به عنوان موفق."""
+        self.deletion_status = 'success'
+        self.deleted_from_core_at = timezone.now()
+        self.save(update_fields=['deletion_status', 'deleted_from_core_at', 'updated_at'])
+    
+    def mark_failed(self, error_message: str):
+        """علامت‌گذاری به عنوان failed."""
+        self.deletion_status = 'failed'
+        self.error_message = error_message
+        self.retry_count += 1
+        self.last_retry_at = timezone.now()
+        self.save(update_fields=['deletion_status', 'error_message', 'retry_count', 'last_retry_at', 'updated_at'])
+    
+    def retry_deletion(self):
+        """تلاش مجدد برای حذف از Core."""
+        if not self.node_id:
+            return False, "No node_id available"
+        
+        try:
+            from ingest.apps.embeddings.models import CoreConfig
+            import requests
+            
+            config = CoreConfig.get_config()
+            if not config or not config.core_api_url:
+                return False, "Core config not available"
+            
+            headers = {'Content-Type': 'application/json'}
+            if config.core_api_key:
+                headers['X-API-Key'] = config.core_api_key
+            
+            url = f"{config.core_api_url}/api/v1/sync/node/{self.node_id}"
+            response = requests.delete(url, headers=headers, timeout=10)
+            
+            if response.status_code in [200, 204]:
+                self.mark_success()
+                return True, "Successfully deleted from Core"
+            else:
+                error_msg = f"HTTP {response.status_code}: {response.text[:500]}"
+                self.mark_failed(error_msg)
+                return False, error_msg
+        
+        except Exception as e:
+            error_msg = str(e)[:500]
+            self.mark_failed(error_msg)
+            return False, error_msg
+
+
 class SyncStats(models.Model):
     """
     آمار کلی sync برای monitoring.

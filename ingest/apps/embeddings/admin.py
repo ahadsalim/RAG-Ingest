@@ -5,11 +5,13 @@ from django.shortcuts import render
 from django.db.models import Count
 from django.contrib.contenttypes.models import ContentType
 from django.conf import settings
+from django.utils import timezone
 from datetime import datetime, timedelta
 import requests
 
 from simple_history.admin import SimpleHistoryAdmin
 from ingest.apps.embeddings.models import Embedding, CoreConfig, SyncLog, SyncStats
+from ingest.apps.embeddings.models_synclog import DeletionLog
 from ingest.admin import admin_site
 from ingest.apps.documents.models import Chunk, QAEntry, LegalUnit
 from ingest.core.admin_mixins import JalaliAdminMixin as SimpleJalaliAdminMixin
@@ -834,6 +836,111 @@ class SyncLogAdmin(SimpleJalaliAdminMixin, admin.ModelAdmin):
         )
     
     verify_selected.short_description = 'Verify selected logs'
+
+
+# DeletionLog Admin
+@admin.register(DeletionLog, site=admin_site)
+class DeletionLogAdmin(SimpleJalaliAdminMixin, admin.ModelAdmin):
+    """Admin برای DeletionLog - نمایش و مدیریت حذف‌های pending"""
+    
+    list_display = ('chunk_id', 'deletion_status_display', 'node_id', 'retry_count', 
+                   'jalali_deleted_from_ingest_at_display', 'jalali_deleted_from_core_at_display')
+    list_filter = ('deletion_status', 'retry_count', 'deleted_from_ingest_at')
+    search_fields = ('chunk_id', 'embedding_id', 'node_id', 'error_message')
+    readonly_fields = ('chunk_id', 'embedding_id', 'node_id', 'deleted_from_ingest_at',
+                      'deleted_from_core_at', 'retry_count', 'last_retry_at', 
+                      'error_message', 'chunk_metadata', 'created_at', 'updated_at')
+    
+    actions = ['retry_deletion_action', 'mark_as_success']
+    
+    def deletion_status_display(self, obj):
+        """نمایش وضعیت با رنگ"""
+        colors = {
+            'success': 'green',
+            'pending': 'orange',
+            'failed': 'red',
+            'local_only': 'gray',
+        }
+        icons = {
+            'success': '✓',
+            'pending': '⧗',
+            'failed': '✗',
+            'local_only': '○',
+        }
+        color = colors.get(obj.deletion_status, 'black')
+        icon = icons.get(obj.deletion_status, '?')
+        label = obj.get_deletion_status_display()
+        return format_html(
+            '<span style="color: {};">{} {}</span>',
+            color, icon, label
+        )
+    deletion_status_display.short_description = 'وضعیت حذف'
+    
+    def jalali_deleted_from_ingest_at_display(self, obj):
+        """نمایش تاریخ حذف از Ingest"""
+        if obj.deleted_from_ingest_at:
+            from ingest.core.jalali import to_jalali_datetime
+            return to_jalali_datetime(obj.deleted_from_ingest_at)
+        return '-'
+    jalali_deleted_from_ingest_at_display.short_description = 'حذف از Ingest'
+    
+    def jalali_deleted_from_core_at_display(self, obj):
+        """نمایش تاریخ حذف از Core"""
+        if obj.deleted_from_core_at:
+            from ingest.core.jalali import to_jalali_datetime
+            return to_jalali_datetime(obj.deleted_from_core_at)
+        return '-'
+    jalali_deleted_from_core_at_display.short_description = 'حذف از Core'
+    
+    def retry_deletion_action(self, request, queryset):
+        """تلاش مجدد برای حذف از Core"""
+        success_count = 0
+        failed_count = 0
+        
+        for deletion_log in queryset.filter(deletion_status__in=['pending', 'failed']):
+            if deletion_log.retry_count >= 5:
+                continue
+            
+            success, message = deletion_log.retry_deletion()
+            if success:
+                success_count += 1
+            else:
+                failed_count += 1
+        
+        if success_count > 0:
+            self.message_user(
+                request,
+                f'✅ {success_count} مورد با موفقیت از Core حذف شد',
+                level=messages.SUCCESS
+            )
+        if failed_count > 0:
+            self.message_user(
+                request,
+                f'❌ {failed_count} مورد با خطا مواجه شد',
+                level=messages.WARNING
+            )
+    
+    retry_deletion_action.short_description = 'تلاش مجدد برای حذف از Core'
+    
+    def mark_as_success(self, request, queryset):
+        """علامت‌گذاری به عنوان موفق (برای موارد manual)"""
+        count = queryset.filter(deletion_status__in=['pending', 'failed']).update(
+            deletion_status='success',
+            deleted_from_core_at=timezone.now()
+        )
+        self.message_user(
+            request,
+            f'✅ {count} مورد به عنوان موفق علامت‌گذاری شد',
+            level=messages.SUCCESS
+        )
+    
+    mark_as_success.short_description = 'علامت‌گذاری به عنوان موفق'
+    
+    def has_add_permission(self, request):
+        return False
+    
+    def has_change_permission(self, request, obj=None):
+        return False
 
 
 # SyncStats Admin
