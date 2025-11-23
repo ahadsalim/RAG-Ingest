@@ -25,15 +25,20 @@
     white-space: nowrap;
 }
 
-/* جلوگیری از wrap شدن محتوا */
-#result_list td {
-    white-space: nowrap;
+/* جلوگیری از wrap شدن محتوا در ستون‌های خاص */
+#result_list .field-unit_type_display,
+#result_list .field-order_index_display,
+#result_list .field-chunk_display,
+#result_list .field-jalali_created_at_display {
+    white-space: nowrap !important;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-/* عنوان می‌تواند wrap شود */
+/* عنوان می‌تواند wrap شود و عرض زیاد داشته باشد */
 #result_list .field-indented_title_short {
     white-space: normal !important;
     max-width: none !important;
+    width: auto !important;
+    overflow: visible !important;
 }
