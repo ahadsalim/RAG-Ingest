@@ -1034,7 +1034,7 @@ class QAEntryAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
 admin_site.register(InstrumentWork, InstrumentWorkAdmin)
 admin_site.register(InstrumentExpression, InstrumentExpressionAdmin)
 admin_site.register(InstrumentManifestation, InstrumentManifestationAdmin)
-# admin_site.register(LegalUnit, LegalUnitAdmin)  # غیرفعال - فقط از LUnit استفاده می‌کنیم
+admin_site.register(LegalUnit, LegalUnitAdmin)
 admin_site.register(InstrumentRelation, InstrumentRelationAdmin)
 admin_site.register(PinpointCitation, PinpointCitationAdmin)
 admin_site.register(FileAsset, FileAssetAdmin)
