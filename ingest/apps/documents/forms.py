@@ -23,7 +23,8 @@ from .models import (
     InstrumentExpression, 
     InstrumentManifestation, 
     InstrumentRelation,
-    LegalUnit
+    LegalUnit,
+    LUnit
 )
 
 
@@ -276,6 +277,160 @@ class LegalUnitForm(forms.ModelForm):
     class Meta:
         model = LegalUnit
         fields = '__all__'
+
+
+class LUnitForm(forms.ModelForm):
+    """
+    فرم بهینه شده برای LUnit با layout بهتر و تجربه کاربری ساده‌تر.
+    """
+    
+    valid_from = JalaliDateField(
+        label='تاریخ تصویب / اجرا',
+        required=False,
+        help_text='فرمت: 1402/01/15' if JALALI_AVAILABLE else 'فرمت: YYYY-MM-DD'
+    )
+    
+    valid_to = JalaliDateField(
+        label='تاریخ پایان اعتبار',
+        required=False,
+        help_text=''  # توضیحات در template نمایش داده می‌شود
+    )
+    
+    def __init__(self, *args, **kwargs):
+        # دریافت manifestation_id از kwargs
+        self.manifestation_id = kwargs.pop('manifestation_id', None)
+        
+        super().__init__(*args, **kwargs)
+        
+        if JALALI_AVAILABLE:
+            self.fields['valid_from'].widget = JalaliDateWidget()
+            self.fields['valid_to'].widget = JalaliDateWidget()
+        
+        # تنظیمات فیلد محتوا
+        if 'content' in self.fields:
+            self.fields['content'].widget = forms.Textarea(attrs={
+                'rows': 12,
+                'cols': 100,
+                'style': 'width: 95%; font-family: "Vazirmatn", "Tahoma", sans-serif; font-size: 14px;'
+            })
+        
+        # تنظیمات فیلدهای کوچک (در یک خط)
+        if 'unit_type' in self.fields:
+            self.fields['unit_type'].widget.attrs['style'] = 'width: 200px;'
+        
+        if 'number' in self.fields:
+            self.fields['number'].widget.attrs['style'] = 'width: 150px;'
+            self.fields['number'].widget.attrs['placeholder'] = 'مثال: 1'
+        
+        if 'order_index' in self.fields:
+            self.fields['order_index'].widget.attrs['style'] = 'width: 100px;'
+            self.fields['order_index'].widget.attrs['placeholder'] = '0'
+        
+        # فیلتر parent بر اساس manifestation
+        if 'parent' in self.fields:
+            self.fields['parent'].required = False
+            
+            # تعیین manifestation
+            manifestation = None
+            if self.instance and self.instance.pk:
+                # Edit mode
+                manifestation = self.instance.manifestation
+            elif self.manifestation_id:
+                # Add mode با manifestation_id
+                manifestation = self.manifestation_id
+            elif self.initial.get('manifestation'):
+                # Add mode با initial
+                manifestation = self.initial.get('manifestation')
+            
+            # فیلتر parent queryset
+            if manifestation:
+                from .models import LegalUnit
+                manifestation_id = manifestation.id if hasattr(manifestation, 'id') else manifestation
+                
+                queryset = LegalUnit.objects.filter(
+                    manifestation_id=manifestation_id
+                ).only('id', 'number', 'unit_type', 'content', 'order_index').order_by('order_index', 'number')
+                
+                if self.instance and self.instance.pk:
+                    queryset = queryset.exclude(pk=self.instance.pk)
+                
+                self.fields['parent'].queryset = queryset
+            else:
+                self.fields['parent'].queryset = LegalUnit.objects.none()
+                self.fields['parent'].help_text = 'ابتدا سند را انتخاب کنید'
+    
+    def clean_parent(self):
+        """Validation برای parent field."""
+        parent_id = self.data.get('parent')
+        
+        if not parent_id:
+            return None
+        
+        # استفاده از queryset فیلد
+        try:
+            parent = self.fields['parent'].queryset.get(pk=parent_id)
+        except:
+            try:
+                from .models import LegalUnit
+                parent = LegalUnit.objects.get(pk=parent_id)
+            except:
+                raise forms.ValidationError('والد انتخاب شده معتبر نیست.')
+        
+        # تعیین manifestation
+        if self.instance and self.instance.pk:
+            manifestation = self.instance.manifestation
+        else:
+            manifestation = self.cleaned_data.get('manifestation')
+        
+        # بررسی manifestation
+        if parent and manifestation:
+            if parent.manifestation != manifestation:
+                raise forms.ValidationError('والد انتخاب شده باید متعلق به همان سند باشد.')
+            
+            if self.instance and self.instance.pk and parent.pk == self.instance.pk:
+                raise forms.ValidationError('یک بند نمی‌تواند والد خودش باشد.')
+        
+        return parent
+    
+    def clean(self):
+        """Validation کلی."""
+        cleaned_data = super().clean()
+        
+        # تعیین manifestation برای update کردن parent queryset
+        if self.instance and self.instance.pk:
+            manifestation = self.instance.manifestation
+        else:
+            manifestation = cleaned_data.get('manifestation')
+        
+        # Update parent queryset
+        if manifestation and 'parent' in self.fields:
+            from .models import LegalUnit
+            manifestation_id = manifestation.id if hasattr(manifestation, 'id') else manifestation
+            
+            valid_parents = LegalUnit.objects.filter(manifestation_id=manifestation_id)
+            if self.instance and self.instance.pk:
+                valid_parents = valid_parents.exclude(pk=self.instance.pk)
+            
+            self.fields['parent'].queryset = valid_parents
+        
+        return cleaned_data
+    
+    def save(self, commit=True):
+        """ذخیره با تنظیمات پیش‌فرض."""
+        instance = super().save(commit=False)
+        
+        # اگر valid_from خالی است، از publication_date استفاده کن
+        if not instance.valid_from and instance.manifestation:
+            if hasattr(instance.manifestation, 'publication_date') and instance.manifestation.publication_date:
+                instance.valid_from = instance.manifestation.publication_date
+        
+        if commit:
+            instance.save()
+        return instance
+    
+    class Meta:
+        model = LUnit
+        exclude = ['id', 'created_at', 'updated_at', 'path_label', 'work', 'expr', 'eli_fragment', 'xml_id']
 
 
 class FileAssetForm(forms.ModelForm):

@@ -384,6 +384,17 @@ class LegalUnit(MPTTModel, BaseModel):
         super().save(*args, **kwargs)
 
 
+class LUnit(LegalUnit):
+    """
+    Proxy model for LegalUnit with simplified admin interface.
+    بازنویسی رابط کاربری LegalUnit با تجربه کاربری بهتر.
+    """
+    class Meta:
+        proxy = True
+        verbose_name = 'بند سند حقوقی'
+        verbose_name_plural = 'بندهای اسناد حقوقی'
+
+
 class LegalUnitChange(BaseModel):
     """
     Change log for legal amendments with effective dates.

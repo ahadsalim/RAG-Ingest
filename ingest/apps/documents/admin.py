@@ -13,7 +13,7 @@ from ingest.core.admin_mixins import JalaliAdminMixin as SimpleJalaliAdminMixin
 
 from .models import (
     InstrumentWork, InstrumentExpression, InstrumentManifestation,
-    LegalUnit, LegalUnitChange, LegalUnitVocabularyTerm, InstrumentRelation, PinpointCitation,
+    LegalUnit, LUnit, LegalUnitChange, LegalUnitVocabularyTerm, InstrumentRelation, PinpointCitation,
     FileAsset, Chunk, IngestLog, QAEntry
 )
 from .forms import (
@@ -1040,3 +1040,7 @@ admin_site.register(PinpointCitation, PinpointCitationAdmin)
 admin_site.register(FileAsset, FileAssetAdmin)
 admin_site.register(QAEntry, QAEntryAdmin)
 admin_site.register(Chunk, ChunkAdminRegistered)  # Register after QAEntry for sidebar ordering
+
+# ثبت LUnit با admin سفارشی
+from .admin_lunit import LUnitAdmin
+admin_site.register(LUnit, LUnitAdmin)
