@@ -32,6 +32,22 @@
         position: relative;
     }
     
+    /* FIX: autocomplete dropdown باید روی fieldset باشد */
+    .parent-autocomplete-results,
+    .ui-autocomplete {
+        z-index: 9999 !important;
+        position: absolute !important;
+    }
+    
+    /* FIX: fieldset نباید overflow hidden داشته باشد */
+    fieldset {
+        overflow: visible !important;
+    }
+    
+    .module {
+        overflow: visible !important;
+    }
+    
     /* تنظیم عرض فیلدها برای جا شدن در یک خط */
     .field-order_index input {
         width: 80px !important;
@@ -66,6 +82,11 @@
     .field-number label,
     .field-content label {
         font-weight: normal !important;
+    }
+    
+    /* حذف breadcrumbs دوم (path) */
+    #content h1 + p {
+        display: none !important;
     }
 </style>
 {% endblock %}
