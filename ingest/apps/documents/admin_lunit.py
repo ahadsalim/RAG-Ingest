@@ -149,11 +149,12 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
                 Q(content__icontains=query)
             )
         
-        parents = parents.only('id', 'unit_type', 'number', 'content', 'path_label').order_by('order_index', 'number')[:30]
+        # مرتب‌سازی: ابتدا بر اساس parent order، سپس order_index خودش
+        parents = parents.only('id', 'unit_type', 'number', 'content', 'path_label', 'parent').select_related('parent').order_by('parent__order_index', 'order_index', 'number')[:30]
         
         results = []
         for parent in parents:
-            # ترکیب: مسیر + نوع + شماره + 15 کاراکتر اول محتوا
+            # ترکیب: مسیر + نوع + شماره + محتوا
             display_parts = []
             if parent.path_label:
                 display_parts.append(parent.path_label)
