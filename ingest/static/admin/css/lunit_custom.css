@@ -1,0 +1,39 @@
+/* Custom CSS for LUnit Admin List */
+
+/* کاهش عرض ستون‌های خاص */
+#result_list .field-unit_type_display {
+    width: 80px !important;
+    max-width: 80px !important;
+    white-space: nowrap;
+}
+
+#result_list .field-order_index_display {
+    width: 60px !important;
+    max-width: 60px !important;
+    text-align: center;
+}
+
+#result_list .field-chunk_display {
+    width: 60px !important;
+    max-width: 60px !important;
+    text-align: center;
+}
+
+#result_list .field-jalali_created_at_display {
+    width: 120px !important;
+    max-width: 120px !important;
+    white-space: nowrap;
+}
+
+/* جلوگیری از wrap شدن محتوا */
+#result_list td {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* عنوان می‌تواند wrap شود */
+#result_list .field-indented_title_short {
+    white-space: normal !important;
+    max-width: none !important;
+}

@@ -32,8 +32,13 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
     """
     form = LUnitForm
     
+    class Media:
+        css = {
+            'all': ('admin/css/lunit_custom.css',)
+        }
+    
     # List display
-    list_display = ('indented_title_short', 'unit_type', 'order_index', 'chunk_display', 'jalali_created_at_display')
+    list_display = ('indented_title_short', 'unit_type_display', 'order_index_display', 'chunk_display', 'jalali_created_at_display')
     list_filter = ('unit_type', 'created_at')
     search_fields = ('content', 'path_label', 'number')
     mptt_level_indent = 20
@@ -242,6 +247,18 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
             content += '...'
         return format_html('<span style="font-weight: normal; font-size: 13px;">{}</span>', content)
     indented_title_short.short_description = 'عنوان'
+    
+    def unit_type_display(self, obj):
+        """نمایش نوع واحد با عرض کمتر."""
+        return obj.get_unit_type_display() if obj.unit_type else '-'
+    unit_type_display.short_description = 'واحد'
+    unit_type_display.admin_order_field = 'unit_type'
+    
+    def order_index_display(self, obj):
+        """نمایش ترتیب با عرض کمتر."""
+        return obj.order_index if obj.order_index is not None else '-'
+    order_index_display.short_description = 'ترتیب'
+    order_index_display.admin_order_field = 'order_index'
     
     def chunk_display(self, obj):
         """نمایش تعداد چانک‌ها."""
