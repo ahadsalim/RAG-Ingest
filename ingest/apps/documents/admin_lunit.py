@@ -317,10 +317,6 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
         تنظیمات فرم.
         در edit mode: manifestation را exclude کن.
         """
-        # در edit mode: exclude manifestation
-        if obj:
-            kwargs.setdefault('exclude', []).append('manifestation')
-        
         # Get manifestation_id از URL
         manifestation_id = request.GET.get('manifestation')
         
