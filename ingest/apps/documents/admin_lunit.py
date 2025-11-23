@@ -110,24 +110,41 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
             'ضمیمه': 'appendix',
         }
         
-        # بررسی آیا query یک نوع واحد است
-        query_lower = query.lower()
+        # بررسی آیا query شامل نوع واحد + شماره است (مثل "فصل 2")
+        query_lower = query.lower().strip()
         unit_type_filter = None
+        number_filter = None
+        
+        # چک کردن آیا query شامل نوع واحد + شماره است
         for persian_name, english_code in unit_type_map.items():
-            if query_lower == persian_name.lower():
+            if query_lower.startswith(persian_name.lower()):
                 unit_type_filter = english_code
+                # استخراج شماره بعد از نوع واحد
+                remaining = query_lower[len(persian_name):].strip()
+                if remaining:
+                    number_filter = remaining
                 break
+        
+        # اگر فقط نوع واحد بود (بدون شماره)
+        if not unit_type_filter:
+            for persian_name, english_code in unit_type_map.items():
+                if query_lower == persian_name.lower():
+                    unit_type_filter = english_code
+                    break
         
         # ساخت query
         base_query = LegalUnit.objects.filter(manifestation_id=manifestation_id)
         
         if unit_type_filter:
-            # جستجوی دقیق بر اساس نوع واحد
+            # جستجوی بر اساس نوع واحد
             parents = base_query.filter(unit_type=unit_type_filter)
+            # اگر شماره هم داده شده، فیلتر کن
+            if number_filter:
+                parents = parents.filter(number=number_filter)
         else:
-            # جستجوی عمومی در شماره یا محتوا
+            # جستجوی دقیق در شماره (exact match) یا محتوا
             parents = base_query.filter(
-                Q(number__icontains=query) |
+                Q(number__exact=query) |
                 Q(content__icontains=query)
             )
         
