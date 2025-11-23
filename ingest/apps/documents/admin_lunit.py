@@ -117,15 +117,20 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
     
     # از get_fieldsets استفاده می‌کنیم تا parent با widget سفارشی اضافه شود
     def get_fieldsets(self, request, obj=None):
-        """Fieldsets بهینه شده."""
+        """Fieldsets بهینه شده - والد و محتوا در یک fieldset."""
         # در edit mode: بدون manifestation
         if obj:
             return (
                 ('', {
                     'fields': (
                         'parent',
-                        ('unit_type', 'number', 'order_index'),
                         'content',
+                    ),
+                    'classes': ('wide',),
+                }),
+                ('اطلاعات بند', {
+                    'fields': (
+                        ('unit_type', 'number', 'order_index'),
                         ('valid_from', 'valid_to'),
                     ),
                     'classes': ('wide',),
@@ -138,8 +143,13 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
                     'fields': (
                         'manifestation',
                         'parent',
-                        ('unit_type', 'number', 'order_index'),
                         'content',
+                    ),
+                    'classes': ('wide',),
+                }),
+                ('اطلاعات بند', {
+                    'fields': (
+                        ('unit_type', 'number', 'order_index'),
                         ('valid_from', 'valid_to'),
                     ),
                     'classes': ('wide',),

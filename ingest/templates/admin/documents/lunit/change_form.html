@@ -4,34 +4,6 @@
 {# حذف breadcrumbs - فقط h1 با path کامل نمایش داده شود #}
 {% endblock %}
 
-{% block field_sets %}
-{# Override field_sets برای استفاده از table به جای fieldset #}
-{% for fieldset in adminform %}
-  <div class="module aligned">
-    <table style="width: 100%; border-collapse: collapse;">
-      {% for line in fieldset %}
-        {% for field in line %}
-          <tr>
-            <td style="width: 150px; padding: 10px; vertical-align: top; text-align: right;">
-              {{ field.field.label_tag }}
-            </td>
-            <td style="padding: 10px;">
-              {{ field.field }}
-              {% if field.field.help_text %}
-                <div style="color: #666; font-size: 11px; margin-top: 5px;">{{ field.field.help_text }}</div>
-              {% endif %}
-              {% if field.field.errors %}
-                <div style="color: red; margin-top: 5px;">{{ field.field.errors }}</div>
-              {% endif %}
-            </td>
-          </tr>
-        {% endfor %}
-      {% endfor %}
-    </table>
-  </div>
-{% endfor %}
-{% endblock %}
-
 {% block extrastyle %}
 {{ block.super }}
 <style>
