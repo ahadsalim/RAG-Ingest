@@ -46,9 +46,9 @@
                         </span>
                     </td>
                     <td style="padding: 12px; text-align: center; color: #666;">
-                        {% load jformat %}
                         {% if manifestation.publication_date %}
-                            {{ manifestation.publication_date|jformat:"%Y/%m/%d" }}
+                            {% load ingest_jalali %}
+                            {{ manifestation.publication_date|jalali_date }}
                         {% else %}
                             -
                         {% endif %}
