@@ -273,11 +273,18 @@ class ChunkProcessingService:
         """
         from .models import Chunk
         
-        results = {'chunks_created': 0, 'embeddings_created': 0}
+        results = {'chunks_created': 0, 'embeddings_created': 0, 'chunks_deleted': 0}
         
         # Skip if unit has no content
         if not unit.content or not unit.content.strip():
             return results
+        
+        # حذف چانک‌های قدیمی قبل از ایجاد چانک‌های جدید
+        # توجه: حذف Chunk به صورت خودکار Embedding های مرتبط را هم حذف می‌کند (CASCADE)
+        old_chunks_count = Chunk.objects.filter(unit=unit).count()
+        if old_chunks_count > 0:
+            Chunk.objects.filter(unit=unit).delete()
+            results['chunks_deleted'] = old_chunks_count
         
         # Create chunks for the legal unit
         chunks = self.chunking_service.chunk_text(unit.content)
