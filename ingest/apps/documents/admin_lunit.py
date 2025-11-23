@@ -32,6 +32,7 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
     """
     form = LUnitForm
     
+    change_list_template = 'admin/documents/lunit_change_list_custom.html'
     
     # List display
     list_display = ('indented_title_short', 'is_active_display', 'unit_type_display', 'order_index_display', 'chunk_display', 'jalali_created_at_display')
@@ -142,6 +143,18 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
             )
         except:
             pass
+        
+        # اضافه CSS برای کاهش عرض sidebar
+        extra_context['extra_css'] = '''
+        <style>
+            #changelist-filter {
+                width: 180px !important;
+            }
+            #changelist {
+                margin-left: 200px !important;
+            }
+        </style>
+        '''
         
         return super().changelist_view(request, extra_context)
     
