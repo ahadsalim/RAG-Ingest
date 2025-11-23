@@ -66,7 +66,6 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
                     'content',
                     ('valid_from', 'valid_to'),
                 ),
-                'description': '<p style="color: #666; margin-top: 10px;">خالی گذاشتن فیلد "تاریخ پایان اعتبار" به معنی بدون تاریخ انقضا است.</p>',
                 'classes': ('wide',),
             }),
         )

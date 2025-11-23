@@ -294,7 +294,7 @@ class LUnitForm(forms.ModelForm):
     valid_to = JalaliDateField(
         label='تاریخ پایان اعتبار',
         required=False,
-        help_text=''
+        help_text='خالی گذاشتن این فیلد به معنی بدون تاریخ انقضا است.'
     )
     
     def __init__(self, *args, **kwargs):
