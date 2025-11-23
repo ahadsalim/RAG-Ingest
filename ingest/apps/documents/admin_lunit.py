@@ -133,7 +133,7 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
                     unit_type_filter = english_code
                     break
         
-        # ساخت query
+        # ساخت query - همه موارد (فعال و غیرفعال)
         base_query = LegalUnit.objects.filter(manifestation_id=manifestation_id)
         
         if unit_type_filter:
@@ -150,12 +150,17 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
             )
         
         # مرتب‌سازی: ابتدا بر اساس parent order، سپس order_index خودش
-        parents = parents.only('id', 'unit_type', 'number', 'content', 'path_label', 'parent').select_related('parent').order_by('parent__order_index', 'order_index', 'number')[:30]
+        parents = parents.only('id', 'unit_type', 'number', 'content', 'path_label', 'parent', 'is_active', 'valid_from', 'valid_to').select_related('parent').order_by('parent__order_index', 'order_index', 'number')[:30]
         
         results = []
         for parent in parents:
             # ترکیب: مسیر + نوع + شماره + محتوا
             display_parts = []
+            
+            # اضافه نماد فعال/غیرفعال
+            status_icon = '✓' if parent.is_active else '✗'
+            display_parts.append(status_icon)
+            
             if parent.path_label:
                 display_parts.append(parent.path_label)
             display_parts.append(parent.get_unit_type_display())
@@ -171,7 +176,8 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
                 'number': parent.number or '',
                 'path': parent.path_label or '',
                 'content': content_preview,
-                'display': display
+                'display': display,
+                'is_active': parent.is_active
             })
         
         return JsonResponse({'results': results})
