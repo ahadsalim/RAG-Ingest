@@ -76,8 +76,8 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
         chunks_deleted = 0
         
         for obj in queryset:
-            # حذف chunks مرتبط
-            related_chunks = Chunk.objects.filter(legal_unit=obj)
+            # حذف chunks مرتبط (فیلد درست: unit نه legal_unit)
+            related_chunks = Chunk.objects.filter(unit=obj)
             chunk_count = related_chunks.count()
             
             # حذف embeddings از طریق cascade
