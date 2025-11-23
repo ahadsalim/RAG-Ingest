@@ -1,5 +1,13 @@
-{% extends "admin/change_list.html" %}
+{% extends "admin/base_site.html" %}
 {% load i18n static %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+    &rsaquo; <a href="{% url 'admin:app_list' app_label='documents' %}">اسناد</a>
+    &rsaquo; اسناد حقوقی
+</div>
+{% endblock %}
 
 {% block content %}
 <div id="content-main">
