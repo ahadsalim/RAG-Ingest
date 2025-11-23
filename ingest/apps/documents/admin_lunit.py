@@ -32,7 +32,6 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
     """
     form = LUnitForm
     
-    change_list_template = 'admin/documents/lunit_change_list_custom.html'
     
     # List display
     list_display = ('indented_title_short', 'is_active_display', 'unit_type_display', 'order_index_display', 'chunk_display', 'jalali_created_at_display')
@@ -103,6 +102,15 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
         
         return JsonResponse({'results': results})
     
+    def get_changelist_template(self, request):
+        """انتخاب template بر اساس اینکه manifestation انتخاب شده یا نه."""
+        manifestation_id = request.GET.get('manifestation__id__exact')
+        if manifestation_id:
+            # وقتی manifestation انتخاب شده، از template سفارشی با sidebar کوچک استفاده کن
+            return 'admin/documents/lunit_change_list_custom.html'
+        # وقتی manifestation انتخاب نشده، از template پیش‌فرض استفاده کن
+        return super().get_changelist_template(request)
+    
     def changelist_view(self, request, extra_context=None):
         """
         نمایش لیست manifestation ها اگر manifestation انتخاب نشده.
@@ -143,18 +151,6 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
             )
         except:
             pass
-        
-        # اضافه CSS برای کاهش عرض sidebar
-        extra_context['extra_css'] = '''
-        <style>
-            #changelist-filter {
-                width: 180px !important;
-            }
-            #changelist {
-                margin-left: 200px !important;
-            }
-        </style>
-        '''
         
         return super().changelist_view(request, extra_context)
     
