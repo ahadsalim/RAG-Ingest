@@ -29,7 +29,7 @@
             <tbody>
                 {% for manifestation in manifestations %}
                 <tr style="border-bottom: 1px solid #eee; {% cycle 'background: #fff;' 'background: #f9f9f9;' %}">
-                    <td style="padding: 12px;">
+                    <td style="padding: 12px; font-weight: normal; font-size: 13px;">
                         {% if manifestation.expr and manifestation.expr.work %}
                             {{ manifestation.expr.work.title_official }}
                         {% else %}
