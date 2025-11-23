@@ -177,6 +177,19 @@ document.addEventListener('DOMContentLoaded', function() {
     themeButtons.forEach(button => {
         button.style.display = 'none';
     });
+    
+    // Shortkey F2 برای دکمه اضافه کردن - در همه صفحات admin
+    document.addEventListener('keydown', function(e) {
+        // F2 برای اضافه کردن
+        if (e.key === 'F2') {
+            e.preventDefault();
+            // پیدا کردن دکمه اضافه کردن
+            const addButton = document.querySelector('.object-tools .addlink, .object-tools a.addlink');
+            if (addButton) {
+                window.location.href = addButton.href;
+            }
+        }
+    });
 });
 </script>
 {% endblock %}
