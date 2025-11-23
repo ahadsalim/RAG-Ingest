@@ -32,10 +32,6 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
     """
     form = LUnitForm
     
-    class Media:
-        css = {
-            'all': ('admin/css/lunit_custom.css',)
-        }
     
     # List display
     list_display = ('indented_title_short', 'unit_type_display', 'order_index_display', 'chunk_display', 'jalali_created_at_display')
@@ -250,21 +246,22 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
     
     def unit_type_display(self, obj):
         """نمایش نوع واحد با عرض کمتر."""
-        return obj.get_unit_type_display() if obj.unit_type else '-'
+        value = obj.get_unit_type_display() if obj.unit_type else '-'
+        return format_html('<span style="display: inline-block; width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{}</span>', value)
     unit_type_display.short_description = 'واحد'
     unit_type_display.admin_order_field = 'unit_type'
     
     def order_index_display(self, obj):
         """نمایش ترتیب با عرض کمتر."""
-        return obj.order_index if obj.order_index is not None else '-'
+        value = obj.order_index if obj.order_index is not None else '-'
+        return format_html('<span style="display: inline-block; width: 60px; text-align: center;">{}</span>', value)
     order_index_display.short_description = 'ترتیب'
     order_index_display.admin_order_field = 'order_index'
     
     def chunk_display(self, obj):
         """نمایش تعداد چانک‌ها."""
         count = obj.chunks.count() if hasattr(obj, 'chunks') else 0
-        if count > 0:
-            return format_html('<span style="color: green;">{}</span>', count)
-        return format_html('<span style="color: #999;">0</span>')
+        color = 'green' if count > 0 else '#999'
+        return format_html('<span style="display: inline-block; width: 60px; text-align: center; color: {};">{}</span>', color, count)
     chunk_display.short_description = 'چانک'
     chunk_display.admin_order_field = 'chunks__count'
