@@ -394,10 +394,28 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
     def save_model(self, request, obj, form, change):
         """ذخیره با auto-populate."""
         
-        # در add mode، اگر manifestation نداریم، از parent بگیر
+        # در add mode، اگر manifestation نداریم
         if not change and not obj.manifestation:
+            # اول سعی کن از parent بگیر
             if obj.parent and obj.parent.manifestation:
                 obj.manifestation = obj.parent.manifestation
+            # اگر parent نداشت، از URL بگیر
+            elif not obj.parent:
+                manifestation_id = request.GET.get('manifestation')
+                if not manifestation_id:
+                    changelist_filters = request.GET.get('_changelist_filters')
+                    if changelist_filters and 'manifestation__id__exact' in changelist_filters:
+                        import re
+                        match = re.search(r'manifestation__id__exact[=%]([a-f0-9-]+)', changelist_filters)
+                        if match:
+                            manifestation_id = match.group(1)
+                
+                if manifestation_id:
+                    from ingest.apps.documents.models import InstrumentManifestation
+                    try:
+                        obj.manifestation = InstrumentManifestation.objects.get(id=manifestation_id)
+                    except InstrumentManifestation.DoesNotExist:
+                        pass
         
         # در edit mode، manifestation را restore کن
         if change and not obj.manifestation:
