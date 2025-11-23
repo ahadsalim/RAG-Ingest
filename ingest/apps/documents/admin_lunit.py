@@ -61,14 +61,12 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
         return (
             ('', {
                 'fields': (
-                    ('parent', 'order_index'),
-                    ('unit_type', 'number'),
+                    ('parent', 'order_index' ,'unit_type', 'number' , 'content'),
                 ),
                 'classes': ('wide',),
             }),
             ('', {
                 'fields': (
-                    'content',
                     ('valid_from', 'valid_to'),
                 ),
                 'classes': ('wide',),

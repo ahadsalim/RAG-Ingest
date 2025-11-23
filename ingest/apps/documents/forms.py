@@ -315,16 +315,16 @@ class LUnitForm(forms.ModelForm):
                 'style': 'width: 95%; font-family: "Vazirmatn", "Tahoma", sans-serif; font-size: 14px;'
             })
         
-        # تنظیمات فیلدهای کوچک
+        # تنظیمات فیلدهای کوچک برای جا شدن در یک خط
         if 'unit_type' in self.fields:
-            self.fields['unit_type'].widget.attrs['style'] = 'width: 250px; display: inline-block;'
+            self.fields['unit_type'].widget.attrs['style'] = 'width: 200px; display: inline-block;'
         
         if 'number' in self.fields:
-            self.fields['number'].widget.attrs['style'] = 'width: 150px;'
+            self.fields['number'].widget.attrs['style'] = 'width: 100px;'
             self.fields['number'].widget.attrs['placeholder'] = 'مثال: 1'
         
         if 'order_index' in self.fields:
-            self.fields['order_index'].widget.attrs['style'] = 'width: 100px;'
+            self.fields['order_index'].widget.attrs['style'] = 'width: 80px;'
             self.fields['order_index'].widget.attrs['placeholder'] = '0'
         
         # parent widget در admin.get_form.CustomFormClass تنظیم می‌شود

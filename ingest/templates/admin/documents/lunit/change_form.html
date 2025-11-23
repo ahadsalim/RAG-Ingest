@@ -32,14 +32,39 @@
         position: relative;
     }
     
-    /* تنظیم عرض فیلد unit_type */
+    /* تنظیم عرض فیلدها برای جا شدن در یک خط */
+    .field-order_index input {
+        width: 80px !important;
+        display: inline-block !important;
+    }
+    
     .field-unit_type select {
-        width: 250px !important;
+        width: 200px !important;
+        display: inline-block !important;
+    }
+    
+    .field-number input {
+        width: 100px !important;
+        display: inline-block !important;
+    }
+    
+    /* تنظیم عرض فیلدهای تاریخ */
+    .field-valid_from input,
+    .field-valid_to input {
+        width: 150px !important;
         display: inline-block !important;
     }
     
     /* حذف bold از label های فیلدها */
     .form-row label {
+        font-weight: normal !important;
+    }
+    
+    /* حذف bold از label های خاص */
+    .field-order_index label,
+    .field-unit_type label,
+    .field-number label,
+    .field-content label {
         font-weight: normal !important;
     }
 </style>
