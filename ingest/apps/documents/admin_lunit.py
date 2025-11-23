@@ -460,3 +460,21 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
         return format_html('<span style="display: inline-block; width: 30px; text-align: center; color: {}; padding: 0 2px; font-size: 12px;">{}</span>', color, count)
     chunk_display.short_description = 'چانک'
     chunk_display.admin_order_field = 'chunks__count'
+    
+    def jalali_valid_from_display(self, obj):
+        """نمایش تاریخ شروع اعتبار به شمسی."""
+        if obj.valid_from:
+            from ingest.core.utils import gregorian_to_jalali
+            return gregorian_to_jalali(obj.valid_from)
+        return '-'
+    jalali_valid_from_display.short_description = 'شروع اعتبار'
+    jalali_valid_from_display.admin_order_field = 'valid_from'
+    
+    def jalali_valid_to_display(self, obj):
+        """نمایش تاریخ پایان اعتبار به شمسی."""
+        if obj.valid_to:
+            from ingest.core.utils import gregorian_to_jalali
+            return gregorian_to_jalali(obj.valid_to)
+        return '-'
+    jalali_valid_to_display.short_description = 'پایان اعتبار'
+    jalali_valid_to_display.admin_order_field = 'valid_to'
