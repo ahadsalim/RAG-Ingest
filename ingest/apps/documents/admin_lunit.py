@@ -102,15 +102,6 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
         
         return JsonResponse({'results': results})
     
-    def get_changelist_template(self, request):
-        """انتخاب template بر اساس اینکه manifestation انتخاب شده یا نه."""
-        manifestation_id = request.GET.get('manifestation__id__exact')
-        if manifestation_id:
-            # وقتی manifestation انتخاب شده، از template سفارشی با sidebar کوچک استفاده کن
-            return 'admin/documents/lunit_change_list_custom.html'
-        # وقتی manifestation انتخاب نشده، از template پیش‌فرض استفاده کن
-        return super().get_changelist_template(request)
-    
     def changelist_view(self, request, extra_context=None):
         """
         نمایش لیست manifestation ها اگر manifestation انتخاب نشده.
