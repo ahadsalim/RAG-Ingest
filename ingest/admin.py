@@ -7,21 +7,6 @@ class CustomAdminSite(AdminSite):
     site_header = "سیستم مدیریت اسناد"
     site_title = "مدیریت اسناد"
     index_title = "پنل مدیریت"
-    
-    def each_context(self, request):
-        """اضافه CSS global برای کاهش عرض sidebar در همه صفحات."""
-        context = super().each_context(request)
-        context['custom_css'] = '''
-        <style>
-            #changelist-filter {
-                width: 180px !important;
-            }
-            #changelist {
-                margin-left: 200px !important;
-            }
-        </style>
-        '''
-        return context
 
     def get_app_list(self, request, app_label=None):
         """
