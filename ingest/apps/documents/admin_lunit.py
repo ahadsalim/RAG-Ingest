@@ -57,16 +57,17 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
     
     # از get_fieldsets استفاده می‌کنیم تا parent با widget سفارشی اضافه شود
     def get_fieldsets(self, request, obj=None):
-        """Fieldsets ساده با همه فیلدها در یک گروه."""
+        """Fieldsets ساده - همه فیلدها در یک گروه تا قبل از تگ‌ها."""
         return (
-            (None, {
+            ('', {
                 'fields': (
                     'parent',
                     ('unit_type', 'order_index', 'number'),
                     'content',
                     ('valid_from', 'valid_to'),
                 ),
-                'description': '<p style="color: #666; margin-top: 10px;">خالی گذاشتن فیلد "تاریخ پایان اعتبار" به معنی بدون تاریخ انقضا است.</p>'
+                'description': '<p style="color: #666; margin-top: 10px;">خالی گذاشتن فیلد "تاریخ پایان اعتبار" به معنی بدون تاریخ انقضا است.</p>',
+                'classes': ('wide',),
             }),
         )
     
