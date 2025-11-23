@@ -37,7 +37,7 @@ class RelationType(models.TextChoices):
 
 
 class UnitType(models.TextChoices):
-    PART = 'part', 'بخش'
+    PART = 'part', 'باب'
     CHAPTER = 'chapter', 'فصل'
     SECTION = 'section', 'قسمت'
     ARTICLE = 'article', 'ماده'
