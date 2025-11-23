@@ -113,4 +113,21 @@
         display: none !important;
     }
 </style>
+
+<script>
+// Shortkey F2 برای دکمه اضافه کردن
+document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('keydown', function(e) {
+        // F2 برای اضافه کردن
+        if (e.key === 'F2') {
+            e.preventDefault();
+            // پیدا کردن دکمه اضافه کردن
+            const addButton = document.querySelector('.object-tools .addlink');
+            if (addButton) {
+                window.location.href = addButton.href;
+            }
+        }
+    });
+});
+</script>
 {% endblock %}

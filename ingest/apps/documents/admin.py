@@ -661,6 +661,12 @@ class LegalUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin)
                 obj.work = obj.expr.work
         
         super().save_model(request, obj, form, change)
+        
+        # Clear cache برای parent queryset - تا ایتم جدید فوراً در لیست والد ظاهر شود
+        from django.core.cache import cache
+        if obj.manifestation:
+            cache_key = f'legalunit_parents_{obj.manifestation.id}'
+            cache.delete(cache_key)
     
     def response_add(self, request, obj, post_url_continue=None):
         """Override to prevent duplicate success messages."""
