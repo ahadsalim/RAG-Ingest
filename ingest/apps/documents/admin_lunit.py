@@ -90,7 +90,7 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
     def search_parents_view(self, request):
         """
         AJAX endpoint برای جستجوی والدها.
-        جستجو در: مسیر + نوع واحد + شماره + 15 کاراکتر اول محتوا
+        جستجو بر اساس نوع واحد دقیق (باب، فصل، ماده، ...) یا شماره
         """
         query = request.GET.get('q', '').strip()
         manifestation_id = request.GET.get('manifestation_id', '')
@@ -98,15 +98,40 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
         if not query or not manifestation_id:
             return JsonResponse({'results': []})
         
-        # جستجو در والدها - در مسیر، نوع، شماره، و محتوا
-        parents = LegalUnit.objects.filter(
-            manifestation_id=manifestation_id
-        ).filter(
-            Q(path_label__icontains=query) |
-            Q(number__icontains=query) |
-            Q(unit_type__icontains=query) |
-            Q(content__icontains=query)
-        ).only('id', 'unit_type', 'number', 'content', 'path_label').order_by('order_index', 'number')[:20]
+        # نقشه نوع واحدها برای جستجوی دقیق
+        unit_type_map = {
+            'باب': 'part',
+            'فصل': 'chapter',
+            'قسمت': 'section',
+            'ماده': 'article',
+            'بند': 'clause',
+            'زیربند': 'subclause',
+            'تبصره': 'note',
+            'ضمیمه': 'appendix',
+        }
+        
+        # بررسی آیا query یک نوع واحد است
+        query_lower = query.lower()
+        unit_type_filter = None
+        for persian_name, english_code in unit_type_map.items():
+            if query_lower == persian_name.lower():
+                unit_type_filter = english_code
+                break
+        
+        # ساخت query
+        base_query = LegalUnit.objects.filter(manifestation_id=manifestation_id)
+        
+        if unit_type_filter:
+            # جستجوی دقیق بر اساس نوع واحد
+            parents = base_query.filter(unit_type=unit_type_filter)
+        else:
+            # جستجوی عمومی در شماره یا محتوا
+            parents = base_query.filter(
+                Q(number__icontains=query) |
+                Q(content__icontains=query)
+            )
+        
+        parents = parents.only('id', 'unit_type', 'number', 'content', 'path_label').order_by('order_index', 'number')[:30]
         
         results = []
         for parent in parents:
