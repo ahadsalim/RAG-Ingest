@@ -290,7 +290,8 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
                     from .widgets import ParentAutocompleteWidget
                     self.fields['parent'].widget = ParentAutocompleteWidget(manifestation_id=manifestation_id)
                     self.fields['parent'].widget.attrs['style'] = 'width: 500px; display: inline-block;'
-                    self.fields['parent'].queryset = LegalUnit.objects.none()
+                    # queryset باید all() باشد تا validation کار کند
+                    self.fields['parent'].queryset = LegalUnit.objects.all()
         
         # Set initial برای add mode
         if manifestation_id and not obj:
