@@ -40,6 +40,9 @@
         background: white !important;
         border: 1px solid #ccc !important;
         box-shadow: 0 2px 5px rgba(0,0,0,0.2) !important;
+        max-height: 150px !important;
+        overflow-y: auto !important;
+        overflow-x: hidden !important;
     }
     
     /* Table و container ها */
@@ -56,12 +59,9 @@
     }
     
     /* فاصله برای parent autocomplete */
-    tr:has(.field-parent) {
+    .form-row:has(.field-parent) {
         position: relative;
-    }
-    
-    tr:has(.field-parent) td:last-child {
-        padding-bottom: 350px !important;
+        margin-bottom: 180px !important;
     }
     
     /* تنظیم عرض فیلدها برای جا شدن در یک خط */
