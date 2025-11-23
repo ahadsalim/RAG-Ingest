@@ -247,14 +247,14 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
     def unit_type_display(self, obj):
         """نمایش نوع واحد با عرض کمتر."""
         value = obj.get_unit_type_display() if obj.unit_type else '-'
-        return format_html('<span style="display: inline-block; width: 60px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 5px;">{}</span>', value)
+        return format_html('<span style="display: inline-block; width: 45px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 3px; font-size: 12px;">{}</span>', value)
     unit_type_display.short_description = 'واحد'
     unit_type_display.admin_order_field = 'unit_type'
     
     def order_index_display(self, obj):
         """نمایش ترتیب با عرض کمتر."""
         value = obj.order_index if obj.order_index is not None else '-'
-        return format_html('<span style="display: inline-block; width: 40px; text-align: center; padding: 0 5px;">{}</span>', value)
+        return format_html('<span style="display: inline-block; width: 30px; text-align: center; padding: 0 2px; font-size: 12px;">{}</span>', value)
     order_index_display.short_description = 'ترتیب'
     order_index_display.admin_order_field = 'order_index'
     
@@ -262,6 +262,6 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
         """نمایش تعداد چانک‌ها."""
         count = obj.chunks.count() if hasattr(obj, 'chunks') else 0
         color = 'green' if count > 0 else '#999'
-        return format_html('<span style="display: inline-block; width: 40px; text-align: center; color: {}; padding: 0 5px;">{}</span>', color, count)
+        return format_html('<span style="display: inline-block; width: 30px; text-align: center; color: {}; padding: 0 2px; font-size: 12px;">{}</span>', color, count)
     chunk_display.short_description = 'چانک'
     chunk_display.admin_order_field = 'chunks__count'
