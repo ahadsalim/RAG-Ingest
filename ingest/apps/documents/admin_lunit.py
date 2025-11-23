@@ -150,7 +150,7 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
             )
         
         # مرتب‌سازی: ابتدا بر اساس parent order، سپس order_index خودش
-        parents = parents.only('id', 'unit_type', 'number', 'content', 'path_label', 'parent', 'is_active', 'valid_from', 'valid_to').select_related('parent').order_by('parent__order_index', 'order_index', 'number')[:30]
+        parents = parents.only('id', 'unit_type', 'number', 'content', 'path_label', 'parent', 'valid_from', 'valid_to').select_related('parent').order_by('parent__order_index', 'order_index', 'number')[:30]
         
         results = []
         for parent in parents:
