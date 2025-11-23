@@ -34,7 +34,7 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
     
     
     # List display
-    list_display = ('indented_title_short', 'unit_type_display', 'order_index_display', 'chunk_display', 'jalali_created_at_display')
+    list_display = ('indented_title_short', 'is_active_display', 'unit_type_display', 'order_index_display', 'chunk_display', 'jalali_created_at_display')
     list_filter = ('unit_type', 'created_at')
     search_fields = ('content', 'path_label', 'number')
     mptt_level_indent = 20
@@ -244,10 +244,19 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
         return format_html('<span style="font-weight: normal; font-size: 13px; white-space: nowrap;">{}</span>', content)
     indented_title_short.short_description = 'عنوان'
     
+    def is_active_display(self, obj):
+        """نمایش وضعیت فعال بودن بر اساس تاریخ انقضا."""
+        if obj.is_active:
+            return format_html('<span style="color: green; font-size: 16px; display: inline-block; width: 25px; text-align: center;">✓</span>')
+        else:
+            return format_html('<span style="color: red; font-size: 16px; display: inline-block; width: 25px; text-align: center;">✗</span>')
+    is_active_display.short_description = 'معتبر'
+    is_active_display.admin_order_field = 'valid_to'
+    
     def unit_type_display(self, obj):
         """نمایش نوع واحد با عرض کمتر."""
         value = obj.get_unit_type_display() if obj.unit_type else '-'
-        return format_html('<span style="display: inline-block; width: 45px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 3px; font-size: 12px;">{}</span>', value)
+        return format_html('<span style="display: inline-block; width: 40px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 2px; font-size: 12px;">{}</span>', value)
     unit_type_display.short_description = 'واحد'
     unit_type_display.admin_order_field = 'unit_type'
     
