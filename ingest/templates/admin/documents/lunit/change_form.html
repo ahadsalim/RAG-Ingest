@@ -4,6 +4,34 @@
 {# حذف breadcrumbs - فقط h1 با path کامل نمایش داده شود #}
 {% endblock %}
 
+{% block field_sets %}
+{# Override field_sets برای استفاده از table به جای fieldset #}
+{% for fieldset in adminform %}
+  <div class="module aligned">
+    <table style="width: 100%; border-collapse: collapse;">
+      {% for line in fieldset %}
+        {% for field in line %}
+          <tr>
+            <td style="width: 150px; padding: 10px; vertical-align: top; text-align: right;">
+              {{ field.field.label_tag }}
+            </td>
+            <td style="padding: 10px;">
+              {{ field.field }}
+              {% if field.field.help_text %}
+                <div style="color: #666; font-size: 11px; margin-top: 5px;">{{ field.field.help_text }}</div>
+              {% endif %}
+              {% if field.field.errors %}
+                <div style="color: red; margin-top: 5px;">{{ field.field.errors }}</div>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      {% endfor %}
+    </table>
+  </div>
+{% endfor %}
+{% endblock %}
+
 {% block extrastyle %}
 {{ block.super }}
 <style>
@@ -30,40 +58,38 @@
         display: inline-block !important;
     }
     
-    /* اضافه فاصله بعد از ردیف parent تا dropdown روی فیلدهای بعدی نیفتد */
-    .form-row:has(.field-parent) {
-        margin-bottom: 420px !important;
-        position: relative;
-    }
-    
-    /* FIX: autocomplete dropdown باید روی fieldset باشد */
+    /* autocomplete dropdown */
     .parent-autocomplete-results,
     .ui-autocomplete,
     .select2-dropdown,
     .autocomplete-suggestions {
         z-index: 99999 !important;
         position: absolute !important;
+        background: white !important;
+        border: 1px solid #ccc !important;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2) !important;
     }
     
-    /* FIX: fieldset نباید overflow hidden داشته باشد */
-    fieldset,
+    /* Table و container ها */
+    table,
     .module,
-    .form-row,
     #content-main,
-    #content,
-    .colM,
-    .aligned {
-        overflow: visible !important;
-    }
-    
-    /* اطمینان از اینکه container ها overflow ندارند */
-    * {
+    #content {
         overflow: visible !important;
     }
     
     /* فقط textarea overflow داشته باشد */
     textarea {
         overflow: auto !important;
+    }
+    
+    /* فاصله برای parent autocomplete */
+    tr:has(.field-parent) {
+        position: relative;
+    }
+    
+    tr:has(.field-parent) td:last-child {
+        padding-bottom: 350px !important;
     }
     
     /* تنظیم عرض فیلدها برای جا شدن در یک خط */
