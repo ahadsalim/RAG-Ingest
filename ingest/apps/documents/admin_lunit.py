@@ -121,6 +121,7 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
         return (
             ('', {
                 'fields': (
+                    'manifestation',
                     ('parent', 'order_index' ,'unit_type', 'number' , 'content'),
                 ),
                 'classes': ('wide',),
@@ -464,8 +465,7 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
     def jalali_valid_from_display(self, obj):
         """نمایش تاریخ شروع اعتبار به شمسی."""
         if obj.valid_from:
-            from ingest.core.utils import gregorian_to_jalali
-            return gregorian_to_jalali(obj.valid_from)
+            return self.jalali_date_display(obj.valid_from)
         return '-'
     jalali_valid_from_display.short_description = 'شروع اعتبار'
     jalali_valid_from_display.admin_order_field = 'valid_from'
@@ -473,8 +473,7 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
     def jalali_valid_to_display(self, obj):
         """نمایش تاریخ پایان اعتبار به شمسی."""
         if obj.valid_to:
-            from ingest.core.utils import gregorian_to_jalali
-            return gregorian_to_jalali(obj.valid_to)
+            return self.jalali_date_display(obj.valid_to)
         return '-'
     jalali_valid_to_display.short_description = 'پایان اعتبار'
     jalali_valid_to_display.admin_order_field = 'valid_to'
