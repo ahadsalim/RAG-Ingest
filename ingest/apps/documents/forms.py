@@ -203,8 +203,13 @@ class LegalUnitForm(forms.ModelForm):
                     'والد انتخاب شده معتبر نیست.'
                 )
         
-        # بررسی manifestation (اگر در cleaned_data باشد)
-        manifestation = self.cleaned_data.get('manifestation')
+        # بررسی manifestation
+        # ⭐ در edit mode از instance استفاده کن، نه cleaned_data
+        if self.instance and self.instance.pk:
+            manifestation = self.instance.manifestation
+        else:
+            manifestation = self.cleaned_data.get('manifestation')
+        
         if parent and manifestation:
             # Check if parent belongs to the same manifestation
             if parent.manifestation != manifestation:
@@ -237,7 +242,12 @@ class LegalUnitForm(forms.ModelForm):
     def clean(self):
         """Override clean to update parent queryset dynamically."""
         cleaned_data = super().clean()
-        manifestation = cleaned_data.get('manifestation')
+        
+        # ⭐ در edit mode از instance استفاده کن، نه cleaned_data
+        if self.instance and self.instance.pk:
+            manifestation = self.instance.manifestation
+        else:
+            manifestation = cleaned_data.get('manifestation')
         
         # Update parent queryset based on selected manifestation
         if manifestation and 'parent' in self.fields:

@@ -605,6 +605,10 @@ class LegalUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
     
     def get_form(self, request, obj=None, **kwargs):
+        # ⭐ در edit mode: exclude manifestation (چون نباید تغییر کند)
+        if obj:
+            kwargs.setdefault('exclude', []).append('manifestation')
+        
         # Exclude non-editable fields and hide work/expr since they're auto-populated
         kwargs.setdefault('exclude', []).extend(['id', 'created_at', 'updated_at', 'path_label', 'work', 'expr'])
         
@@ -636,22 +640,23 @@ class LegalUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin)
             except InstrumentManifestation.DoesNotExist:
                 pass
         
-        # If editing existing object, make manifestation readonly
-        if obj and 'manifestation' in form.base_fields:
-            # راه‌حل: استفاده از custom clean method در form
-            # نمی‌توانیم disabled کنیم چون در POST نخواهد بود
-            # نمی‌توانیم readonly کنیم چون برای select کار نمی‌کند
-            # پس فقط initial را set می‌کنیم و در form validation می‌کنیم
-            form.base_fields['manifestation'].initial = obj.manifestation
-            form.base_fields['manifestation'].help_text = '⚠️ نسخه سند قابل تغییر نیست'
-            # استفاده از JavaScript برای غیرفعال کردن
-            form.base_fields['manifestation'].widget.attrs['onchange'] = 'this.value=this.defaultValue;'
-            form.base_fields['manifestation'].widget.attrs['style'] = 'background-color: #f5f5f5;'
+        # ⭐ در edit mode، manifestation از form exclude شده
+        # پس نیازی به تنظیمات widget نیست
         
         return form
 
     def save_model(self, request, obj, form, change):
         """Auto-populate work and expr based on manifestation selection."""
+        
+        # ⭐ در edit mode، manifestation از form exclude شده
+        # پس باید از instance قبلی بگیریم
+        if change and not obj.manifestation:
+            try:
+                old_obj = self.model.objects.get(pk=obj.pk)
+                obj.manifestation = old_obj.manifestation
+            except self.model.DoesNotExist:
+                pass
+        
         if obj.manifestation:
             # Auto-populate expr from manifestation
             obj.expr = obj.manifestation.expr
