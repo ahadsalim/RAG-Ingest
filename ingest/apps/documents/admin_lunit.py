@@ -413,6 +413,11 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
             if obj.expr:
                 obj.work = obj.expr.work
         
+        # اگر valid_from خالی است و manifestation موجود است، از publication_date استفاده کن
+        if not obj.valid_from and obj.manifestation and hasattr(obj.manifestation, 'publication_date'):
+            if obj.manifestation.publication_date:
+                obj.valid_from = obj.manifestation.publication_date
+        
         super().save_model(request, obj, form, change)
     
     def response_add(self, request, obj, post_url_continue=None):
