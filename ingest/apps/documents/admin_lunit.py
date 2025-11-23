@@ -367,10 +367,15 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
                     kwargs['manifestation_id'] = manifestation_id
                 super().__init__(*args, **kwargs)
                 
-                # اجبار استفاده از ParentAutocompleteWidget
-                if manifestation_id and 'parent' in self.fields:
+                # اجبار استفاده از ParentAutocompleteWidget - هم add و هم edit
+                # در edit mode، manifestation_id را از obj بگیر
+                current_manifestation_id = manifestation_id
+                if obj and obj.manifestation_id:
+                    current_manifestation_id = str(obj.manifestation_id)
+                
+                if current_manifestation_id and 'parent' in self.fields:
                     from .widgets import ParentAutocompleteWidget
-                    self.fields['parent'].widget = ParentAutocompleteWidget(manifestation_id=manifestation_id)
+                    self.fields['parent'].widget = ParentAutocompleteWidget(manifestation_id=current_manifestation_id)
                     self.fields['parent'].widget.attrs['style'] = 'width: 500px; display: inline-block;'
                     # queryset باید all() باشد تا validation کار کند
                     self.fields['parent'].queryset = LegalUnit.objects.all()

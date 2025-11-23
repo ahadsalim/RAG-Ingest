@@ -151,7 +151,7 @@ class LegalUnitForm(forms.ModelForm):
             })
         
         # Filter parent field based on manifestation
-        if 'parent' in self.fields and 'manifestation' in self.fields:
+        if 'parent' in self.fields:
             # غیرفعال کردن validation خودکار Django برای parent
             self.fields['parent'].required = False
             
@@ -165,21 +165,26 @@ class LegalUnitForm(forms.ModelForm):
                     'id', 'number', 'unit_type', 'content', 'order_index'
                 ).order_by('order_index', 'number')
             # If manifestation is set (from initial data), filter by it
-            elif self.initial.get('manifestation'):
+            elif self.initial.get('manifestation') or ('manifestation' in self.fields and self.fields['manifestation'].initial):
                 manifestation_id = self.initial.get('manifestation')
+                if not manifestation_id and 'manifestation' in self.fields:
+                    manifestation_id = self.fields['manifestation'].initial
                 # تبدیل به string اگر UUID object است
                 if hasattr(manifestation_id, 'hex'):
                     manifestation_id = str(manifestation_id)
                 # استفاده از only() برای بهینه‌سازی
-                self.fields['parent'].queryset = LegalUnit.objects.filter(
-                    manifestation_id=manifestation_id
-                ).only(
-                    'id', 'number', 'unit_type', 'content', 'order_index'
-                ).order_by('order_index', 'number')
+                if manifestation_id:
+                    self.fields['parent'].queryset = LegalUnit.objects.filter(
+                        manifestation_id=manifestation_id
+                    ).only(
+                        'id', 'number', 'unit_type', 'content', 'order_index'
+                    ).order_by('order_index', 'number')
+                else:
+                    # اگر manifestation نداریم، همه را نشان بده
+                    self.fields['parent'].queryset = LegalUnit.objects.all()
             else:
-                # No manifestation yet, show empty queryset
-                self.fields['parent'].queryset = LegalUnit.objects.none()
-                self.fields['parent'].help_text = 'ابتدا نسخه سند را انتخاب کنید'
+                # اگر manifestation نداریم، همه را نشان بده (برای validation)
+                self.fields['parent'].queryset = LegalUnit.objects.all()
     
     def clean_parent(self):
         """
