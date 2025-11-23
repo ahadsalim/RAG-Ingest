@@ -1,5 +1,9 @@
 {% extends "admin/change_form.html" %}
 
+{% block breadcrumbs %}
+{# حذف breadcrumbs - فقط h1 با path کامل نمایش داده شود #}
+{% endblock %}
+
 {% block extrastyle %}
 {{ block.super }}
 <style>
@@ -34,18 +38,32 @@
     
     /* FIX: autocomplete dropdown باید روی fieldset باشد */
     .parent-autocomplete-results,
-    .ui-autocomplete {
-        z-index: 9999 !important;
+    .ui-autocomplete,
+    .select2-dropdown,
+    .autocomplete-suggestions {
+        z-index: 99999 !important;
         position: absolute !important;
     }
     
     /* FIX: fieldset نباید overflow hidden داشته باشد */
-    fieldset {
+    fieldset,
+    .module,
+    .form-row,
+    #content-main,
+    #content,
+    .colM,
+    .aligned {
         overflow: visible !important;
     }
     
-    .module {
+    /* اطمینان از اینکه container ها overflow ندارند */
+    * {
         overflow: visible !important;
+    }
+    
+    /* فقط textarea overflow داشته باشد */
+    textarea {
+        overflow: auto !important;
     }
     
     /* تنظیم عرض فیلدها برای جا شدن در یک خط */
@@ -82,11 +100,6 @@
     .field-number label,
     .field-content label {
         font-weight: normal !important;
-    }
-    
-    /* حذف breadcrumbs (هدر خاکستری بالا) - فقط h1 بماند */
-    .breadcrumbs {
-        display: none !important;
     }
 </style>
 {% endblock %}
