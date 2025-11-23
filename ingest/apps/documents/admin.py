@@ -585,10 +585,16 @@ class LegalUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin)
             
             # اعمال فیلتر اگر manifestation پیدا شد
             if manifestation_id:
+                # Clear cache برای اطمینان از fresh data
+                from django.core.cache import cache
+                cache_key = f'legalunit_parents_{manifestation_id}'
+                cache.delete(cache_key)
+                
                 # استفاده از همان queryset که در form استفاده می‌شود
+                # استفاده از .all() برای force evaluation از دیتابیس
                 queryset = LegalUnit.objects.filter(
                     manifestation_id=manifestation_id
-                ).order_by('order_index', 'number')
+                ).select_related('parent').order_by('order_index', 'number')
                 
                 # اگر در حال ویرایش هستیم، خود object را exclude کن
                 if hasattr(request, 'resolver_match') and request.resolver_match:
@@ -622,6 +628,12 @@ class LegalUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin)
         
         # Store manifestation_id for later use in formfield_for_foreignkey
         request._manifestation_id = manifestation_id
+        
+        # Clear cache قبل از ساخت form - برای "ذخیره و ایجاد یکی دیگر"
+        if manifestation_id:
+            from django.core.cache import cache
+            cache_key = f'legalunit_parents_{manifestation_id}'
+            cache.delete(cache_key)
         
         form = super().get_form(request, obj, **kwargs)
         
