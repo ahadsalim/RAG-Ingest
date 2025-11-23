@@ -605,10 +605,6 @@ class LegalUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
     
     def get_form(self, request, obj=None, **kwargs):
-        # ⭐ در edit mode: exclude manifestation (چون نباید تغییر کند)
-        if obj:
-            kwargs.setdefault('exclude', []).append('manifestation')
-        
         # Exclude non-editable fields and hide work/expr since they're auto-populated
         kwargs.setdefault('exclude', []).extend(['id', 'created_at', 'updated_at', 'path_label', 'work', 'expr'])
         
