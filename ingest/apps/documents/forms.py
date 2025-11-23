@@ -156,19 +156,23 @@ class LegalUnitForm(forms.ModelForm):
             # If instance exists (editing), filter by its manifestation
             if self.instance and self.instance.pk and self.instance.manifestation:
                 # فیلتر parent به LegalUnit های همان manifestation
-                # استفاده از .none() و سپس union برای جلوگیری از cache
+                # استفاده از only() برای بهینه‌سازی
                 self.fields['parent'].queryset = LegalUnit.objects.filter(
                     manifestation=self.instance.manifestation
-                ).exclude(pk=self.instance.pk).order_by('order_index', 'number')
+                ).exclude(pk=self.instance.pk).only(
+                    'id', 'number', 'unit_type', 'content', 'order_index'
+                ).order_by('order_index', 'number')
             # If manifestation is set (from initial data), filter by it
             elif self.initial.get('manifestation'):
                 manifestation_id = self.initial.get('manifestation')
                 # تبدیل به string اگر UUID object است
                 if hasattr(manifestation_id, 'hex'):
                     manifestation_id = str(manifestation_id)
-                # استفاده از filter بدون cache
+                # استفاده از only() برای بهینه‌سازی
                 self.fields['parent'].queryset = LegalUnit.objects.filter(
                     manifestation_id=manifestation_id
+                ).only(
+                    'id', 'number', 'unit_type', 'content', 'order_index'
                 ).order_by('order_index', 'number')
             else:
                 # No manifestation yet, show empty queryset
@@ -178,7 +182,7 @@ class LegalUnitForm(forms.ModelForm):
     def clean_parent(self):
         """
         Custom validation for parent field.
-        این متد validation را bypass می‌کند چون queryset را در formfield_for_foreignkey تنظیم کرده‌ایم.
+        استفاده از queryset فیلد برای جلوگیری از query اضافی.
         """
         # دریافت parent_id از داده‌های خام
         parent_id = self.data.get('parent')
@@ -187,13 +191,17 @@ class LegalUnitForm(forms.ModelForm):
         if not parent_id:
             return None
         
-        # تلاش برای دریافت parent از دیتابیس (بدون فیلتر manifestation)
+        # استفاده از queryset فیلد (از cache) به جای query جدید
         try:
-            parent = LegalUnit.objects.get(pk=parent_id)
-        except (LegalUnit.DoesNotExist, ValueError):
-            raise forms.ValidationError(
-                'والد انتخاب شده معتبر نیست.'
-            )
+            parent = self.fields['parent'].queryset.get(pk=parent_id)
+        except (LegalUnit.DoesNotExist, ValueError, AttributeError):
+            # اگر queryset مشکل داشت، fallback به query مستقیم
+            try:
+                parent = LegalUnit.objects.get(pk=parent_id)
+            except (LegalUnit.DoesNotExist, ValueError):
+                raise forms.ValidationError(
+                    'والد انتخاب شده معتبر نیست.'
+                )
         
         # بررسی manifestation (اگر در cleaned_data باشد)
         manifestation = self.cleaned_data.get('manifestation')

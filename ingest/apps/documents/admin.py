@@ -324,12 +324,18 @@ class LegalUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin)
     search_fields = ('content', 'path_label', 'eli_fragment', 'xml_id')
     mptt_level_indent = 20
     readonly_fields = ('path_label', 'created_at', 'updated_at')
-    inlines = [LegalUnitVocabularyTermInline, LegalUnitChangeInline]
+    # inlines به صورت dynamic load می‌شوند (get_inlines)
     actions = ['mark_as_repealed', 'mark_as_active']
     list_per_page = 100
     
     # MPTT settings برای نمایش درختی
     mptt_indent_field = "indented_title"
+    
+    def get_inlines(self, request, obj):
+        """Lazy load inlines - فقط در edit mode برای بهینه‌سازی performance."""
+        if obj:  # Edit mode - object exists
+            return [LegalUnitVocabularyTermInline, LegalUnitChangeInline]
+        return []  # Add mode - no inlines for faster load
     
     def changelist_view(self, request, extra_context=None):
         """Override to show manifestation list if no manifestation filter."""
@@ -630,12 +636,12 @@ class LegalUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin)
             except InstrumentManifestation.DoesNotExist:
                 pass
         
-        # If editing existing object, make manifestation readonly با HiddenInput
+        # If editing existing object, make manifestation readonly
         if obj and 'manifestation' in form.base_fields:
-            from django import forms as django_forms
-            # استفاده از HiddenInput + readonly text برای نمایش
-            form.base_fields['manifestation'].widget = django_forms.HiddenInput()
+            # استفاده از disabled برای جلوگیری از validation error
+            form.base_fields['manifestation'].disabled = True
             form.base_fields['manifestation'].initial = obj.manifestation
+            form.base_fields['manifestation'].help_text = 'نسخه سند قابل تغییر نیست'
         
         return form
 
