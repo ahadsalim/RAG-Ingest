@@ -114,7 +114,7 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
                 display_parts.append(str(parent.number))
             
             display = ' > '.join(display_parts)
-            content_preview = parent.content[:15] if parent.content else ''
+            content_preview = parent.content[:50] if parent.content else ''
             
             results.append({
                 'id': str(parent.id),
@@ -234,7 +234,7 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
                 if manifestation_id and 'parent' in self.fields:
                     from .widgets import ParentAutocompleteWidget
                     self.fields['parent'].widget = ParentAutocompleteWidget(manifestation_id=manifestation_id)
-                    self.fields['parent'].widget.attrs['style'] = 'width: 250px; display: inline-block;'
+                    self.fields['parent'].widget.attrs['style'] = 'width: 500px; display: inline-block;'
                     self.fields['parent'].queryset = LegalUnit.objects.none()
         
         # Set initial برای add mode

@@ -19,7 +19,7 @@ class ParentAutocompleteWidget(forms.TextInput):
             'class': 'parent-autocomplete vTextField',
             'placeholder': 'تایپ کنید برای جستجو...',
             'autocomplete': 'off',
-            'style': 'width: 250px; display: inline-block;'
+            'style': 'width: 500px; display: inline-block;'
         })
     
     def render(self, name, value, attrs=None, renderer=None):
@@ -59,14 +59,14 @@ class ParentAutocompleteWidget(forms.TextInput):
                 position: absolute;
                 top: 100%;
                 left: 0;
-                right: 0;
+                width: 600px;
                 background: white;
                 border: 1px solid #ccc;
                 border-top: none;
-                max-height: 300px;
+                max-height: 400px;
                 overflow-y: auto;
                 z-index: 1000;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                box-shadow: 0 4px 8px rgba(0,0,0,0.15);
             "></div>
         </div>
         
@@ -123,13 +123,16 @@ class ParentAutocompleteWidget(forms.TextInput):
                 let html = '';
                 results.forEach(function(item) {{
                     html += '<div class="autocomplete-item" data-id="' + item.id + '" data-display="' + item.display + '" style="';
-                    html += 'padding: 8px 10px;';
+                    html += 'padding: 10px 12px;';
                     html += 'cursor: pointer;';
                     html += 'border-bottom: 1px solid #eee;';
+                    html += 'white-space: nowrap;';
+                    html += 'overflow: hidden;';
+                    html += 'text-overflow: ellipsis;';
                     html += '">';
-                    html += '<div style="font-size: 13px; font-weight: 500;">' + item.display + '</div>';
+                    html += '<div style="font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + item.display + '</div>';
                     if (item.content) {{
-                        html += '<div style="color: #666; font-size: 11px; margin-top: 2px;">' + item.content + '</div>';
+                        html += '<div style="color: #666; font-size: 11px; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">' + item.content + '</div>';
                     }}
                     html += '</div>';
                 }});
