@@ -26,6 +26,7 @@ from .models import (
     LegalUnit,
     LUnit
 )
+from .widgets import ParentAutocompleteWidget
 
 
 class InstrumentExpressionForm(forms.ModelForm):
@@ -314,9 +315,9 @@ class LUnitForm(forms.ModelForm):
                 'style': 'width: 95%; font-family: "Vazirmatn", "Tahoma", sans-serif; font-size: 14px;'
             })
         
-        # تنظیمات فیلدهای کوچک (در یک خط)
+        # تنظیمات فیلدهای کوچک
         if 'unit_type' in self.fields:
-            self.fields['unit_type'].widget.attrs['style'] = 'width: 200px;'
+            self.fields['unit_type'].widget.attrs['style'] = 'width: 250px;'
         
         if 'number' in self.fields:
             self.fields['number'].widget.attrs['style'] = 'width: 150px;'
@@ -326,35 +327,30 @@ class LUnitForm(forms.ModelForm):
             self.fields['order_index'].widget.attrs['style'] = 'width: 100px;'
             self.fields['order_index'].widget.attrs['placeholder'] = '0'
         
-        # فیلتر parent بر اساس manifestation
+        # استفاده از Autocomplete Widget برای parent
         if 'parent' in self.fields:
             self.fields['parent'].required = False
             
-            # تعیین manifestation
-            manifestation = None
+            # تعیین manifestation_id
+            manifestation_id = None
             if self.instance and self.instance.pk:
                 # Edit mode
-                manifestation = self.instance.manifestation
+                if self.instance.manifestation:
+                    manifestation_id = str(self.instance.manifestation.id)
             elif self.manifestation_id:
                 # Add mode با manifestation_id
-                manifestation = self.manifestation_id
+                manifestation_id = str(self.manifestation_id) if hasattr(self.manifestation_id, 'id') else str(self.manifestation_id)
             elif self.initial.get('manifestation'):
                 # Add mode با initial
-                manifestation = self.initial.get('manifestation')
+                manif = self.initial.get('manifestation')
+                manifestation_id = str(manif.id) if hasattr(manif, 'id') else str(manif)
             
-            # فیلتر parent queryset
-            if manifestation:
-                from .models import LegalUnit
-                manifestation_id = manifestation.id if hasattr(manifestation, 'id') else manifestation
-                
-                queryset = LegalUnit.objects.filter(
-                    manifestation_id=manifestation_id
-                ).only('id', 'number', 'unit_type', 'content', 'order_index').order_by('order_index', 'number')
-                
-                if self.instance and self.instance.pk:
-                    queryset = queryset.exclude(pk=self.instance.pk)
-                
-                self.fields['parent'].queryset = queryset
+            # استفاده از Autocomplete Widget
+            if manifestation_id:
+                self.fields['parent'].widget = ParentAutocompleteWidget(manifestation_id=manifestation_id)
+                self.fields['parent'].help_text = 'تایپ کنید برای جستجو (شماره، نوع، یا محتوا)'
+                # queryset خالی - چون از AJAX استفاده می‌کنیم
+                self.fields['parent'].queryset = LegalUnit.objects.none()
             else:
                 self.fields['parent'].queryset = LegalUnit.objects.none()
                 self.fields['parent'].help_text = 'ابتدا سند را انتخاب کنید'
@@ -366,15 +362,12 @@ class LUnitForm(forms.ModelForm):
         if not parent_id:
             return None
         
-        # استفاده از queryset فیلد
+        # دریافت parent از دیتابیس (چون از autocomplete استفاده می‌کنیم)
         try:
-            parent = self.fields['parent'].queryset.get(pk=parent_id)
-        except:
-            try:
-                from .models import LegalUnit
-                parent = LegalUnit.objects.get(pk=parent_id)
-            except:
-                raise forms.ValidationError('والد انتخاب شده معتبر نیست.')
+            from .models import LegalUnit
+            parent = LegalUnit.objects.get(pk=parent_id)
+        except (LegalUnit.DoesNotExist, ValueError):
+            raise forms.ValidationError('والد انتخاب شده معتبر نیست.')
         
         # تعیین manifestation
         if self.instance and self.instance.pk:
@@ -395,24 +388,7 @@ class LUnitForm(forms.ModelForm):
     def clean(self):
         """Validation کلی."""
         cleaned_data = super().clean()
-        
-        # تعیین manifestation برای update کردن parent queryset
-        if self.instance and self.instance.pk:
-            manifestation = self.instance.manifestation
-        else:
-            manifestation = cleaned_data.get('manifestation')
-        
-        # Update parent queryset
-        if manifestation and 'parent' in self.fields:
-            from .models import LegalUnit
-            manifestation_id = manifestation.id if hasattr(manifestation, 'id') else manifestation
-            
-            valid_parents = LegalUnit.objects.filter(manifestation_id=manifestation_id)
-            if self.instance and self.instance.pk:
-                valid_parents = valid_parents.exclude(pk=self.instance.pk)
-            
-            self.fields['parent'].queryset = valid_parents
-        
+        # با autocomplete widget دیگر نیازی به update کردن queryset نیست
         return cleaned_data
     
     def save(self, commit=True):

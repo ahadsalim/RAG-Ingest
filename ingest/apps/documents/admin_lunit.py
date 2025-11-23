@@ -10,8 +10,20 @@ from mptt.admin import MPTTModelAdmin
 from simple_history.admin import SimpleHistoryAdmin
 
 from ingest.core.admin_mixins import JalaliAdminMixin as SimpleJalaliAdminMixin
-from .models import LUnit, InstrumentManifestation
+from .models import LUnit, InstrumentManifestation, LegalUnit, LegalUnitVocabularyTerm
 from .forms import LUnitForm
+from django.http import JsonResponse
+from django.db.models import Q
+
+
+class LegalUnitVocabularyTermInlineSimple(admin.TabularInline):
+    """Inline ساده برای Tags با autocomplete."""
+    model = LegalUnitVocabularyTerm
+    extra = 1
+    fields = ('term', 'relevance_score')
+    autocomplete_fields = ['term']
+    verbose_name = 'برچسب'
+    verbose_name_plural = 'برچسب‌ها'
 
 
 class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
@@ -31,10 +43,13 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
     # MPTT settings
     mptt_indent_field = "indented_title_short"
     
+    # Inlines
+    inlines = [LegalUnitVocabularyTermInlineSimple]
+    
     # Fieldsets برای layout بهتر
     fieldsets = (
         (None, {
-            'fields': ('parent', ('unit_type', 'number', 'order_index'), 'content')
+            'fields': (('parent', 'unit_type'), ('order_index', 'number'), 'content')
         }),
         ('تاریخ‌های اعتبار', {
             'fields': (('valid_from', 'valid_to'),),
@@ -46,6 +61,45 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
         """بهینه‌سازی queryset."""
         qs = super().get_queryset(request)
         return qs.select_related('manifestation', 'manifestation__expr', 'manifestation__expr__work')
+    
+    def get_urls(self):
+        """اضافه کردن URL برای AJAX search."""
+        from django.urls import path
+        urls = super().get_urls()
+        custom_urls = [
+            path('search-parents/', self.admin_site.admin_view(self.search_parents_view), name='lunit_search_parents'),
+        ]
+        return custom_urls + urls
+    
+    def search_parents_view(self, request):
+        """
+        AJAX endpoint برای جستجوی والدها.
+        """
+        query = request.GET.get('q', '').strip()
+        manifestation_id = request.GET.get('manifestation_id', '')
+        
+        if not query or not manifestation_id:
+            return JsonResponse({'results': []})
+        
+        # جستجو در والدها
+        parents = LegalUnit.objects.filter(
+            manifestation_id=manifestation_id
+        ).filter(
+            Q(number__icontains=query) |
+            Q(content__icontains=query) |
+            Q(unit_type__icontains=query)
+        ).only('id', 'unit_type', 'number', 'content').order_by('order_index', 'number')[:20]
+        
+        results = []
+        for parent in parents:
+            results.append({
+                'id': str(parent.id),
+                'type': parent.get_unit_type_display(),
+                'number': parent.number or '',
+                'content': parent.content[:50] if parent.content else ''
+            })
+        
+        return JsonResponse({'results': results})
     
     def changelist_view(self, request, extra_context=None):
         """
@@ -90,48 +144,7 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
         
         return super().changelist_view(request, extra_context)
     
-    def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        """فیلتر parent بر اساس manifestation."""
-        if db_field.name == "parent":
-            # دریافت manifestation_id
-            manifestation_id = request.GET.get('manifestation')
-            
-            if not manifestation_id:
-                changelist_filters = request.GET.get('_changelist_filters')
-                if changelist_filters and 'manifestation__id__exact' in changelist_filters:
-                    import re
-                    match = re.search(r'manifestation__id__exact[=%]([a-f0-9-]+)', changelist_filters)
-                    if match:
-                        manifestation_id = match.group(1)
-            
-            if not manifestation_id and hasattr(request, 'resolver_match') and request.resolver_match:
-                object_id = request.resolver_match.kwargs.get('object_id')
-                if object_id:
-                    try:
-                        obj = self.model.objects.get(pk=object_id)
-                        if obj.manifestation:
-                            manifestation_id = str(obj.manifestation.id)
-                    except self.model.DoesNotExist:
-                        pass
-            
-            # اعمال فیلتر
-            if manifestation_id:
-                from .models import LegalUnit
-                queryset = LegalUnit.objects.filter(
-                    manifestation_id=manifestation_id
-                ).order_by('order_index', 'number')
-                
-                if hasattr(request, 'resolver_match') and request.resolver_match:
-                    object_id = request.resolver_match.kwargs.get('object_id')
-                    if object_id:
-                        queryset = queryset.exclude(pk=object_id)
-                
-                kwargs["queryset"] = queryset
-            else:
-                from .models import LegalUnit
-                kwargs["queryset"] = LegalUnit.objects.all()
-        
-        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+    # حذف formfield_for_foreignkey چون از autocomplete استفاده می‌کنیم
     
     def get_form(self, request, obj=None, **kwargs):
         """
