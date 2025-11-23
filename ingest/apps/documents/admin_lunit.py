@@ -5,6 +5,7 @@ Admin interface برای LUnit - نسخه بهینه شده LegalUnit
 from django.contrib import admin
 from django.db import models
 from django.utils.html import format_html
+from django.utils.safestring import mark_safe
 from django.shortcuts import render
 from mptt.admin import MPTTModelAdmin
 from simple_history.admin import SimpleHistoryAdmin
@@ -349,11 +350,28 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
     
     # Custom display methods
     def indented_title_short(self, obj):
-        """عنوان کوتاه (30 کاراکتر) برای list display."""
-        content = obj.content[:30] if obj.content else '-'
-        if len(obj.content) > 30:
+        """عنوان کوتاه با indent برای نمایش tree."""
+        # محاسبه indent بر اساس level
+        indent = '&nbsp;&nbsp;&nbsp;&nbsp;' * obj.level
+        
+        # نمایش نوع و شماره
+        type_display = obj.get_unit_type_display()
+        number_display = f' {obj.number}' if obj.number else ''
+        title = f'{type_display}{number_display}'
+        
+        # محتوای کوتاه
+        content = obj.content[:40] if obj.content else ''
+        if len(obj.content) > 40:
             content += '...'
-        return format_html('<span style="font-weight: normal; font-size: 13px; white-space: nowrap;">{}</span>', content)
+        
+        # ترکیب
+        full_title = f'{title}: {content}' if content else title
+        
+        return format_html(
+            '{}<span style="font-weight: normal; font-size: 13px;">{}</span>',
+            mark_safe(indent),
+            full_title
+        )
     indented_title_short.short_description = 'عنوان'
     
     def is_active_display(self, obj):
