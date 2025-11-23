@@ -11,7 +11,7 @@ from mptt.admin import MPTTModelAdmin
 from simple_history.admin import SimpleHistoryAdmin
 
 from ingest.core.admin_mixins import JalaliAdminMixin as SimpleJalaliAdminMixin
-from .models import LUnit, InstrumentManifestation, LegalUnit, LegalUnitVocabularyTerm
+from .models import LUnit, InstrumentManifestation, LegalUnit, LegalUnitVocabularyTerm, LegalUnitChange
 from .forms import LUnitForm
 from django.http import JsonResponse
 from django.db.models import Q
@@ -35,6 +35,27 @@ class LegalUnitVocabularyTermInlineSimple(admin.TabularInline):
         return qs
 
 
+class LegalUnitChangeInlineSimple(admin.StackedInline):
+    """Inline برای مدیریت تغییرات واحد قانونی."""
+    model = LegalUnitChange
+    fk_name = "unit"
+    extra = 0
+    readonly_fields = ('created_at', 'updated_at')
+    
+    def get_formset(self, request, obj=None, **kwargs):
+        """استفاده از form سفارشی با پشتیبانی تاریخ جلالی."""
+        from .forms import LegalUnitChangeForm
+        kwargs['form'] = LegalUnitChangeForm
+        return super().get_formset(request, obj, **kwargs)
+    
+    fieldsets = (
+        ('اطلاعات تغییر', {
+            'fields': ('change_type', 'effective_date', 'source_expression', 'superseded_by', 'note'),
+            'classes': ('collapse',),
+        }),
+    )
+
+
 class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
     """
     Admin برای LUnit با رابط کاربری ساده و بهینه.
@@ -56,7 +77,7 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
     mptt_indent_field = "indented_title_short"
     
     # Inlines
-    inlines = [LegalUnitVocabularyTermInlineSimple]
+    inlines = [LegalUnitVocabularyTermInlineSimple, LegalUnitChangeInlineSimple]
     
     def get_actions(self, request):
         """حذف action پیش‌فرض و اضافه action سفارشی."""
