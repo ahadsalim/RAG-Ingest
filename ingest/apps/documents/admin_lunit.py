@@ -66,7 +66,7 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
     actions = ['delete_selected_with_related']
     
     # List display
-    list_display = ('indented_title_short', 'is_active_display', 'unit_type_display', 'order_index_display', 'chunk_display', 'jalali_created_at_display')
+    list_display = ('indented_title_short', 'is_active_display', 'unit_type_display', 'order_index_display', 'chunk_display', 'jalali_valid_from_display', 'jalali_valid_to_display', 'jalali_created_at_display')
     list_filter = ('unit_type', 'created_at')
     search_fields = ('content', 'path_label', 'number')
     mptt_level_indent = 20
@@ -414,27 +414,19 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
     
     # Custom display methods
     def indented_title_short(self, obj):
-        """عنوان کوتاه با indent برای نمایش tree."""
+        """عنوان کوتاه با indent برای نمایش tree - فقط محتوا."""
         # محاسبه indent بر اساس level
         indent = '&nbsp;&nbsp;&nbsp;&nbsp;' * obj.level
         
-        # نمایش نوع و شماره
-        type_display = obj.get_unit_type_display()
-        number_display = f' {obj.number}' if obj.number else ''
-        title = f'{type_display}{number_display}'
-        
-        # محتوای کوتاه
-        content = obj.content[:40] if obj.content else ''
-        if len(obj.content) > 40:
+        # فقط محتوای کوتاه (30 کاراکتر)
+        content = obj.content[:30] if obj.content else '-'
+        if obj.content and len(obj.content) > 30:
             content += '...'
-        
-        # ترکیب
-        full_title = f'{title}: {content}' if content else title
         
         return format_html(
             '{}<span style="font-weight: normal; font-size: 13px;">{}</span>',
             mark_safe(indent),
-            full_title
+            content
         )
     indented_title_short.short_description = 'عنوان'
     
