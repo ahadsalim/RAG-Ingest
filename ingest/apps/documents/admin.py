@@ -323,12 +323,13 @@ class LegalUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin)
     list_filter = ('unit_type', ActiveTodayListFilter, HasExpiryListFilter, 'created_at')
     search_fields = ('content', 'path_label', 'eli_fragment', 'xml_id')
     mptt_level_indent = 20
-    # برای نمایش درختی، باید list_display_links را تنظیم کنیم
-    list_display_links = ('indented_title',)
     readonly_fields = ('path_label', 'created_at', 'updated_at')
     inlines = [LegalUnitVocabularyTermInline, LegalUnitChangeInline]
     actions = ['mark_as_repealed', 'mark_as_active']
     list_per_page = 100
+    
+    # MPTT settings برای نمایش درختی
+    mptt_indent_field = "indented_title"
     
     def changelist_view(self, request, extra_context=None):
         """Override to show manifestation list if no manifestation filter."""
@@ -659,10 +660,8 @@ class LegalUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin)
         نمایش عنوان با indent برای tree view.
         این متد توسط MPTTModelAdmin به صورت خودکار indent می‌شود.
         """
-        # نمایش شماره و محتوا (تا 50 کاراکتر)
-        content = obj.content[:50] if obj.content else ''
-        if obj.number:
-            return f"{obj.number} - {content}"
+        # فقط نمایش محتوا (بدون شماره)
+        content = obj.content[:80] if obj.content else '-'
         return content
     indented_title.short_description = 'عنوان'
 
