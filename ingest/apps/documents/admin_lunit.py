@@ -98,9 +98,10 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
         if not query or not manifestation_id:
             return JsonResponse({'results': []})
         
-        # نقشه نوع واحدها برای جستجوی دقیق
+        # نقشه نوع واحدها برای جستجوی دقیق (با مترادف‌ها)
         unit_type_map = {
             'باب': 'part',
+            'بخش': 'part',  # مترادف باب
             'فصل': 'chapter',
             'قسمت': 'section',
             'ماده': 'article',

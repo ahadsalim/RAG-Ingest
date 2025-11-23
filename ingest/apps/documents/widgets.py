@@ -17,7 +17,7 @@ class ParentAutocompleteWidget(forms.TextInput):
         super().__init__(*args, **kwargs)
         self.attrs.update({
             'class': 'parent-autocomplete vTextField',
-            'placeholder': 'نوع واحد (باب، فصل، ماده، ...) یا شماره',
+            'placeholder': 'نوع واحد (باب/بخش، فصل، ماده، ...) یا شماره',
             'autocomplete': 'off',
             'style': 'width: 500px; display: inline-block;'
         })
