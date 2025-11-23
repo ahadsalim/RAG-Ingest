@@ -57,12 +57,17 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
     
     # از get_fieldsets استفاده می‌کنیم تا parent با widget سفارشی اضافه شود
     def get_fieldsets(self, request, obj=None):
-        """Fieldsets ساده - همه فیلدها در یک گروه تا قبل از تگ‌ها."""
+        """Fieldsets با ساختار جدید - 3 بخش."""
         return (
             ('', {
                 'fields': (
-                    'parent',
-                    ('unit_type', 'order_index', 'number'),
+                    ('parent', 'order_index'),
+                    ('unit_type', 'number'),
+                ),
+                'classes': ('wide',),
+            }),
+            ('', {
+                'fields': (
                     'content',
                     ('valid_from', 'valid_to'),
                 ),
