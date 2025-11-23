@@ -327,34 +327,44 @@ class LUnitForm(forms.ModelForm):
             self.fields['order_index'].widget.attrs['style'] = 'width: 100px;'
             self.fields['order_index'].widget.attrs['placeholder'] = '0'
         
-        # استفاده از Autocomplete Widget برای parent
-        if 'parent' in self.fields:
-            self.fields['parent'].required = False
+        # اضافه کردن فیلد parent به صورت دستی با widget سفارشی
+        # تعیین manifestation_id
+        manifestation_id = None
+        if self.instance and self.instance.pk:
+            # Edit mode
+            if self.instance.manifestation:
+                manifestation_id = str(self.instance.manifestation.id)
+        elif self.manifestation_id:
+            # Add mode با manifestation_id
+            manifestation_id = str(self.manifestation_id) if hasattr(self.manifestation_id, 'id') else str(self.manifestation_id)
+        elif self.initial.get('manifestation'):
+            # Add mode با initial
+            manif = self.initial.get('manifestation')
+            manifestation_id = str(manif.id) if hasattr(manif, 'id') else str(manif)
+        
+        # ایجاد فیلد parent با widget سفارشی
+        if manifestation_id:
+            from django.forms import ModelChoiceField
+            self.fields['parent'] = ModelChoiceField(
+                queryset=LegalUnit.objects.none(),
+                required=False,
+                label='والد',
+                widget=ParentAutocompleteWidget(manifestation_id=manifestation_id),
+                help_text=''
+            )
+            self.fields['parent'].widget.attrs['style'] = 'width: 250px; display: inline-block;'
             
-            # تعیین manifestation_id
-            manifestation_id = None
-            if self.instance and self.instance.pk:
-                # Edit mode
-                if self.instance.manifestation:
-                    manifestation_id = str(self.instance.manifestation.id)
-            elif self.manifestation_id:
-                # Add mode با manifestation_id
-                manifestation_id = str(self.manifestation_id) if hasattr(self.manifestation_id, 'id') else str(self.manifestation_id)
-            elif self.initial.get('manifestation'):
-                # Add mode با initial
-                manif = self.initial.get('manifestation')
-                manifestation_id = str(manif.id) if hasattr(manif, 'id') else str(manif)
-            
-            # استفاده از Autocomplete Widget
-            if manifestation_id:
-                self.fields['parent'].widget = ParentAutocompleteWidget(manifestation_id=manifestation_id)
-                self.fields['parent'].widget.attrs['style'] = 'width: 250px; display: inline-block;'
-                self.fields['parent'].help_text = ''
-                # queryset خالی - چون از AJAX استفاده می‌کنیم
-                self.fields['parent'].queryset = LegalUnit.objects.none()
-            else:
-                self.fields['parent'].queryset = LegalUnit.objects.none()
-                self.fields['parent'].help_text = ''
+            # اگر instance دارای parent است، آن را set کن
+            if self.instance and self.instance.pk and self.instance.parent:
+                self.fields['parent'].initial = self.instance.parent
+        else:
+            from django.forms import ModelChoiceField
+            self.fields['parent'] = ModelChoiceField(
+                queryset=LegalUnit.objects.none(),
+                required=False,
+                label='والد',
+                help_text=''
+            )
     
     def clean_parent(self):
         """Validation برای parent field."""
@@ -407,7 +417,8 @@ class LUnitForm(forms.ModelForm):
     
     class Meta:
         model = LUnit
-        exclude = ['id', 'created_at', 'updated_at', 'path_label', 'work', 'expr', 'eli_fragment', 'xml_id']
+        exclude = ['id', 'created_at', 'updated_at', 'path_label', 'work', 'expr', 'eli_fragment', 'xml_id', 'parent']
+        # parent را در __init__ با widget سفارشی اضافه می‌کنیم
 
 
 class FileAssetForm(forms.ModelForm):

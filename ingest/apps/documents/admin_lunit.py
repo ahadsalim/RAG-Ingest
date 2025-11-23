@@ -168,8 +168,6 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
         
         return super().changelist_view(request, extra_context)
     
-    # حذف formfield_for_foreignkey چون از autocomplete استفاده می‌کنیم
-    
     def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
         """تنظیم عنوان صفحه."""
         extra_context = extra_context or {}
