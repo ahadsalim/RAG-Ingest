@@ -41,6 +41,8 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
     """
     form = LUnitForm
     
+    # Actions
+    actions = ['delete_selected_with_related']
     
     # List display
     list_display = ('indented_title_short', 'is_active_display', 'unit_type_display', 'order_index_display', 'chunk_display', 'jalali_created_at_display')
@@ -55,6 +57,42 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
     
     # Inlines
     inlines = [LegalUnitVocabularyTermInlineSimple]
+    
+    def get_actions(self, request):
+        """حذف action پیش‌فرض و اضافه action سفارشی."""
+        actions = super().get_actions(request)
+        # حذف delete_selected پیش‌فرض که با proxy model مشکل دارد
+        if 'delete_selected' in actions:
+            del actions['delete_selected']
+        if 'delete_selected_tree' in actions:
+            del actions['delete_selected_tree']
+        return actions
+    
+    def delete_selected_with_related(self, request, queryset):
+        """حذف بندها به همراه chunks و embeddings مرتبط."""
+        from .models import Chunk
+        
+        deleted_count = 0
+        chunks_deleted = 0
+        
+        for obj in queryset:
+            # حذف chunks مرتبط
+            related_chunks = Chunk.objects.filter(legal_unit=obj)
+            chunk_count = related_chunks.count()
+            
+            # حذف embeddings از طریق cascade
+            related_chunks.delete()
+            chunks_deleted += chunk_count
+            
+            # حذف خود بند (از طریق LegalUnit برای جلوگیری از مشکل proxy)
+            LegalUnit.objects.filter(pk=obj.pk).delete()
+            deleted_count += 1
+        
+        self.message_user(
+            request,
+            f'{deleted_count} بند و {chunks_deleted} chunk مرتبط حذف شدند.'
+        )
+    delete_selected_with_related.short_description = "حذف بندهای انتخاب شده (با chunks)"
     
     # از get_fieldsets استفاده می‌کنیم تا parent با widget سفارشی اضافه شود
     def get_fieldsets(self, request, obj=None):
