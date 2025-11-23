@@ -199,6 +199,80 @@ class CustomUserAdmin(UserAdmin):
             change_password_url
         )
     password_display.short_description = 'گذرواژه'
+    
+    def save_model(self, request, obj, form, change):
+        """
+        وقتی کاربر permission ویرایش LUnit/LegalUnit می‌گیرد،
+        permission حذف SyncLog هم بده.
+        """
+        super().save_model(request, obj, form, change)
+        
+        # بررسی permissions
+        from django.contrib.contenttypes.models import ContentType
+        from django.contrib.auth.models import Permission
+        
+        # اگر کاربر permission ویرایش LUnit یا LegalUnit دارد
+        lunit_ct = ContentType.objects.get(app_label='documents', model='lunit')
+        legalunit_ct = ContentType.objects.get(app_label='documents', model='legalunit')
+        
+        has_lunit_change = obj.user_permissions.filter(
+            content_type=lunit_ct, codename='change_lunit'
+        ).exists() or obj.groups.filter(
+            permissions__content_type=lunit_ct, permissions__codename='change_lunit'
+        ).exists()
+        
+        has_legalunit_change = obj.user_permissions.filter(
+            content_type=legalunit_ct, codename='change_legalunit'
+        ).exists() or obj.groups.filter(
+            permissions__content_type=legalunit_ct, permissions__codename='change_legalunit'
+        ).exists()
+        
+        # اگر یکی از این permissions را دارد، permission حذف SyncLog بده
+        if has_lunit_change or has_legalunit_change:
+            synclog_ct = ContentType.objects.get(app_label='embeddings', model='synclog')
+            delete_synclog_perm = Permission.objects.get(
+                content_type=synclog_ct, codename='delete_synclog'
+            )
+            
+            # اضافه کردن permission اگر نداشته باشد
+            if not obj.user_permissions.filter(pk=delete_synclog_perm.pk).exists():
+                obj.user_permissions.add(delete_synclog_perm)
+    
+    def save_related(self, request, form, formsets, change):
+        """
+        بعد از save کردن permissions/groups، دوباره چک کن.
+        """
+        super().save_related(request, form, formsets, change)
+        
+        # دوباره save_model را صدا بزن تا permissions را چک کند
+        obj = form.instance
+        
+        from django.contrib.contenttypes.models import ContentType
+        from django.contrib.auth.models import Permission
+        
+        lunit_ct = ContentType.objects.get(app_label='documents', model='lunit')
+        legalunit_ct = ContentType.objects.get(app_label='documents', model='legalunit')
+        
+        has_lunit_change = obj.user_permissions.filter(
+            content_type=lunit_ct, codename='change_lunit'
+        ).exists() or obj.groups.filter(
+            permissions__content_type=lunit_ct, permissions__codename='change_lunit'
+        ).exists()
+        
+        has_legalunit_change = obj.user_permissions.filter(
+            content_type=legalunit_ct, codename='change_legalunit'
+        ).exists() or obj.groups.filter(
+            permissions__content_type=legalunit_ct, permissions__codename='change_legalunit'
+        ).exists()
+        
+        if has_lunit_change or has_legalunit_change:
+            synclog_ct = ContentType.objects.get(app_label='embeddings', model='synclog')
+            delete_synclog_perm = Permission.objects.get(
+                content_type=synclog_ct, codename='delete_synclog'
+            )
+            
+            if not obj.user_permissions.filter(pk=delete_synclog_perm.pk).exists():
+                obj.user_permissions.add(delete_synclog_perm)
 
 
 admin_site.register(User, CustomUserAdmin)
