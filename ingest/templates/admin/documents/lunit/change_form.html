@@ -1,0 +1,23 @@
+{% extends "admin/change_form.html" %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+    /* پنهان کردن دکمه‌های اضافی کنار فیلد parent */
+    .field-parent .related-widget-wrapper-link {
+        display: none !important;
+    }
+    
+    /* تنظیم عرض فیلد parent */
+    .field-parent input[type="text"] {
+        width: 250px !important;
+        display: inline-block !important;
+    }
+    
+    /* تنظیم عرض فیلد unit_type */
+    .field-unit_type select {
+        width: 250px !important;
+        display: inline-block !important;
+    }
+</style>
+{% endblock %}

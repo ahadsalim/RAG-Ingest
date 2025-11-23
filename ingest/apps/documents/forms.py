@@ -288,13 +288,13 @@ class LUnitForm(forms.ModelForm):
     valid_from = JalaliDateField(
         label='تاریخ تصویب / اجرا',
         required=False,
-        help_text='فرمت: 1402/01/15' if JALALI_AVAILABLE else 'فرمت: YYYY-MM-DD'
+        help_text=''
     )
     
     valid_to = JalaliDateField(
         label='تاریخ پایان اعتبار',
         required=False,
-        help_text=''  # توضیحات در template نمایش داده می‌شود
+        help_text=''
     )
     
     def __init__(self, *args, **kwargs):
@@ -305,7 +305,9 @@ class LUnitForm(forms.ModelForm):
         
         if JALALI_AVAILABLE:
             self.fields['valid_from'].widget = JalaliDateWidget()
+            self.fields['valid_from'].initial = '1404/07/05'
             self.fields['valid_to'].widget = JalaliDateWidget()
+            self.fields['valid_to'].initial = '1404/07/05'
         
         # تنظیمات فیلد محتوا
         if 'content' in self.fields:
@@ -317,7 +319,7 @@ class LUnitForm(forms.ModelForm):
         
         # تنظیمات فیلدهای کوچک
         if 'unit_type' in self.fields:
-            self.fields['unit_type'].widget.attrs['style'] = 'width: 250px;'
+            self.fields['unit_type'].widget.attrs['style'] = 'width: 250px; display: inline-block;'
         
         if 'number' in self.fields:
             self.fields['number'].widget.attrs['style'] = 'width: 150px;'
@@ -348,12 +350,13 @@ class LUnitForm(forms.ModelForm):
             # استفاده از Autocomplete Widget
             if manifestation_id:
                 self.fields['parent'].widget = ParentAutocompleteWidget(manifestation_id=manifestation_id)
-                self.fields['parent'].help_text = 'تایپ کنید برای جستجو (شماره، نوع، یا محتوا)'
+                self.fields['parent'].widget.attrs['style'] = 'width: 250px; display: inline-block;'
+                self.fields['parent'].help_text = ''
                 # queryset خالی - چون از AJAX استفاده می‌کنیم
                 self.fields['parent'].queryset = LegalUnit.objects.none()
             else:
                 self.fields['parent'].queryset = LegalUnit.objects.none()
-                self.fields['parent'].help_text = 'ابتدا سند را انتخاب کنید'
+                self.fields['parent'].help_text = ''
     
     def clean_parent(self):
         """Validation برای parent field."""

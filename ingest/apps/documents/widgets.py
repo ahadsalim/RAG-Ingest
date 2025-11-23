@@ -16,10 +16,10 @@ class ParentAutocompleteWidget(forms.TextInput):
         self.manifestation_id = manifestation_id
         super().__init__(*args, **kwargs)
         self.attrs.update({
-            'class': 'parent-autocomplete',
+            'class': 'parent-autocomplete vTextField',
             'placeholder': 'تایپ کنید برای جستجو...',
             'autocomplete': 'off',
-            'style': 'width: 100%; max-width: 500px;'
+            'style': 'width: 250px; display: inline-block;'
         })
     
     def render(self, name, value, attrs=None, renderer=None):
@@ -122,14 +122,14 @@ class ParentAutocompleteWidget(forms.TextInput):
                 
                 let html = '';
                 results.forEach(function(item) {{
-                    html += '<div class="autocomplete-item" data-id="' + item.id + '" style="';
-                    html += 'padding: 10px;';
+                    html += '<div class="autocomplete-item" data-id="' + item.id + '" data-display="' + item.display + '" style="';
+                    html += 'padding: 8px 10px;';
                     html += 'cursor: pointer;';
                     html += 'border-bottom: 1px solid #eee;';
                     html += '">';
-                    html += '<strong>' + item.type + ' ' + item.number + '</strong>';
+                    html += '<div style="font-size: 13px; font-weight: 500;">' + item.display + '</div>';
                     if (item.content) {{
-                        html += '<br><span style="color: #666; font-size: 12px;">' + item.content + '</span>';
+                        html += '<div style="color: #666; font-size: 11px; margin-top: 2px;">' + item.content + '</div>';
                     }}
                     html += '</div>';
                 }});
@@ -140,7 +140,7 @@ class ParentAutocompleteWidget(forms.TextInput):
                 // اضافه کردن event listener به هر آیتم
                 resultsDiv.querySelectorAll('.autocomplete-item').forEach(function(item) {{
                     item.addEventListener('click', function() {{
-                        selectParent(this.dataset.id, this.textContent.trim());
+                        selectParent(this.dataset.id, this.dataset.display);
                     }});
                     
                     item.addEventListener('mouseenter', function() {{

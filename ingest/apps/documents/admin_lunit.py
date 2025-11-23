@@ -75,6 +75,7 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
     def search_parents_view(self, request):
         """
         AJAX endpoint برای جستجوی والدها.
+        جستجو در: مسیر + نوع واحد + شماره + 15 کاراکتر اول محتوا
         """
         query = request.GET.get('q', '').strip()
         manifestation_id = request.GET.get('manifestation_id', '')
@@ -82,22 +83,36 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
         if not query or not manifestation_id:
             return JsonResponse({'results': []})
         
-        # جستجو در والدها
+        # جستجو در والدها - در مسیر، نوع، شماره، و محتوا
         parents = LegalUnit.objects.filter(
             manifestation_id=manifestation_id
         ).filter(
+            Q(path_label__icontains=query) |
             Q(number__icontains=query) |
-            Q(content__icontains=query) |
-            Q(unit_type__icontains=query)
-        ).only('id', 'unit_type', 'number', 'content').order_by('order_index', 'number')[:20]
+            Q(unit_type__icontains=query) |
+            Q(content__icontains=query)
+        ).only('id', 'unit_type', 'number', 'content', 'path_label').order_by('order_index', 'number')[:20]
         
         results = []
         for parent in parents:
+            # ترکیب: مسیر + نوع + شماره + 15 کاراکتر اول محتوا
+            display_parts = []
+            if parent.path_label:
+                display_parts.append(parent.path_label)
+            display_parts.append(parent.get_unit_type_display())
+            if parent.number:
+                display_parts.append(str(parent.number))
+            
+            display = ' > '.join(display_parts)
+            content_preview = parent.content[:15] if parent.content else ''
+            
             results.append({
                 'id': str(parent.id),
                 'type': parent.get_unit_type_display(),
                 'number': parent.number or '',
-                'content': parent.content[:50] if parent.content else ''
+                'path': parent.path_label or '',
+                'content': content_preview,
+                'display': display
             })
         
         return JsonResponse({'results': results})
@@ -146,6 +161,32 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
         return super().changelist_view(request, extra_context)
     
     # حذف formfield_for_foreignkey چون از autocomplete استفاده می‌کنیم
+    
+    def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
+        """تنظیم عنوان صفحه."""
+        extra_context = extra_context or {}
+        
+        # دریافت manifestation
+        manifestation_id = request.GET.get('manifestation') or request.GET.get('_changelist_filters', '')
+        if 'manifestation__id__exact' in manifestation_id:
+            import re
+            match = re.search(r'manifestation__id__exact[=%]([a-f0-9-]+)', manifestation_id)
+            if match:
+                manifestation_id = match.group(1)
+        
+        if manifestation_id and not object_id:
+            try:
+                manifestation = InstrumentManifestation.objects.get(id=manifestation_id)
+                manifestation_title = (
+                    manifestation.expr.work.title_official 
+                    if manifestation.expr and manifestation.expr.work 
+                    else f'سند #{manifestation.id}'
+                )
+                extra_context['title'] = f'اضافه کردن بند به سند: {manifestation_title}'
+            except:
+                pass
+        
+        return super().changeform_view(request, object_id, form_url, extra_context)
     
     def get_form(self, request, obj=None, **kwargs):
         """
