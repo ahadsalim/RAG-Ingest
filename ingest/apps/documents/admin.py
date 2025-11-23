@@ -573,7 +573,7 @@ class LegalUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin)
                         manifestation_id = match.group(1)
             
             # اگر در حال ویرایش هستیم، از object بخوان
-            if not manifestation_id and hasattr(request, 'resolver_match'):
+            if not manifestation_id and hasattr(request, 'resolver_match') and request.resolver_match:
                 object_id = request.resolver_match.kwargs.get('object_id')
                 if object_id:
                     try:
@@ -638,10 +638,15 @@ class LegalUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin)
         
         # If editing existing object, make manifestation readonly
         if obj and 'manifestation' in form.base_fields:
-            # استفاده از disabled برای جلوگیری از validation error
-            form.base_fields['manifestation'].disabled = True
+            # راه‌حل: استفاده از custom clean method در form
+            # نمی‌توانیم disabled کنیم چون در POST نخواهد بود
+            # نمی‌توانیم readonly کنیم چون برای select کار نمی‌کند
+            # پس فقط initial را set می‌کنیم و در form validation می‌کنیم
             form.base_fields['manifestation'].initial = obj.manifestation
-            form.base_fields['manifestation'].help_text = 'نسخه سند قابل تغییر نیست'
+            form.base_fields['manifestation'].help_text = '⚠️ نسخه سند قابل تغییر نیست'
+            # استفاده از JavaScript برای غیرفعال کردن
+            form.base_fields['manifestation'].widget.attrs['onchange'] = 'this.value=this.defaultValue;'
+            form.base_fields['manifestation'].widget.attrs['style'] = 'background-color: #f5f5f5;'
         
         return form
 

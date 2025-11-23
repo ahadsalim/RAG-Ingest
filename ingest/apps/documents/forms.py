@@ -220,6 +220,20 @@ class LegalUnitForm(forms.ModelForm):
         
         return parent
     
+    def clean_manifestation(self):
+        """
+        Prevent changing manifestation in edit mode.
+        """
+        manifestation = self.cleaned_data.get('manifestation')
+        
+        # در edit mode، manifestation نباید تغییر کند
+        if self.instance and self.instance.pk and self.instance.manifestation:
+            if manifestation != self.instance.manifestation:
+                # اگر کاربر سعی کرد تغییر دهد، مقدار قبلی را برگردان
+                return self.instance.manifestation
+        
+        return manifestation
+    
     def clean(self):
         """Override clean to update parent queryset dynamically."""
         cleaned_data = super().clean()
