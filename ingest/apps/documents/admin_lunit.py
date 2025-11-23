@@ -308,6 +308,11 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
     def save_model(self, request, obj, form, change):
         """ذخیره با auto-populate."""
         
+        # در add mode، اگر manifestation نداریم، از parent بگیر
+        if not change and not obj.manifestation:
+            if obj.parent and obj.parent.manifestation:
+                obj.manifestation = obj.parent.manifestation
+        
         # در edit mode، manifestation را restore کن
         if change and not obj.manifestation:
             try:
