@@ -20,8 +20,8 @@ class LegalUnitVocabularyTermInlineSimple(admin.TabularInline):
     """Inline ساده برای Tags با autocomplete."""
     model = LegalUnitVocabularyTerm
     extra = 1
-    fields = ('term', 'relevance_score')
-    autocomplete_fields = ['term']
+    fields = ('vocabulary_term', 'weight')
+    autocomplete_fields = ['vocabulary_term']
     verbose_name = 'برچسب'
     verbose_name_plural = 'برچسب‌ها'
 
@@ -33,7 +33,7 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
     form = LUnitForm
     
     # List display
-    list_display = ('indented_title_short', 'unit_type', 'number', 'order_index', 'chunk_display', 'jalali_created_at_display')
+    list_display = ('indented_title_short', 'unit_type', 'order_index', 'chunk_display', 'jalali_created_at_display')
     list_filter = ('unit_type', 'created_at')
     search_fields = ('content', 'path_label', 'number')
     mptt_level_indent = 20
