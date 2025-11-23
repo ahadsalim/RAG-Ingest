@@ -117,22 +117,34 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
     
     # از get_fieldsets استفاده می‌کنیم تا parent با widget سفارشی اضافه شود
     def get_fieldsets(self, request, obj=None):
-        """Fieldsets با ساختار جدید - 3 بخش."""
-        return (
-            ('', {
-                'fields': (
-                    'manifestation',
-                    ('parent', 'order_index' ,'unit_type', 'number' , 'content'),
-                ),
-                'classes': ('wide',),
-            }),
-            ('', {
-                'fields': (
-                    ('valid_from', 'valid_to'),
-                ),
-                'classes': ('wide',),
-            }),
-        )
+        """Fieldsets بهینه شده."""
+        # در edit mode: بدون manifestation
+        if obj:
+            return (
+                ('', {
+                    'fields': (
+                        'parent',
+                        ('unit_type', 'number', 'order_index'),
+                        'content',
+                        ('valid_from', 'valid_to'),
+                    ),
+                    'classes': ('wide',),
+                }),
+            )
+        # در add mode: با manifestation
+        else:
+            return (
+                ('', {
+                    'fields': (
+                        'manifestation',
+                        'parent',
+                        ('unit_type', 'number', 'order_index'),
+                        'content',
+                        ('valid_from', 'valid_to'),
+                    ),
+                    'classes': ('wide',),
+                }),
+            )
     
     def get_queryset(self, request):
         """بهینه‌سازی queryset."""
@@ -287,28 +299,57 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
         return super().changelist_view(request, extra_context)
     
     def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
-        """تنظیم عنوان صفحه."""
+        """تنظیم عنوان صفحه با path کامل."""
         extra_context = extra_context or {}
         
-        # دریافت manifestation
-        manifestation_id = request.GET.get('manifestation') or request.GET.get('_changelist_filters', '')
-        if 'manifestation__id__exact' in manifestation_id:
-            import re
-            match = re.search(r'manifestation__id__exact[=%]([a-f0-9-]+)', manifestation_id)
-            if match:
-                manifestation_id = match.group(1)
-        
-        if manifestation_id and not object_id:
+        # اگر edit mode است
+        if object_id:
             try:
-                manifestation = InstrumentManifestation.objects.get(id=manifestation_id)
-                manifestation_title = (
-                    manifestation.expr.work.title_official 
-                    if manifestation.expr and manifestation.expr.work 
-                    else f'سند #{manifestation.id}'
-                )
-                extra_context['title'] = f'اضافه کردن بند به سند: {manifestation_title}'
+                obj = self.get_object(request, object_id)
+                if obj:
+                    # ساخت path کامل
+                    path_parts = []
+                    
+                    # عنوان سند
+                    if obj.manifestation and obj.manifestation.expr and obj.manifestation.expr.work:
+                        path_parts.append(obj.manifestation.expr.work.title_official)
+                    
+                    # path_label (باب > فصل > ...)
+                    if obj.path_label:
+                        path_parts.append(obj.path_label)
+                    
+                    # نوع و شماره فعلی
+                    current_part = obj.get_unit_type_display()
+                    if obj.number:
+                        current_part += f' {obj.number}'
+                    path_parts.append(current_part)
+                    
+                    # ترکیب با " - " و " > "
+                    full_path = ' - '.join([path_parts[0]] + [' > '.join(path_parts[1:])]) if len(path_parts) > 1 else path_parts[0]
+                    
+                    extra_context['title'] = f'ویرایش بند: {full_path}'
             except:
-                pass
+                extra_context['title'] = 'ویرایش بند'
+        else:
+            # Add mode
+            manifestation_id = request.GET.get('manifestation') or request.GET.get('_changelist_filters', '')
+            if 'manifestation__id__exact' in manifestation_id:
+                import re
+                match = re.search(r'manifestation__id__exact[=%]([a-f0-9-]+)', manifestation_id)
+                if match:
+                    manifestation_id = match.group(1)
+            
+            if manifestation_id:
+                try:
+                    manifestation = InstrumentManifestation.objects.get(id=manifestation_id)
+                    manifestation_title = (
+                        manifestation.expr.work.title_official 
+                        if manifestation.expr and manifestation.expr.work 
+                        else f'سند #{manifestation.id}'
+                    )
+                    extra_context['title'] = f'اضافه کردن بند به سند: {manifestation_title}'
+                except:
+                    pass
         
         return super().changeform_view(request, object_id, form_url, extra_context)
     
