@@ -139,8 +139,8 @@ class LegalUnitForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if JALALI_AVAILABLE:
-            self.fields['valid_from'].widget = JalaliDateWidget()
-            self.fields['valid_to'].widget = JalaliDateWidget()
+            self.fields['valid_from'].widget = JalaliDateWidget(attrs={'placeholder': '1404/07/05'})
+            self.fields['valid_to'].widget = JalaliDateWidget(attrs={'placeholder': '1404/07/05'})
         
         # Make content field wider with larger textarea
         if 'content' in self.fields:
@@ -304,10 +304,8 @@ class LUnitForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         
         if JALALI_AVAILABLE:
-            self.fields['valid_from'].widget = JalaliDateWidget()
-            self.fields['valid_from'].initial = '1404/07/05'
-            self.fields['valid_to'].widget = JalaliDateWidget()
-            self.fields['valid_to'].initial = '1404/07/05'
+            self.fields['valid_from'].widget = JalaliDateWidget(attrs={'placeholder': 'مثال: 1404/07/05'})
+            self.fields['valid_to'].widget = JalaliDateWidget(attrs={'placeholder': 'مثال: 1404/07/05'})
         
         # تنظیمات فیلد محتوا
         if 'content' in self.fields:

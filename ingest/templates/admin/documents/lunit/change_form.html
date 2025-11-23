@@ -4,12 +4,24 @@
 {{ block.super }}
 <style>
     /* پنهان کردن دکمه‌های اضافی کنار فیلد parent */
-    .field-parent .related-widget-wrapper-link {
+    .field-parent .related-widget-wrapper-link,
+    .field-parent a.related-widget-wrapper-link,
+    .field-parent .related-lookup,
+    .field-parent .changelink,
+    .field-parent .addlink,
+    .field-parent .viewlink {
+        display: none !important;
+        visibility: hidden !important;
+    }
+    
+    /* پنهان کردن select اصلی parent و نمایش فقط autocomplete */
+    .field-parent select {
         display: none !important;
     }
     
-    /* تنظیم عرض فیلد parent */
-    .field-parent input[type="text"] {
+    /* تنظیم عرض فیلد parent autocomplete */
+    .field-parent input[type="text"],
+    .field-parent .parent-autocomplete-search {
         width: 250px !important;
         display: inline-block !important;
     }

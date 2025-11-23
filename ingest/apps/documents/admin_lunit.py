@@ -19,11 +19,19 @@ from django.db.models import Q
 class LegalUnitVocabularyTermInlineSimple(admin.TabularInline):
     """Inline ساده برای Tags با autocomplete."""
     model = LegalUnitVocabularyTerm
-    extra = 1
+    extra = 0  # بدون ردیف پیش‌فرض
     fields = ('vocabulary_term', 'weight')
     autocomplete_fields = ['vocabulary_term']
     verbose_name = 'برچسب'
     verbose_name_plural = 'برچسب‌ها'
+    
+    def get_queryset(self, request):
+        """فقط تگ‌های موجود را نمایش بده، نه همه."""
+        qs = super().get_queryset(request)
+        # اگر object جدید است، queryset خالی برگردان
+        if not hasattr(request, '_obj_') or not request._obj_:
+            return qs.none()
+        return qs
 
 
 class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
