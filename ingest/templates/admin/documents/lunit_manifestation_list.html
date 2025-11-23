@@ -23,18 +23,20 @@
                     <th style="padding: 12px; text-align: right; font-weight: bold;">عنوان سند</th>
                     <th style="padding: 12px; text-align: center; font-weight: bold; width: 150px;">تعداد بندها</th>
                     <th style="padding: 12px; text-align: center; font-weight: bold; width: 150px;">تاریخ تصویب</th>
-                    <th style="padding: 12px; text-align: center; font-weight: bold; width: 120px;">عملیات</th>
                 </tr>
             </thead>
             <tbody>
                 {% for manifestation in manifestations %}
                 <tr style="border-bottom: 1px solid #eee; {% cycle 'background: #fff;' 'background: #f9f9f9;' %}">
                     <td style="padding: 12px; font-weight: normal; font-size: 13px;">
-                        {% if manifestation.expr and manifestation.expr.work %}
-                            {{ manifestation.expr.work.title_official }}
-                        {% else %}
-                            سند #{{ manifestation.id }}
-                        {% endif %}
+                        <a href="?manifestation__id__exact={{ manifestation.id }}" 
+                           style="color: #417690; text-decoration: none; font-weight: 500;">
+                            {% if manifestation.expr and manifestation.expr.work %}
+                                {{ manifestation.expr.work.title_official }}
+                            {% else %}
+                                سند #{{ manifestation.id }}
+                            {% endif %}
+                        </a>
                         {% if manifestation.expr and manifestation.expr.work and manifestation.expr.work.title_short %}
                             <br>
                             <span style="color: #666; font-size: 12px;">{{ manifestation.expr.work.title_short }}</span>
@@ -52,13 +54,6 @@
                         {% else %}
                             -
                         {% endif %}
-                    </td>
-                    <td style="padding: 12px; text-align: center;">
-                        <a href="?manifestation__id__exact={{ manifestation.id }}" 
-                           class="button" 
-                           style="background: #417690; color: white; padding: 6px 16px; text-decoration: none; border-radius: 4px; display: inline-block;">
-                            مشاهده بندها
-                        </a>
                     </td>
                 </tr>
                 {% endfor %}

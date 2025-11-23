@@ -77,7 +77,7 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
     mptt_indent_field = "indented_title_short"
     
     # Inlines
-    inlines = [LegalUnitVocabularyTermInlineSimple, LegalUnitChangeInlineSimple]
+    inlines = [LegalUnitVocabularyTermInlineSimple]
     
     def get_actions(self, request):
         """حذف action پیش‌فرض و اضافه action سفارشی."""
