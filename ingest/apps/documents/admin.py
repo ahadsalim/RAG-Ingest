@@ -557,7 +557,7 @@ class LegalUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin)
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         """
         بهینه‌سازی parent field برای نمایش فقط LegalUnit های همان manifestation.
-        این متد بهترین روش Django برای فیلتر کردن ForeignKey است.
+        استفاده از ParentAutocompleteWidget برای جستجوی سریع.
         """
         if db_field.name == "parent":
             # دریافت manifestation از URL یا object
@@ -583,32 +583,114 @@ class LegalUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin)
                     except self.model.DoesNotExist:
                         pass
             
-            # اعمال فیلتر اگر manifestation پیدا شد
+            # استفاده از ParentAutocompleteWidget
             if manifestation_id:
-                # Clear cache برای اطمینان از fresh data
-                from django.core.cache import cache
-                cache_key = f'legalunit_parents_{manifestation_id}'
-                cache.delete(cache_key)
-                
-                # استفاده از همان queryset که در form استفاده می‌شود
-                # استفاده از .all() برای force evaluation از دیتابیس
-                queryset = LegalUnit.objects.filter(
-                    manifestation_id=manifestation_id
-                ).select_related('parent').order_by('order_index', 'number')
-                
-                # اگر در حال ویرایش هستیم، خود object را exclude کن
-                if hasattr(request, 'resolver_match') and request.resolver_match:
-                    object_id = request.resolver_match.kwargs.get('object_id')
-                    if object_id:
-                        queryset = queryset.exclude(pk=object_id)
-                
-                kwargs["queryset"] = queryset
+                from .widgets import ParentAutocompleteWidget
+                kwargs["widget"] = ParentAutocompleteWidget(manifestation_id=manifestation_id, model_name='legalunit')
+                # queryset باید all() باشد تا validation کار کند
+                kwargs["queryset"] = LegalUnit.objects.all()
             else:
-                # اگر manifestation نداریم، همه را نشان بده (برای validation)
-                # اما در form این محدود می‌شود
+                # اگر manifestation نداریم، همه را نشان بده
                 kwargs["queryset"] = LegalUnit.objects.all()
         
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
+    
+    def get_urls(self):
+        """اضافه کردن URL برای AJAX search."""
+        from django.urls import path
+        urls = super().get_urls()
+        custom_urls = [
+            path('search-parents/', self.admin_site.admin_view(self.search_parents_view), name='documents_legalunit_search_parents'),
+        ]
+        return custom_urls + urls
+    
+    def search_parents_view(self, request):
+        """
+        AJAX endpoint برای جستجوی والدها.
+        مشابه LUnitAdmin.search_parents_view
+        """
+        from django.http import JsonResponse
+        from django.db.models import Q
+        
+        query = request.GET.get('q', '').strip()
+        manifestation_id = request.GET.get('manifestation_id', '')
+        
+        if not query or not manifestation_id:
+            return JsonResponse({'results': []})
+        
+        # نقشه نوع واحدها
+        unit_type_map = {
+            'باب': 'part',
+            'بخش': 'part',
+            'فصل': 'chapter',
+            'قسمت': 'section',
+            'ماده': 'article',
+            'بند': 'clause',
+            'زیربند': 'subclause',
+            'تبصره': 'note',
+            'ضمیمه': 'appendix',
+        }
+        
+        query_lower = query.lower().strip()
+        unit_type_filter = None
+        number_filter = None
+        
+        # چک کردن نوع واحد + شماره
+        for persian_name, english_code in unit_type_map.items():
+            if query_lower.startswith(persian_name.lower()):
+                unit_type_filter = english_code
+                remaining = query_lower[len(persian_name):].strip()
+                if remaining:
+                    number_filter = remaining
+                break
+        
+        if not unit_type_filter:
+            for persian_name, english_code in unit_type_map.items():
+                if query_lower == persian_name.lower():
+                    unit_type_filter = english_code
+                    break
+        
+        # ساخت query
+        base_query = LegalUnit.objects.filter(manifestation_id=manifestation_id)
+        
+        if unit_type_filter:
+            parents = base_query.filter(unit_type=unit_type_filter)
+            if number_filter:
+                parents = parents.filter(number=number_filter)
+        else:
+            parents = base_query.filter(
+                Q(number__exact=query) |
+                Q(content__icontains=query)
+            )
+        
+        parents = parents.only('id', 'unit_type', 'number', 'content', 'path_label', 'parent').select_related('parent').order_by('parent__order_index', 'order_index', 'number')[:30]
+        
+        results = []
+        for parent in parents:
+            display_parts = []
+            status_icon = '✓' if parent.is_active else '✗'
+            display_parts.append(status_icon)
+            
+            if parent.path_label:
+                display_parts.append(parent.path_label)
+            display_parts.append(parent.get_unit_type_display())
+            if parent.number:
+                display_parts.append(str(parent.number))
+            
+            display = ' > '.join(display_parts)
+            content_preview = parent.content[:50] if parent.content else ''
+            
+            results.append({
+                'id': str(parent.id),
+                'type': parent.get_unit_type_display(),
+                'number': parent.number or '',
+                'path': parent.path_label or '',
+                'content': content_preview,
+                'display': display,
+                'is_active': parent.is_active
+            })
+        
+        return JsonResponse({'results': results})
     
     def get_form(self, request, obj=None, **kwargs):
         # Exclude non-editable fields and hide work/expr since they're auto-populated

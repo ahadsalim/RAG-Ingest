@@ -12,14 +12,16 @@ class ParentAutocompleteWidget(forms.TextInput):
     """
     template_name = 'admin/documents/widgets/parent_autocomplete.html'
     
-    def __init__(self, manifestation_id=None, *args, **kwargs):
+    def __init__(self, manifestation_id=None, model_name='lunit', *args, **kwargs):
         self.manifestation_id = manifestation_id
+        self.model_name = model_name  # 'lunit' or 'legalunit'
         super().__init__(*args, **kwargs)
         self.attrs.update({
             'class': 'parent-autocomplete vTextField',
             'placeholder': 'نوع واحد (باب/بخش، فصل، ماده، ...) یا شماره',
             'autocomplete': 'off',
-            'style': 'width: 500px; display: inline-block;'
+            'style': 'width: 500px; display: inline-block;',
+            'data-model-name': model_name
         })
     
     def render(self, name, value, attrs=None, renderer=None):
@@ -95,12 +97,13 @@ class ParentAutocompleteWidget(forms.TextInput):
             // جستجو در والدها
             function searchParents(query) {{
                 const manifestationId = searchInput.dataset.manifestationId;
+                const modelName = searchInput.dataset.modelName || 'lunit';
                 if (!manifestationId) {{
                     console.error('Manifestation ID not found');
                     return;
                 }}
                 
-                const url = '/admin/documents/lunit/search-parents/?q=' + encodeURIComponent(query) + '&manifestation_id=' + manifestationId;
+                const url = '/admin/documents/' + modelName + '/search-parents/?q=' + encodeURIComponent(query) + '&manifestation_id=' + manifestationId;
                 
                 fetch(url)
                     .then(response => response.json())
