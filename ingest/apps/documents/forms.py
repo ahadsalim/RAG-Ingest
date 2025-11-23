@@ -327,44 +327,7 @@ class LUnitForm(forms.ModelForm):
             self.fields['order_index'].widget.attrs['style'] = 'width: 100px;'
             self.fields['order_index'].widget.attrs['placeholder'] = '0'
         
-        # اضافه کردن فیلد parent به صورت دستی با widget سفارشی
-        # تعیین manifestation_id
-        manifestation_id = None
-        if self.instance and self.instance.pk:
-            # Edit mode
-            if self.instance.manifestation:
-                manifestation_id = str(self.instance.manifestation.id)
-        elif self.manifestation_id:
-            # Add mode با manifestation_id
-            manifestation_id = str(self.manifestation_id) if hasattr(self.manifestation_id, 'id') else str(self.manifestation_id)
-        elif self.initial.get('manifestation'):
-            # Add mode با initial
-            manif = self.initial.get('manifestation')
-            manifestation_id = str(manif.id) if hasattr(manif, 'id') else str(manif)
-        
-        # ایجاد فیلد parent با widget سفارشی
-        if manifestation_id:
-            from django.forms import ModelChoiceField
-            self.fields['parent'] = ModelChoiceField(
-                queryset=LegalUnit.objects.none(),
-                required=False,
-                label='والد',
-                widget=ParentAutocompleteWidget(manifestation_id=manifestation_id),
-                help_text=''
-            )
-            self.fields['parent'].widget.attrs['style'] = 'width: 250px; display: inline-block;'
-            
-            # اگر instance دارای parent است، آن را set کن
-            if self.instance and self.instance.pk and self.instance.parent:
-                self.fields['parent'].initial = self.instance.parent
-        else:
-            from django.forms import ModelChoiceField
-            self.fields['parent'] = ModelChoiceField(
-                queryset=LegalUnit.objects.none(),
-                required=False,
-                label='والد',
-                help_text=''
-            )
+        # parent widget در admin.get_form.CustomFormClass تنظیم می‌شود
     
     def clean_parent(self):
         """Validation برای parent field."""
@@ -417,8 +380,8 @@ class LUnitForm(forms.ModelForm):
     
     class Meta:
         model = LUnit
-        exclude = ['id', 'created_at', 'updated_at', 'path_label', 'work', 'expr', 'eli_fragment', 'xml_id', 'parent']
-        # parent را در __init__ با widget سفارشی اضافه می‌کنیم
+        exclude = ['id', 'created_at', 'updated_at', 'path_label', 'work', 'expr', 'eli_fragment', 'xml_id']
+        # parent widget در admin.get_form تنظیم می‌شود
 
 
 class FileAssetForm(forms.ModelForm):

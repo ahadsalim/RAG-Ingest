@@ -55,16 +55,18 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
     # Inlines
     inlines = [LegalUnitVocabularyTermInlineSimple]
     
-    # Fieldsets برای layout بهتر
-    fieldsets = (
-        (None, {
-            'fields': (('parent', 'unit_type'), ('order_index', 'number'), 'content')
-        }),
-        ('تاریخ‌های اعتبار', {
-            'fields': (('valid_from', 'valid_to'),),
-            'description': '<p style="color: #666;">خالی گذاشتن فیلد "تاریخ پایان اعتبار" به معنی بدون تاریخ انقضا است.</p>'
-        }),
-    )
+    # از get_fieldsets استفاده می‌کنیم تا parent با widget سفارشی اضافه شود
+    def get_fieldsets(self, request, obj=None):
+        """Fieldsets با parent که در form با widget سفارشی تعریف شده."""
+        return (
+            (None, {
+                'fields': (('parent', 'unit_type'), ('order_index', 'number'), 'content')
+            }),
+            ('تاریخ‌های اعتبار', {
+                'fields': (('valid_from', 'valid_to'),),
+                'description': '<p style="color: #666;">خالی گذاشتن فیلد "تاریخ پایان اعتبار" به معنی بدون تاریخ انقضا است.</p>'
+            }),
+        )
     
     def get_queryset(self, request):
         """بهینه‌سازی queryset."""
@@ -227,6 +229,13 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
                 if manifestation_id and not obj:
                     kwargs['manifestation_id'] = manifestation_id
                 super().__init__(*args, **kwargs)
+                
+                # اجبار استفاده از ParentAutocompleteWidget
+                if manifestation_id and 'parent' in self.fields:
+                    from .widgets import ParentAutocompleteWidget
+                    self.fields['parent'].widget = ParentAutocompleteWidget(manifestation_id=manifestation_id)
+                    self.fields['parent'].widget.attrs['style'] = 'width: 250px; display: inline-block;'
+                    self.fields['parent'].queryset = LegalUnit.objects.none()
         
         # Set initial برای add mode
         if manifestation_id and not obj:
