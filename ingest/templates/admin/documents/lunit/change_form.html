@@ -4,6 +4,10 @@
 {# حذف breadcrumbs - فقط h1 با path کامل نمایش داده شود #}
 {% endblock %}
 
+{% block content_title %}
+{# حذف content title اضافی #}
+{% endblock %}
+
 {% block extrastyle %}
 {{ block.super }}
 <style>
@@ -98,6 +102,15 @@
     .field-number label,
     .field-content label {
         font-weight: normal !important;
+    }
+    
+    /* حذف هر خط اضافی بالای فرم */
+    .breadcrumbs,
+    #content > h1:first-child,
+    #content-main > div:first-child:not(.module),
+    .submit-row + p,
+    div[style*="background"] {
+        display: none !important;
     }
 </style>
 {% endblock %}
