@@ -240,7 +240,7 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
         content = obj.content[:40] if obj.content else '-'
         if len(obj.content) > 40:
             content += '...'
-        return content
+        return format_html('<span style="font-weight: normal; font-size: 13px;">{}</span>', content)
     indented_title_short.short_description = 'عنوان'
     
     def chunk_display(self, obj):
