@@ -19,6 +19,8 @@ logger = logging.getLogger(__name__)
 @receiver(pre_save, sender=LegalUnit)
 def track_legal_unit_changes(sender, instance, **kwargs):
     """Track content changes in LegalUnit before save."""
+    logger.info(f"📝 pre_save signal triggered for LegalUnit {instance.id} (pk={instance.pk})")
+    
     if instance.pk:  # Existing instance
         try:
             old_instance = LegalUnit.objects.get(pk=instance.pk)
@@ -31,10 +33,13 @@ def track_legal_unit_changes(sender, instance, **kwargs):
             
             # Compare normalized versions
             instance._content_changed = old_instance.content != normalized_new_content
+            logger.info(f"  Existing unit, content_changed={instance._content_changed}")
         except LegalUnit.DoesNotExist:
             instance._content_changed = True  # Treat as new if not found
+            logger.info(f"  Unit not found in DB, treating as new")
     else:
         instance._content_changed = True  # New instance
+        logger.info(f"  New unit (no pk yet)")
 
 
 @receiver(post_save, sender=LegalUnit)

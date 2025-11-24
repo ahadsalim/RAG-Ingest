@@ -437,6 +437,14 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
                 obj.valid_from = obj.manifestation.publication_date
         
         super().save_model(request, obj, form, change)
+        
+        # بعد از save، چک کنیم که آیا Chunk دارد
+        # اگر نداشت، task را queue کنیم (چون signal ها گاهی trigger نمی‌شوند)
+        from ingest.apps.documents.models import Chunk
+        from ingest.apps.documents.processing.tasks import process_legal_unit_chunks
+        
+        if not Chunk.objects.filter(unit=obj).exists():
+            process_legal_unit_chunks.delay(str(obj.id))
     
     def response_add(self, request, obj, post_url_continue=None):
         """بعد از add، به لیست همان manifestation برگرد."""
