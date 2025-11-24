@@ -43,13 +43,27 @@ def process_legal_unit_on_save(sender, instance, created, **kwargs):
     Process legal unit chunks when created or content changed.
     This will automatically create chunks and queue embedding generation.
     """
-    should_process = created or getattr(instance, '_content_changed', False)
+    # همیشه log کن تا بفهمیم signal trigger می‌شود یا نه
+    logger.info(f"🔔 post_save signal triggered for LegalUnit {instance.id} (created={created})")
+    
+    # چک کنیم آیا Chunk دارد یا نه
+    has_chunks = Chunk.objects.filter(unit_id=instance.id).exists()
+    
+    should_process = created or getattr(instance, '_content_changed', False) or not has_chunks
     
     if should_process:
-        logger.info(f"Enqueuing chunk processing for LegalUnit {instance.id} (created={created}, content_changed={getattr(instance, '_content_changed', False)})")
+        reason = []
+        if created:
+            reason.append("created")
+        if getattr(instance, '_content_changed', False):
+            reason.append("content_changed")
+        if not has_chunks:
+            reason.append("no_chunks")
+        
+        logger.info(f"Enqueuing chunk processing for LegalUnit {instance.id} (reasons: {', '.join(reason)})")
         process_legal_unit_chunks.delay(str(instance.id))
     else:
-        logger.debug(f"Skipping chunk processing for LegalUnit {instance.id} - no content changes")
+        logger.info(f"⚠️  Skipping chunk processing for LegalUnit {instance.id} - already has chunks and no changes")
 
 
 @receiver(post_delete, sender=LegalUnit)
