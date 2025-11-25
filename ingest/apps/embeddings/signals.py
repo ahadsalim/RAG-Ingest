@@ -4,12 +4,15 @@ Signals for tracking metadata changes in related models.
 from django.db.models.signals import post_save, m2m_changed
 from django.dispatch import receiver
 from django.contrib.contenttypes.models import ContentType
+from django.contrib.auth import get_user_model
 
 from ingest.apps.documents.models import (
     LegalUnit, InstrumentWork, InstrumentExpression, 
     InstrumentManifestation, Chunk, QAEntry
 )
 from ingest.apps.embeddings.models import Embedding
+
+User = get_user_model()
 
 
 @receiver(post_save, sender=LegalUnit)
@@ -145,3 +148,93 @@ def invalidate_qa_tags_embeddings(sender, instance, action, **kwargs):
         object_id=instance.id,
         synced_to_core=True
     ).update(metadata_hash='')
+
+
+@receiver(m2m_changed, sender=User.user_permissions.through)
+def auto_grant_synclog_delete_permission(sender, instance, action, pk_set, **kwargs):
+    """
+    وقتی کاربر permission ویرایش LegalUnit می‌گیرد،
+    خودکار permission حذف SyncLog هم بهش بده.
+    """
+    if action not in ['post_add']:
+        return
+    
+    if not pk_set:
+        return
+    
+    from django.contrib.auth.models import Permission
+    
+    # دریافت content types
+    try:
+        legalunit_ct = ContentType.objects.get(app_label='documents', model='legalunit')
+        synclog_ct = ContentType.objects.get(app_label='embeddings', model='synclog')
+    except ContentType.DoesNotExist:
+        return
+    
+    # چک کنیم آیا permission ویرایش LegalUnit اضافه شده
+    change_legalunit_perm = Permission.objects.filter(
+        content_type=legalunit_ct,
+        codename='change_legalunit',
+        pk__in=pk_set
+    ).first()
+    
+    if not change_legalunit_perm:
+        return
+    
+    # دریافت permission حذف SyncLog
+    try:
+        delete_synclog_perm = Permission.objects.get(
+            content_type=synclog_ct,
+            codename='delete_synclog'
+        )
+    except Permission.DoesNotExist:
+        return
+    
+    # اگر قبلاً نداشت، اضافه کن
+    if not instance.user_permissions.filter(pk=delete_synclog_perm.pk).exists():
+        instance.user_permissions.add(delete_synclog_perm)
+
+
+@receiver(m2m_changed, sender=User.groups.through)
+def auto_grant_synclog_delete_permission_via_group(sender, instance, action, pk_set, **kwargs):
+    """
+    وقتی کاربر به گروهی اضافه می‌شود که permission ویرایش LegalUnit دارد،
+    خودکار permission حذف SyncLog هم بهش بده.
+    """
+    if action not in ['post_add']:
+        return
+    
+    if not pk_set:
+        return
+    
+    from django.contrib.auth.models import Permission, Group
+    
+    # دریافت content types
+    try:
+        legalunit_ct = ContentType.objects.get(app_label='documents', model='legalunit')
+        synclog_ct = ContentType.objects.get(app_label='embeddings', model='synclog')
+    except ContentType.DoesNotExist:
+        return
+    
+    # چک کنیم آیا گروه‌های اضافه شده permission ویرایش LegalUnit دارند
+    groups_with_change = Group.objects.filter(
+        pk__in=pk_set,
+        permissions__content_type=legalunit_ct,
+        permissions__codename='change_legalunit'
+    )
+    
+    if not groups_with_change.exists():
+        return
+    
+    # دریافت permission حذف SyncLog
+    try:
+        delete_synclog_perm = Permission.objects.get(
+            content_type=synclog_ct,
+            codename='delete_synclog'
+        )
+    except Permission.DoesNotExist:
+        return
+    
+    # اگر قبلاً نداشت، اضافه کن
+    if not instance.user_permissions.filter(pk=delete_synclog_perm.pk).exists():
+        instance.user_permissions.add(delete_synclog_perm)
