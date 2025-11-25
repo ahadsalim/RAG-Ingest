@@ -1,6 +1,7 @@
 """
 Signals for tracking metadata changes in related models.
 """
+from django.db import models
 from django.db.models.signals import post_save, m2m_changed
 from django.dispatch import receiver
 from django.contrib.contenttypes.models import ContentType
@@ -153,7 +154,7 @@ def invalidate_qa_tags_embeddings(sender, instance, action, **kwargs):
 @receiver(m2m_changed, sender=User.user_permissions.through)
 def auto_grant_synclog_delete_permission(sender, instance, action, pk_set, **kwargs):
     """
-    وقتی کاربر permission ویرایش LegalUnit می‌گیرد،
+    وقتی کاربر permission ویرایش LegalUnit یا LUnit می‌گیرد،
     خودکار permission حذف SyncLog هم بهش بده.
     """
     if action not in ['post_add']:
@@ -167,18 +168,20 @@ def auto_grant_synclog_delete_permission(sender, instance, action, pk_set, **kwa
     # دریافت content types
     try:
         legalunit_ct = ContentType.objects.get(app_label='documents', model='legalunit')
+        lunit_ct = ContentType.objects.get(app_label='documents', model='lunit')
         synclog_ct = ContentType.objects.get(app_label='embeddings', model='synclog')
     except ContentType.DoesNotExist:
         return
     
-    # چک کنیم آیا permission ویرایش LegalUnit اضافه شده
-    change_legalunit_perm = Permission.objects.filter(
-        content_type=legalunit_ct,
-        codename='change_legalunit',
+    # چک کنیم آیا permission ویرایش LegalUnit یا LUnit اضافه شده
+    has_change_perm = Permission.objects.filter(
         pk__in=pk_set
-    ).first()
+    ).filter(
+        models.Q(content_type=legalunit_ct, codename='change_legalunit') |
+        models.Q(content_type=lunit_ct, codename='change_lunit')
+    ).exists()
     
-    if not change_legalunit_perm:
+    if not has_change_perm:
         return
     
     # دریافت permission حذف SyncLog
@@ -198,7 +201,7 @@ def auto_grant_synclog_delete_permission(sender, instance, action, pk_set, **kwa
 @receiver(m2m_changed, sender=User.groups.through)
 def auto_grant_synclog_delete_permission_via_group(sender, instance, action, pk_set, **kwargs):
     """
-    وقتی کاربر به گروهی اضافه می‌شود که permission ویرایش LegalUnit دارد،
+    وقتی کاربر به گروهی اضافه می‌شود که permission ویرایش LegalUnit یا LUnit دارد،
     خودکار permission حذف SyncLog هم بهش بده.
     """
     if action not in ['post_add']:
@@ -212,15 +215,17 @@ def auto_grant_synclog_delete_permission_via_group(sender, instance, action, pk_
     # دریافت content types
     try:
         legalunit_ct = ContentType.objects.get(app_label='documents', model='legalunit')
+        lunit_ct = ContentType.objects.get(app_label='documents', model='lunit')
         synclog_ct = ContentType.objects.get(app_label='embeddings', model='synclog')
     except ContentType.DoesNotExist:
         return
     
-    # چک کنیم آیا گروه‌های اضافه شده permission ویرایش LegalUnit دارند
+    # چک کنیم آیا گروه‌های اضافه شده permission ویرایش LegalUnit یا LUnit دارند
     groups_with_change = Group.objects.filter(
-        pk__in=pk_set,
-        permissions__content_type=legalunit_ct,
-        permissions__codename='change_legalunit'
+        pk__in=pk_set
+    ).filter(
+        models.Q(permissions__content_type=legalunit_ct, permissions__codename='change_legalunit') |
+        models.Q(permissions__content_type=lunit_ct, permissions__codename='change_lunit')
     )
     
     if not groups_with_change.exists():

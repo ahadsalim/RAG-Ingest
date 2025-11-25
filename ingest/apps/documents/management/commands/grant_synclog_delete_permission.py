@@ -14,8 +14,16 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         # دریافت content types
-        lunit_ct = ContentType.objects.get(app_label='documents', model='lunit')
-        legalunit_ct = ContentType.objects.get(app_label='documents', model='legalunit')
+        try:
+            lunit_ct = ContentType.objects.get(app_label='documents', model='lunit')
+        except ContentType.DoesNotExist:
+            lunit_ct = None
+            
+        try:
+            legalunit_ct = ContentType.objects.get(app_label='documents', model='legalunit')
+        except ContentType.DoesNotExist:
+            legalunit_ct = None
+            
         synclog_ct = ContentType.objects.get(app_label='embeddings', model='synclog')
         
         # دریافت permission حذف SyncLog
@@ -26,35 +34,41 @@ class Command(BaseCommand):
         # پیدا کردن همه کاربران با permission ویرایش LUnit یا LegalUnit
         users_to_grant = set()
         
-        # کاربران با permission مستقیم
-        users_with_lunit = User.objects.filter(
-            user_permissions__content_type=lunit_ct,
-            user_permissions__codename='change_lunit'
-        )
-        users_with_legalunit = User.objects.filter(
-            user_permissions__content_type=legalunit_ct,
-            user_permissions__codename='change_legalunit'
-        )
+        # کاربران با permission مستقیم LUnit
+        if lunit_ct:
+            users_with_lunit = User.objects.filter(
+                user_permissions__content_type=lunit_ct,
+                user_permissions__codename='change_lunit'
+            )
+            for user in users_with_lunit:
+                users_to_grant.add(user)
+                
+        # کاربران با permission مستقیم LegalUnit
+        if legalunit_ct:
+            users_with_legalunit = User.objects.filter(
+                user_permissions__content_type=legalunit_ct,
+                user_permissions__codename='change_legalunit'
+            )
+            for user in users_with_legalunit:
+                users_to_grant.add(user)
         
-        for user in users_with_lunit:
-            users_to_grant.add(user)
-        for user in users_with_legalunit:
-            users_to_grant.add(user)
-        
-        # کاربران با permission از طریق group
-        users_with_lunit_group = User.objects.filter(
-            groups__permissions__content_type=lunit_ct,
-            groups__permissions__codename='change_lunit'
-        )
-        users_with_legalunit_group = User.objects.filter(
-            groups__permissions__content_type=legalunit_ct,
-            groups__permissions__codename='change_legalunit'
-        )
-        
-        for user in users_with_lunit_group:
-            users_to_grant.add(user)
-        for user in users_with_legalunit_group:
-            users_to_grant.add(user)
+        # کاربران با permission از طریق group LUnit
+        if lunit_ct:
+            users_with_lunit_group = User.objects.filter(
+                groups__permissions__content_type=lunit_ct,
+                groups__permissions__codename='change_lunit'
+            )
+            for user in users_with_lunit_group:
+                users_to_grant.add(user)
+                
+        # کاربران با permission از طریق group LegalUnit
+        if legalunit_ct:
+            users_with_legalunit_group = User.objects.filter(
+                groups__permissions__content_type=legalunit_ct,
+                groups__permissions__codename='change_legalunit'
+            )
+            for user in users_with_legalunit_group:
+                users_to_grant.add(user)
         
         # اضافه کردن permission به کاربران
         granted_count = 0
