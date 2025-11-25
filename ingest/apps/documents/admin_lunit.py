@@ -534,3 +534,19 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
         return '-'
     jalali_valid_to_display.short_description = 'پایان اعتبار'
     jalali_valid_to_display.admin_order_field = 'valid_to'
+    
+    def has_delete_permission(self, request, obj=None):
+        """
+        چک کردن permission حذف.
+        علاوه بر permission حذف LUnit، permission حذف SyncLog هم لازم است
+        چون وقتی LUnit حذف می‌شود، SyncLog های مرتبط هم cascade delete می‌شوند.
+        """
+        # چک permission پایه
+        has_perm = super().has_delete_permission(request, obj)
+        if not has_perm:
+            return False
+        
+        # چک permission حذف SyncLog
+        has_synclog_perm = request.user.has_perm('embeddings.delete_synclog')
+        
+        return has_synclog_perm
