@@ -550,3 +550,34 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
         has_synclog_perm = request.user.has_perm('embeddings.delete_synclog')
         
         return has_synclog_perm
+    
+    def get_deleted_objects(self, objs, request):
+        """
+        Override برای اینکه Django نیاز به permission برای نمایش related objects نداشته باشد.
+        فقط permission حذف اصلی (LUnit) کافی است.
+        """
+        from django.contrib.admin.utils import NestedObjects
+        from django.db import router
+        from django.utils.encoding import force_str
+        from django.utils.html import format_html
+        
+        collector = NestedObjects(using=router.db_for_write(self.model))
+        collector.collect(objs)
+        
+        def format_callback(obj):
+            """فرمت کردن object برای نمایش."""
+            opts = obj._meta
+            no_edit_link = '%s: %s' % (force_str(opts.verbose_name), force_str(obj))
+            return format_html('{}<br/>', no_edit_link)
+        
+        to_delete = collector.nested(format_callback)
+        
+        protected = []
+        model_count = {}
+        
+        for model, instances in collector.model_objs.items():
+            count = len(instances)
+            if count:
+                model_count[model._meta.verbose_name_plural] = count
+        
+        return to_delete, model_count, set(), protected
