@@ -148,6 +148,7 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
         """
         AJAX endpoint برای جستجوی والدها.
         جستجو بر اساس نوع واحد دقیق (باب، فصل، ماده، ...) یا شماره
+        یا ترکیب چند نوع واحد (مثل "تبصره 3 ماده 47")
         """
         query = request.GET.get('q', '').strip()
         manifestation_id = request.GET.get('manifestation_id', '')
@@ -168,43 +169,85 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
             'ضمیمه': 'appendix',
         }
         
-        # بررسی آیا query شامل نوع واحد + شماره است (مثل "فصل 2")
         query_lower = query.lower().strip()
-        unit_type_filter = None
-        number_filter = None
         
-        # چک کردن آیا query شامل نوع واحد + شماره است
-        for persian_name, english_code in unit_type_map.items():
-            if query_lower.startswith(persian_name.lower()):
-                unit_type_filter = english_code
-                # استخراج شماره بعد از نوع واحد
-                remaining = query_lower[len(persian_name):].strip()
-                if remaining:
-                    number_filter = remaining
-                break
-        
-        # اگر فقط نوع واحد بود (بدون شماره)
-        if not unit_type_filter:
-            for persian_name, english_code in unit_type_map.items():
-                if query_lower == persian_name.lower():
-                    unit_type_filter = english_code
-                    break
-        
-        # ساخت query - همه موارد (فعال و غیرفعال)
+        # ساخت query پایه
         base_query = LegalUnit.objects.filter(manifestation_id=manifestation_id)
         
-        if unit_type_filter:
-            # جستجوی بر اساس نوع واحد
-            parents = base_query.filter(unit_type=unit_type_filter)
-            # اگر شماره هم داده شده، فیلتر کن
-            if number_filter:
-                parents = parents.filter(number=number_filter)
-        else:
-            # جستجوی دقیق در شماره (exact match) یا محتوا
+        # تلاش برای parse کردن query به صورت ترکیبی (مثل "تبصره 3 ماده 47")
+        # الگوی جستجو: [نوع واحد] [شماره] [نوع واحد] [شماره] ...
+        import re
+        
+        # پیدا کردن همه نوع واحدها و شماره‌های آنها در query
+        parsed_parts = []
+        remaining_query = query_lower
+        
+        for persian_name, english_code in unit_type_map.items():
+            # پیدا کردن همه موارد این نوع واحد در query
+            pattern = rf'{persian_name.lower()}\s*(\d+)'
+            matches = re.findall(pattern, remaining_query)
+            for match in matches:
+                parsed_parts.append({
+                    'type': english_code,
+                    'type_fa': persian_name,
+                    'number': match
+                })
+        
+        # اگر چند نوع واحد parse شد (مثل "تبصره 3 ماده 47")
+        if len(parsed_parts) >= 2:
+            # جستجو در path_label برای پیدا کردن والدهایی که هر دو را دارند
+            # مثلاً: "فصل 1 > ماده 47 > تبصره 3"
+            q_filters = Q()
+            for part in parsed_parts:
+                # جستجو برای "نوع شماره" در path_label
+                search_term = f"{part['type_fa']} {part['number']}"
+                q_filters &= Q(path_label__icontains=search_term)
+            
+            parents = base_query.filter(q_filters)
+        
+        # اگر فقط یک نوع واحد parse شد (مثل "ماده 47")
+        elif len(parsed_parts) == 1:
+            part = parsed_parts[0]
             parents = base_query.filter(
-                Q(number__exact=query) |
-                Q(content__icontains=query)
+                unit_type=part['type'],
+                number=part['number']
             )
+        
+        # اگر هیچ نوع واحدی parse نشد، جستجوی ساده
+        else:
+            # بررسی آیا query شامل نوع واحد + شماره است (مثل "فصل 2")
+            unit_type_filter = None
+            number_filter = None
+            
+            # چک کردن آیا query شامل نوع واحد + شماره است
+            for persian_name, english_code in unit_type_map.items():
+                if query_lower.startswith(persian_name.lower()):
+                    unit_type_filter = english_code
+                    # استخراج شماره بعد از نوع واحد
+                    remaining = query_lower[len(persian_name):].strip()
+                    if remaining:
+                        number_filter = remaining
+                    break
+            
+            # اگر فقط نوع واحد بود (بدون شماره)
+            if not unit_type_filter:
+                for persian_name, english_code in unit_type_map.items():
+                    if query_lower == persian_name.lower():
+                        unit_type_filter = english_code
+                        break
+            
+            if unit_type_filter:
+                # جستجوی بر اساس نوع واحد
+                parents = base_query.filter(unit_type=unit_type_filter)
+                # اگر شماره هم داده شده، فیلتر کن
+                if number_filter:
+                    parents = parents.filter(number=number_filter)
+            else:
+                # جستجوی دقیق در شماره (exact match) یا محتوا
+                parents = base_query.filter(
+                    Q(number__exact=query) |
+                    Q(content__icontains=query)
+                )
         
         # مرتب‌سازی: ابتدا بر اساس parent order، سپس order_index خودش
         parents = parents.only('id', 'unit_type', 'number', 'content', 'path_label', 'parent', 'valid_from', 'valid_to').select_related('parent').order_by('parent__order_index', 'order_index', 'number')[:30]
