@@ -40,26 +40,27 @@ class EmbeddingInline(GenericTabularInline):
 
 # Simple FileAsset Admin
 class FileAssetAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
-    list_display = ('filename', 'description', 'formatted_size', 'uploaded_by', 'jalali_created_at_display')
+    list_display = ('filename', 'file_link', 'description', 'formatted_size', 'uploaded_by', 'jalali_created_at_display')
     list_filter = ('uploaded_by', 'created_at')
     search_fields = ('file', 'description')
-    readonly_fields = ('id', 'filename', 'file_size', 'formatted_size', 'uploaded_by_display', 'created_at', 'updated_at')
+    readonly_fields = ('id', 'filename', 'file_size', 'formatted_size', 'file_link', 'created_at', 'updated_at')
     actions = ['delete_selected']
     
     fieldsets = (
-        ('مراجع', {
-            'fields': ('legal_unit', 'manifestation'),
-            'description': 'لطفاً فقط یکی از موارد زیر را انتخاب کنید - یا جزء سند حقوقی یا انتشار سند'
-        }),
         ('فایل', {
-            'fields': ('file', 'description')
-        }),
-        ('اطلاعات سیستم', {
-            'fields': ('uploaded_by', 'created_at', 'updated_at'),
-            'classes': ('collapse',),
-            'description': 'آپلودکننده خودکار کاربر جاری تنظیم می‌شود'
+            'fields': ('file', 'file_link', 'manifestation', 'description')
         }),
     )
+    
+    def file_link(self, obj):
+        """نمایش لینک دانلود فایل"""
+        if obj and obj.file:
+            return format_html(
+                '<a href="{}" target="_blank">دانلود فایل</a>',
+                obj.file.url
+            )
+        return '-'
+    file_link.short_description = 'لینک دانلود'
     
     def uploaded_by_display(self, obj):
         """نمایش آپلودکننده یا کاربر جاری برای فایل جدید"""
@@ -73,7 +74,11 @@ class FileAssetAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
     def get_form(self, request, obj=None, **kwargs):
         # ذخیره request برای استفاده در uploaded_by_display
         self._current_request = request
-        return super().get_form(request, obj, **kwargs)
+        form = super().get_form(request, obj, **kwargs)
+        # بزرگ کردن فیلد توضیحات
+        if 'description' in form.base_fields:
+            form.base_fields['description'].widget = forms.Textarea(attrs={'rows': 4, 'cols': 60})
+        return form
     
     def save_model(self, request, obj, form, change):
         # همیشه کاربر جاری را به عنوان آپلودکننده تنظیم کن (فقط در ایجاد جدید)
