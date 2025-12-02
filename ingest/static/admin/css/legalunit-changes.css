@@ -189,6 +189,54 @@
     text-decoration: none;
 }
 
+/* استایل‌های dropdown والد - محدود کردن ارتفاع */
+.field-parent .related-widget-wrapper,
+.form-row.field-parent {
+    position: relative;
+}
+
+.field-parent select,
+.field-parent .select2-container {
+    max-height: 200px;
+}
+
+/* برای select2 dropdown */
+.select2-container--open .select2-dropdown {
+    max-height: 250px !important;
+}
+
+.select2-container--open .select2-results__options {
+    max-height: 200px !important;
+    overflow-y: auto !important;
+}
+
+/* برای native select dropdown */
+.field-parent select[multiple],
+.field-parent select[size] {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+/* اطمینان از z-index مناسب برای dropdown */
+.field-parent .select2-container--open {
+    z-index: 9999 !important;
+}
+
+.select2-container--open .select2-dropdown {
+    z-index: 9999 !important;
+}
+
+/* برای autocomplete dropdown جنگو */
+.select2-results {
+    max-height: 200px !important;
+    overflow-y: auto !important;
+}
+
+.select2-container--admin-autocomplete .select2-results__options {
+    max-height: 200px !important;
+    overflow-y: auto !important;
+}
+
 /* تنظیمات responsive */
 @media (max-width: 768px) {
     .changes-toggle-container {
