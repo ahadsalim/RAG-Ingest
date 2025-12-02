@@ -7,7 +7,6 @@ class DocumentsConfig(AppConfig):
     verbose_name = 'اسناد حقوقی'
     
     def ready(self):
-        """Import signals when the app is ready."""
-        # Import both signal modules
-        import ingest.apps.documents.signals  # noqa: F401
-        import ingest.apps.documents.signals_complete  # noqa: F401
+        """Import unified signals when the app is ready."""
+        # Import unified signal module (combines signals.py and signals_complete.py)
+        import ingest.apps.documents.signals_unified  # noqa: F401
