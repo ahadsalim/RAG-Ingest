@@ -67,6 +67,14 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
     
     # List display
     list_display = ('indented_title_short', 'doc_type_display', 'is_active_display', 'unit_type_display', 'order_index_display', 'chunk_display', 'jalali_valid_from_display', 'jalali_valid_to_display', 'jalali_created_at_display')
+    
+    def doc_type_display(self, obj):
+        """نمایش نوع سند."""
+        if obj.manifestation and obj.manifestation.expr and obj.manifestation.expr.work:
+            return obj.manifestation.expr.work.get_doc_type_display()
+        return '-'
+    doc_type_display.short_description = 'نوع سند'
+    doc_type_display.admin_order_field = 'manifestation__expr__work__doc_type'
     list_filter = ('unit_type', 'created_at')
     search_fields = ('content', 'path_label', 'number')
     ordering = ('manifestation__expr__work__title_official', 'tree_id', 'lft')  # مرتب‌سازی بر اساس عنوان سند
@@ -532,15 +540,6 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
             content
         )
     indented_title_short.short_description = 'عنوان'
-    indented_title_short.admin_order_field = 'manifestation__expr__work__title_official'
-    
-    def doc_type_display(self, obj):
-        """نمایش نوع سند."""
-        if obj.manifestation and obj.manifestation.expr and obj.manifestation.expr.work:
-            return obj.manifestation.expr.work.get_doc_type_display()
-        return '-'
-    doc_type_display.short_description = 'نوع سند'
-    doc_type_display.admin_order_field = 'manifestation__expr__work__doc_type'
     
     def is_active_display(self, obj):
         """نمایش وضعیت فعال بودن بر اساس تاریخ انقضا."""
