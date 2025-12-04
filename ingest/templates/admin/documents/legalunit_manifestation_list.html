@@ -12,13 +12,24 @@
 <table id="result_list">
     <thead>
         <tr>
-            <th scope="col">عنوان سند</th>
+            <th scope="col">تاریخ تصویب</th>
             <th scope="col" style="text-align: center;">تعداد بندها</th>
+            <th scope="col">نوع سند</th>
+            <th scope="col">عنوان سند</th>
         </tr>
     </thead>
     <tbody>
         {% for manifestation in manifestations %}
         <tr>
+            <td>{{ manifestation.jalali_publication_date }}</td>
+            <td style="text-align: center;">{{ manifestation.legalunit_count }}</td>
+            <td>
+                {% if manifestation.expr and manifestation.expr.work %}
+                    {{ manifestation.expr.work.get_doc_type_display }}
+                {% else %}
+                    -
+                {% endif %}
+            </td>
             <td>
                 <a href="?manifestation__id__exact={{ manifestation.id }}">
                     {% if manifestation.expr and manifestation.expr.work %}
@@ -28,7 +39,6 @@
                     {% endif %}
                 </a>
             </td>
-            <td style="text-align: center;">{{ manifestation.legalunit_count }}</td>
         </tr>
         {% endfor %}
     </tbody>

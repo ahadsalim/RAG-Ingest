@@ -350,12 +350,26 @@ class LegalUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin)
             # Show manifestation selection page
             from django.shortcuts import render
             from ingest.apps.documents.models import InstrumentManifestation
+            import jdatetime
             
-            manifestations = InstrumentManifestation.objects.select_related(
+            manifestations_qs = InstrumentManifestation.objects.select_related(
                 'expr', 'expr__work'
             ).annotate(
                 legalunit_count=models.Count('units')
-            ).order_by('-created_at')
+            ).order_by('expr__work__title_official')
+            
+            # اضافه کردن تاریخ شمسی به هر manifestation
+            manifestations = []
+            for m in manifestations_qs:
+                if m.publication_date:
+                    try:
+                        jalali_date = jdatetime.date.fromgregorian(date=m.publication_date)
+                        m.jalali_publication_date = jalali_date.strftime('%Y/%m/%d')
+                    except Exception:
+                        m.jalali_publication_date = str(m.publication_date)
+                else:
+                    m.jalali_publication_date = '-'
+                manifestations.append(m)
             
             context = {
                 **self.admin_site.each_context(request),
