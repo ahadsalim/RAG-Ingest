@@ -69,6 +69,7 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
     list_display = ('indented_title_short', 'is_active_display', 'unit_type_display', 'order_index_display', 'chunk_display', 'jalali_valid_from_display', 'jalali_valid_to_display', 'jalali_created_at_display')
     list_filter = ('unit_type', 'created_at')
     search_fields = ('content', 'path_label', 'number')
+    ordering = ('manifestation__expr__work__title_official', 'tree_id', 'lft')  # مرتب‌سازی بر اساس عنوان سند
     mptt_level_indent = 20
     readonly_fields = ('path_label', 'created_at', 'updated_at')
     list_per_page = 100
