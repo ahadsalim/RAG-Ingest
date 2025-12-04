@@ -277,7 +277,7 @@ class LegalUnit(MPTTModel, BaseModel):
         verbose_name='نوع واحد'
     )
     number = models.CharField(max_length=50, blank=True, verbose_name='شماره')
-    order_index = models.PositiveIntegerField(verbose_name='ترتیب', help_text='ترتیب نمایش (اجباری)')
+    order_index = models.PositiveIntegerField(verbose_name='ترتیب', default=0)
     path_label = models.CharField(max_length=500, blank=True, verbose_name='مسیر کامل')
     content = models.TextField(verbose_name='محتوا')
     
@@ -299,8 +299,8 @@ class LegalUnit(MPTTModel, BaseModel):
         null=True, 
         blank=True, 
         db_index=True,
-        verbose_name='تاریخ تصویب / اجرا',
-        help_text='تاریخ تصویب یا اجرای این واحد قانونی'
+        verbose_name='تاریخ ابلاغ/اجرا',
+        help_text='در صورت عدم ورود مقدار، تاریخ انتشار از سند اصلی درج خواهد شد.'
     )
     valid_to = models.DateField(
         null=True, 

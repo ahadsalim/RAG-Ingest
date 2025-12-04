@@ -312,10 +312,10 @@ class LUnitForm(forms.ModelForm):
             self.fields['valid_from'].widget = JalaliDateWidget(attrs={'placeholder': 'مثال: 1404/07/05'})
             self.fields['valid_to'].widget = JalaliDateWidget(attrs={'placeholder': 'مثال: 1404/07/05'})
         
-        # تنظیمات فیلد محتوا
+        # تنظیمات فیلد محتوا - سطرهای بیشتر
         if 'content' in self.fields:
             self.fields['content'].widget = forms.Textarea(attrs={
-                'rows': 12,
+                'rows': 20,
                 'cols': 100,
                 'style': 'width: 95%; font-family: "Vazirmatn", "Tahoma", sans-serif; font-size: 14px;'
             })
