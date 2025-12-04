@@ -17,6 +17,16 @@ from .models import (
 )
 from .enums import DocumentType, ConsolidationLevel
 
+# Import Jalali fields - same as forms.py
+try:
+    from ingest.core.forms.fields import JalaliDateField
+    from ingest.core.forms.widgets import JalaliDateInput as JalaliDateWidget
+    JALALI_AVAILABLE = True
+except ImportError:
+    from django.forms import DateField as JalaliDateField
+    from django.forms.widgets import DateInput as JalaliDateWidget
+    JALALI_AVAILABLE = False
+
 
 class UnifiedDocumentForm(forms.ModelForm):
     """
@@ -43,11 +53,6 @@ class UnifiedDocumentForm(forms.ModelForm):
         queryset=None,  # Set in __init__
         label='مرجع صادرکننده'
     )
-    subject_summary = forms.CharField(
-        required=False,
-        label='خلاصه موضوع',
-        widget=forms.Textarea(attrs={'rows': 3})
-    )
     
     # === فیلدهای Expression ===
     language = forms.ModelChoiceField(
@@ -60,21 +65,38 @@ class UnifiedDocumentForm(forms.ModelForm):
         label='سطح تلفیق',
         initial=ConsolidationLevel.BASE
     )
-    expression_date = forms.DateField(
+    
+    # === فیلدهای تاریخ - همه با JalaliDateField ===
+    expression_date = JalaliDateField(
         required=False,
         label='تاریخ تصویب/ابلاغ',
-        widget=forms.DateInput(attrs={'type': 'date'})
+        help_text='فرمت: 1404/07/05' if JALALI_AVAILABLE else 'فرمت: YYYY-MM-DD'
+    )
+    
+    publication_date = JalaliDateField(
+        label='تاریخ انتشار',
+        required=True,
+        help_text='فرمت: 1404/07/05' if JALALI_AVAILABLE else 'فرمت: YYYY-MM-DD'
+    )
+    
+    in_force_from = JalaliDateField(
+        required=False,
+        label='اجرا از تاریخ',
+        help_text='فرمت: 1404/07/05' if JALALI_AVAILABLE else 'فرمت: YYYY-MM-DD'
+    )
+    
+    in_force_to = JalaliDateField(
+        required=False,
+        label='اجرا تا تاریخ',
+        help_text='در صورتی که وضعیت سند "لغو یا منسوخ شده" باشد، این فیلد الزامی است.'
     )
     
     # === فیلدهای Manifestation ===
-    publication_date = forms.DateField(
-        label='تاریخ انتشار',
-        widget=forms.DateInput(attrs={'type': 'date'})
-    )
     official_gazette_name = forms.CharField(
         max_length=200,
         required=False,
-        label='نام روزنامه رسمی'
+        label='محل انتشار',
+        widget=forms.TextInput(attrs={'style': 'width: 400px;'})
     )
     gazette_issue_no = forms.CharField(
         max_length=50,
@@ -94,15 +116,12 @@ class UnifiedDocumentForm(forms.ModelForm):
         label='وضعیت سند',
         initial=InstrumentManifestation.RepealStatus.IN_FORCE
     )
-    in_force_from = forms.DateField(
+    
+    # === خلاصه موضوع - بزرگتر ===
+    subject_summary = forms.CharField(
         required=False,
-        label='اجرا از تاریخ',
-        widget=forms.DateInput(attrs={'type': 'date'})
-    )
-    in_force_to = forms.DateField(
-        required=False,
-        label='اجرا تا تاریخ',
-        widget=forms.DateInput(attrs={'type': 'date'})
+        label='خلاصه موضوع',
+        widget=forms.Textarea(attrs={'rows': 5, 'style': 'width: 100%;'})
     )
     
     class Meta:
@@ -118,6 +137,12 @@ class UnifiedDocumentForm(forms.ModelForm):
         self.fields['jurisdiction'].queryset = Jurisdiction.objects.all()
         self.fields['authority'].queryset = IssuingAuthority.objects.all()
         self.fields['language'].queryset = Language.objects.all()
+        
+        # تنظیم widget های تاریخ شمسی
+        if JALALI_AVAILABLE:
+            for field_name in ['expression_date', 'publication_date', 'in_force_from', 'in_force_to']:
+                if field_name in self.fields:
+                    self.fields[field_name].widget = JalaliDateWidget()
         
         # اگر در حالت edit هستیم، فیلدها را پر کن
         if self.instance and self.instance.pk:
@@ -198,29 +223,37 @@ class UnifiedDocumentAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
         return '-'
     jalali_publication_date_display.short_description = 'تاریخ انتشار'
     jalali_publication_date_display.admin_order_field = 'publication_date'
+    
     list_filter = ('repeal_status', 'publication_date', 'created_at')
     search_fields = ('expr__work__title_official', 'official_gazette_name')
     readonly_fields = ('id', 'checksum_sha256', 'retrieval_date', 'created_at', 'updated_at')
     inlines = [FileAssetInlineForDocument]
     
+    # Fieldsets - بدون collapse، تاریخ‌ها زیر هم، خلاصه موضوع در انتها
     fieldsets = (
         ('اطلاعات سند', {
             'fields': ('title_official', 'doc_type', 'jurisdiction', 'authority'),
-            'description': 'اطلاعات اصلی سند حقوقی'
         }),
         ('نسخه و زبان', {
-            'fields': ('language', 'consolidation_level', 'expression_date'),
-            'classes': ('collapse',),
+            'fields': ('language', 'consolidation_level'),
         }),
         ('اطلاعات انتشار', {
-            'fields': ('publication_date', 'official_gazette_name', 'gazette_issue_no', 'page_start', 'source_url'),
+            'fields': (
+                'official_gazette_name',
+                ('gazette_issue_no', 'page_start'),
+                'source_url',
+            ),
         }),
-        ('وضعیت اجرا', {
-            'fields': ('repeal_status', 'in_force_from', 'in_force_to'),
+        ('تاریخ‌ها', {
+            'fields': (
+                'expression_date',
+                'publication_date',
+                'in_force_from',
+                'in_force_to',
+            ),
         }),
-        ('توضیحات', {
-            'fields': ('subject_summary',),
-            'classes': ('collapse',),
+        ('وضعیت و توضیحات', {
+            'fields': ('repeal_status', 'subject_summary'),
         }),
     )
     
