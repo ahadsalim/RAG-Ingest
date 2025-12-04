@@ -293,7 +293,7 @@ class LUnitForm(forms.ModelForm):
     valid_from = JalaliDateField(
         label='تاریخ ابلاغ/اجرا',
         required=False,
-        help_text='در صورت عدم ورود مقدار، تاریخ انتشار از سند اصلی درج خواهد شد.'
+        help_text='در صورت عدم ورود مقدار، تاریخ اجرا از سند اصلی درج خواهد شد.'
     )
     
     valid_to = JalaliDateField(
@@ -378,10 +378,10 @@ class LUnitForm(forms.ModelForm):
         """ذخیره با تنظیمات پیش‌فرض."""
         instance = super().save(commit=False)
         
-        # اگر valid_from خالی است، از publication_date استفاده کن
+        # اگر valid_from خالی است، از in_force_from سند اصلی استفاده کن
         if not instance.valid_from and instance.manifestation:
-            if hasattr(instance.manifestation, 'publication_date') and instance.manifestation.publication_date:
-                instance.valid_from = instance.manifestation.publication_date
+            if hasattr(instance.manifestation, 'in_force_from') and instance.manifestation.in_force_from:
+                instance.valid_from = instance.manifestation.in_force_from
         
         if commit:
             instance.save()

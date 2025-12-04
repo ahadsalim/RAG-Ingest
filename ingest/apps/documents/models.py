@@ -300,7 +300,7 @@ class LegalUnit(MPTTModel, BaseModel):
         blank=True, 
         db_index=True,
         verbose_name='تاریخ ابلاغ/اجرا',
-        help_text='در صورت عدم ورود مقدار، تاریخ انتشار از سند اصلی درج خواهد شد.'
+        help_text='در صورت عدم ورود مقدار، تاریخ اجرا از سند اصلی درج خواهد شد.'
     )
     valid_to = models.DateField(
         null=True, 
