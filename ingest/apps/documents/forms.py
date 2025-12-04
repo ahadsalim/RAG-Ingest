@@ -332,11 +332,9 @@ class LUnitForm(forms.ModelForm):
         
         if 'number' in self.fields:
             self.fields['number'].widget.attrs['style'] = 'width: 100px;'
-            self.fields['number'].widget.attrs['placeholder'] = 'مثال: 1'
         
         if 'order_index' in self.fields:
             self.fields['order_index'].widget.attrs['style'] = 'width: 80px;'
-            self.fields['order_index'].widget.attrs['placeholder'] = '0'
         
         # parent widget در admin.get_form.CustomFormClass تنظیم می‌شود
     
