@@ -82,7 +82,7 @@ class UnifiedDocumentForm(forms.ModelForm):
     in_force_from = JalaliDateField(
         required=False,
         label='اجرا از تاریخ',
-        help_text='فرمت: 1404/07/05' if JALALI_AVAILABLE else 'فرمت: YYYY-MM-DD'
+        help_text='در صورت عدم ورود، تاریخ انتشار درج خواهد شد.'
     )
     
     in_force_to = JalaliDateField(
@@ -322,7 +322,8 @@ class UnifiedDocumentAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
             manifestation.page_start = cleaned.get('page_start')
             manifestation.source_url = cleaned.get('source_url', '')
             manifestation.repeal_status = cleaned['repeal_status']
-            manifestation.in_force_from = cleaned.get('in_force_from')
+            # اگر in_force_from خالی است، از publication_date استفاده کن
+            manifestation.in_force_from = cleaned.get('in_force_from') or cleaned['publication_date']
             manifestation.in_force_to = cleaned.get('in_force_to')
             manifestation.save()
             
@@ -353,7 +354,8 @@ class UnifiedDocumentAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
             obj.page_start = cleaned.get('page_start')
             obj.source_url = cleaned.get('source_url', '')
             obj.repeal_status = cleaned['repeal_status']
-            obj.in_force_from = cleaned.get('in_force_from')
+            # اگر in_force_from خالی است، از publication_date استفاده کن
+            obj.in_force_from = cleaned.get('in_force_from') or cleaned['publication_date']
             obj.in_force_to = cleaned.get('in_force_to')
             obj.save()
     
