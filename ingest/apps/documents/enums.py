@@ -37,6 +37,7 @@ class RelationType(models.TextChoices):
 
 
 class UnitType(models.TextChoices):
+    FULL_TEXT = 'full_text', 'همه متن'
     PART = 'part', 'باب'
     CHAPTER = 'chapter', 'فصل'
     SECTION = 'section', 'قسمت'

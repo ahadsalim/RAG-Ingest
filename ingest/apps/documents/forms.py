@@ -291,9 +291,9 @@ class LUnitForm(forms.ModelForm):
     """
     
     valid_from = JalaliDateField(
-        label='تاریخ تصویب / اجرا',
+        label='تاریخ ابلاغ/اجرا',
         required=False,
-        help_text=''
+        help_text='در صورت عدم ورود مقدار، تاریخ انتشار از سند اصلی درج خواهد شد.'
     )
     
     valid_to = JalaliDateField(
