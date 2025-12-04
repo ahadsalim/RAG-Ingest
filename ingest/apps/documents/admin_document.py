@@ -180,11 +180,24 @@ class UnifiedDocumentAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
     list_display = (
         'get_title', 
         'get_doc_type',
-        'publication_date', 
+        'jalali_publication_date_display', 
         'repeal_status', 
         'get_unit_count',
         'jalali_created_at_display'
     )
+    
+    def jalali_publication_date_display(self, obj):
+        """نمایش تاریخ انتشار به شمسی."""
+        if obj.publication_date:
+            try:
+                import jdatetime
+                jalali_date = jdatetime.date.fromgregorian(date=obj.publication_date)
+                return jalali_date.strftime('%Y/%m/%d')
+            except Exception:
+                return str(obj.publication_date)
+        return '-'
+    jalali_publication_date_display.short_description = 'تاریخ انتشار'
+    jalali_publication_date_display.admin_order_field = 'publication_date'
     list_filter = ('repeal_status', 'publication_date', 'created_at')
     search_fields = ('expr__work__title_official', 'official_gazette_name')
     readonly_fields = ('id', 'checksum_sha256', 'retrieval_date', 'created_at', 'updated_at')
