@@ -121,7 +121,7 @@ class UnifiedDocumentForm(forms.ModelForm):
     subject_summary = forms.CharField(
         required=False,
         label='خلاصه موضوع',
-        widget=forms.Textarea(attrs={'rows': 5, 'style': 'width: 100%;'})
+        widget=forms.Textarea(attrs={'rows': 8, 'style': 'width: 70%;'})
     )
     
     class Meta:
@@ -226,6 +226,7 @@ class UnifiedDocumentAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
     
     list_filter = ('repeal_status', 'publication_date', 'created_at')
     search_fields = ('expr__work__title_official', 'official_gazette_name')
+    ordering = ('expr__work__title_official',)  # مرتب‌سازی پیش‌فرض بر اساس عنوان
     readonly_fields = ('id', 'checksum_sha256', 'retrieval_date', 'created_at', 'updated_at')
     inlines = [FileAssetInlineForDocument]
     
