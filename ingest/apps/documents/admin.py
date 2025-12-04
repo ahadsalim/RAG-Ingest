@@ -1155,28 +1155,29 @@ class QAEntryAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
 # IngestLogRAG moved to embeddings/admin.py to group with EmbeddingProxy
 
 # ============================================================================
-# ثبت مدل‌ها در admin
+# ثبت مدل‌ها در admin - ترتیب مهم است!
 # ============================================================================
 
-# Admin یکپارچه برای سند حقوقی (جایگزین Work + Expression + Manifestation)
-# ثبت در admin_document.py انجام می‌شود
+# 1. اسناد حقوقی (فرم یکپارچه) - اول
 import ingest.apps.documents.admin_document  # noqa: F401
 
-# Admin های جزئی Work/Expression/Manifestation - برای مدیریت پیشرفته
+# 2. بندهای اسناد حقوقی - دوم
+from .admin_lunit import LUnitAdmin
+admin_site.register(LUnit, LUnitAdmin)
+
+# 3. پرسش و پاسخ - سوم
+admin_site.register(QAEntry, QAEntryAdmin)
+
+# 4. سایر مدل‌های مدیریت اسناد
+admin_site.register(PinpointCitation, PinpointCitationAdmin)
+admin_site.register(FileAsset, FileAssetAdmin)
+admin_site.register(Chunk, ChunkAdminRegistered)
+
+# 5. اطلاعات پایه - تعریف اسناد (Work/Expression/Manifestation)
 admin_site.register(InstrumentWork, InstrumentWorkAdmin)
 admin_site.register(InstrumentExpression, InstrumentExpressionAdmin)
 admin_site.register(InstrumentManifestation, InstrumentManifestationAdmin)
+admin_site.register(InstrumentRelation, InstrumentRelationAdmin)
 
 # LegalUnit حذف شد - فقط از LUnit استفاده کنید
 # admin_site.register(LegalUnit, LegalUnitAdmin)  # REMOVED
-
-# سایر مدل‌ها
-admin_site.register(InstrumentRelation, InstrumentRelationAdmin)
-admin_site.register(PinpointCitation, PinpointCitationAdmin)
-admin_site.register(FileAsset, FileAssetAdmin)
-admin_site.register(QAEntry, QAEntryAdmin)
-admin_site.register(Chunk, ChunkAdminRegistered)  # Register after QAEntry for sidebar ordering
-
-# ثبت LUnit با admin سفارشی (جایگزین LegalUnit)
-from .admin_lunit import LUnitAdmin
-admin_site.register(LUnit, LUnitAdmin)
