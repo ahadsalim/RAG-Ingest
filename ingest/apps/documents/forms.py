@@ -309,8 +309,14 @@ class LUnitForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         
         if JALALI_AVAILABLE:
-            self.fields['valid_from'].widget = JalaliDateWidget(attrs={'placeholder': 'مثال: 1404/07/05'})
-            self.fields['valid_to'].widget = JalaliDateWidget(attrs={'placeholder': 'مثال: 1404/07/05'})
+            self.fields['valid_from'].widget = JalaliDateWidget(attrs={
+                'placeholder': 'مثال: 1404/07/05',
+                'style': 'width: 150px;'
+            })
+            self.fields['valid_to'].widget = JalaliDateWidget(attrs={
+                'placeholder': 'مثال: 1404/07/05',
+                'style': 'width: 150px;'
+            })
         
         # تنظیمات فیلد محتوا - سطرهای بیشتر
         if 'content' in self.fields:

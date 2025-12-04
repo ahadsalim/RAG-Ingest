@@ -237,6 +237,22 @@
     overflow-y: auto !important;
 }
 
+/* فیلدهای تاریخ در یک سطر */
+.form-row.field-valid_from.field-valid_to {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    gap: 20px;
+}
+
+.form-row.field-valid_from.field-valid_to .flex-container {
+    display: flex !important;
+    gap: 20px;
+}
+
+.form-row.field-valid_from.field-valid_to > div {
+    flex: 0 0 auto;
+}
+
 /* تنظیمات responsive */
 @media (max-width: 768px) {
     .changes-toggle-container {
