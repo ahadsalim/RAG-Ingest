@@ -277,7 +277,7 @@ class LegalUnit(MPTTModel, BaseModel):
         verbose_name='نوع واحد'
     )
     number = models.CharField(max_length=50, blank=True, verbose_name='شماره')
-    order_index = models.PositiveIntegerField(verbose_name='ترتیب', default=0)
+    order_index = models.CharField(max_length=50, blank=True, default='', verbose_name='ترتیب')
     path_label = models.CharField(max_length=500, blank=True, verbose_name='مسیر کامل')
     content = models.TextField(verbose_name='محتوا')
     
