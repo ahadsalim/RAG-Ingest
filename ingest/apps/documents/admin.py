@@ -1158,22 +1158,22 @@ class QAEntryAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
 # ثبت مدل‌ها در admin - ترتیب مهم است!
 # ============================================================================
 
-# 1. اسناد حقوقی (فرم یکپارچه) - اول
-import ingest.apps.documents.admin_document  # noqa: F401
-
-# 2. بندهای اسناد حقوقی - دوم
+# 1. بندهای اسناد حقوقی - اول
 from .admin_lunit import LUnitAdmin
 admin_site.register(LUnit, LUnitAdmin)
 
-# 3. پرسش و پاسخ - سوم
+# 2. پرسش و پاسخ - دوم
 admin_site.register(QAEntry, QAEntryAdmin)
 
-# 4. سایر مدل‌های مدیریت اسناد
+# 3. سایر مدل‌های مدیریت اسناد
 admin_site.register(PinpointCitation, PinpointCitationAdmin)
 admin_site.register(FileAsset, FileAssetAdmin)
 admin_site.register(Chunk, ChunkAdminRegistered)
 
-# 5. اطلاعات پایه - تعریف اسناد (Work/Expression/Manifestation)
+# 4. اسناد حقوقی (فرم یکپارچه) - قبل از Work/Expression/Manifestation
+import ingest.apps.documents.admin_document  # noqa: F401
+
+# 5. تعریف اسناد (Work/Expression/Manifestation)
 admin_site.register(InstrumentWork, InstrumentWorkAdmin)
 admin_site.register(InstrumentExpression, InstrumentExpressionAdmin)
 admin_site.register(InstrumentManifestation, InstrumentManifestationAdmin)
