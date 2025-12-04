@@ -1162,27 +1162,10 @@ class QAEntryAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
 # ثبت در admin_document.py انجام می‌شود
 import ingest.apps.documents.admin_document  # noqa: F401
 
-# Admin های قدیمی Work/Expression/Manifestation - فقط برای مدیریت پیشرفته
-# این‌ها از sidebar مخفی می‌شوند اما قابل دسترسی هستند
-class HiddenInstrumentWorkAdmin(InstrumentWorkAdmin):
-    """Admin مخفی برای InstrumentWork - فقط برای مدیریت پیشرفته."""
-    def has_module_permission(self, request):
-        # مخفی از sidebar اما قابل دسترسی مستقیم
-        return False
-
-class HiddenInstrumentExpressionAdmin(InstrumentExpressionAdmin):
-    """Admin مخفی برای InstrumentExpression - فقط برای مدیریت پیشرفته."""
-    def has_module_permission(self, request):
-        return False
-
-class HiddenInstrumentManifestationAdmin(InstrumentManifestationAdmin):
-    """Admin مخفی برای InstrumentManifestation - فقط برای مدیریت پیشرفته."""
-    def has_module_permission(self, request):
-        return False
-
-admin_site.register(InstrumentWork, HiddenInstrumentWorkAdmin)
-admin_site.register(InstrumentExpression, HiddenInstrumentExpressionAdmin)
-admin_site.register(InstrumentManifestation, HiddenInstrumentManifestationAdmin)
+# Admin های جزئی Work/Expression/Manifestation - برای مدیریت پیشرفته
+admin_site.register(InstrumentWork, InstrumentWorkAdmin)
+admin_site.register(InstrumentExpression, InstrumentExpressionAdmin)
+admin_site.register(InstrumentManifestation, InstrumentManifestationAdmin)
 
 # LegalUnit حذف شد - فقط از LUnit استفاده کنید
 # admin_site.register(LegalUnit, LegalUnitAdmin)  # REMOVED
