@@ -59,6 +59,52 @@ def process_document_chunks(self, document_id):
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
+def process_qa_entry_chunks(self, qaentry_id):
+    """Celery task to process a QAEntry into chunks.
+    
+    Args:
+        qaentry_id: ID of the QAEntry to process
+        
+    Returns:
+        Dict containing processing results
+    """
+    try:
+        logger.info(f"Processing chunks for QAEntry: {qaentry_id}")
+        result = chunk_processor.process_qaentry(qaentry_id)
+        return {
+            'task': 'process_qa_entry_chunks',
+            'qaentry_id': str(qaentry_id),
+            'result': result
+        }
+    except Exception as exc:
+        logger.error(f"Error processing QAEntry {qaentry_id}: {str(exc)}", exc_info=True)
+        raise self.retry(exc=exc, countdown=60 * self.request.retries)
+
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=60)
+def process_text_entry_chunks(self, textentry_id):
+    """Celery task to process a TextEntry into chunks.
+    
+    Args:
+        textentry_id: ID of the TextEntry to process
+        
+    Returns:
+        Dict containing processing results
+    """
+    try:
+        logger.info(f"Processing chunks for TextEntry: {textentry_id}")
+        result = chunk_processor.process_textentry(textentry_id)
+        return {
+            'task': 'process_text_entry_chunks',
+            'textentry_id': str(textentry_id),
+            'result': result
+        }
+    except Exception as exc:
+        logger.error(f"Error processing TextEntry {textentry_id}: {str(exc)}", exc_info=True)
+        raise self.retry(exc=exc, countdown=60 * self.request.retries)
+
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=60)
 def batch_process_units(self, unit_ids):
     """Process multiple legal units in a batch.
     

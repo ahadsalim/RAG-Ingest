@@ -38,11 +38,24 @@ def build_summary_payload(embedding: Embedding) -> Optional[Dict[str, Any]]:
 
 
 def _build_chunk_payload(embedding: Embedding, chunk: Chunk) -> Dict[str, Any]:
-    """ساخت payload برای Chunk."""
+    """ساخت payload برای Chunk (از LegalUnit، QAEntry یا TextEntry)."""
     
+    # Determine source type
     unit = chunk.unit
+    qaentry = chunk.qaentry
+    textentry = chunk.textentry
+    
+    # Handle QAEntry chunks
+    if qaentry:
+        return _build_qaentry_chunk_payload(embedding, chunk, qaentry)
+    
+    # Handle TextEntry chunks
+    if textentry:
+        return _build_textentry_chunk_payload(embedding, chunk, textentry)
+    
+    # Handle LegalUnit chunks (original behavior)
     if not unit:
-        raise ValueError(f"Chunk {chunk.id} has no associated unit")
+        raise ValueError(f"Chunk {chunk.id} has no associated unit, qaentry, or textentry")
     
     expr = chunk.expr
     work = expr.work if expr else None
@@ -160,8 +173,158 @@ def _build_chunk_payload(embedding: Embedding, chunk: Chunk) -> Dict[str, Any]:
     return payload
 
 
+def _build_qaentry_chunk_payload(embedding: Embedding, chunk: Chunk, qaentry: QAEntry) -> Dict[str, Any]:
+    """ساخت payload برای Chunk از QAEntry."""
+    
+    # Convert vector
+    if hasattr(embedding.vector, 'tolist'):
+        vector = embedding.vector.tolist()
+    elif isinstance(embedding.vector, str):
+        import numpy as np
+        vector = np.fromstring(embedding.vector.strip('[]'), sep=',').tolist()
+    else:
+        vector = list(embedding.vector)
+    
+    # Get related units info
+    related_units = list(qaentry.related_units.select_related(
+        'manifestation__expr__work'
+    ).all())
+    
+    # Use first related unit's work for document_id if available
+    first_unit = related_units[0] if related_units else None
+    first_work = None
+    if first_unit and first_unit.manifestation and first_unit.manifestation.expr:
+        first_work = first_unit.manifestation.expr.work
+    
+    document_id = str(first_work.id) if first_work else str(qaentry.id)
+    
+    # Get chunk index from citation_payload_json
+    chunk_index = chunk.citation_payload_json.get('chunk_index', 0) if chunk.citation_payload_json else 0
+    
+    # Build payload
+    payload = {
+        'id': str(embedding.id),
+        'vector': vector,
+        'text': chunk.chunk_text,
+        'document_id': document_id,
+        'document_type': 'QA',
+        'chunk_index': chunk_index,
+        'language': 'fa',
+        'source': 'ingest',
+        'created_at': chunk.created_at.isoformat(),
+        
+        'metadata': {
+            'chunk_id': str(chunk.id),
+            'qa_entry_id': str(qaentry.id),
+            'question': qaentry.question[:200] if qaentry.question else '',
+            'canonical_question': qaentry.canonical_question or '',
+            
+            # Related units info
+            'related_units': [
+                {
+                    'unit_id': str(u.id),
+                    'path_label': u.path_label or '',
+                    'unit_type': u.unit_type,
+                    'number': u.number or '',
+                    'work_title': u.manifestation.expr.work.title_official if u.manifestation and u.manifestation.expr and u.manifestation.expr.work else '',
+                }
+                for u in related_units
+            ],
+            
+            # Embedding Metadata
+            'embedding_model': embedding.model_id or embedding.model_name,
+            'embedding_dimension': embedding.dim,
+            'embedding_created_at': embedding.created_at.isoformat(),
+            
+            # Tags
+            'tags': [tag.term for tag in qaentry.tags.all()],
+            
+            # System
+            'content_type': 'qa_chunk',
+            'updated_at': chunk.updated_at.isoformat(),
+        }
+    }
+    
+    return payload
+
+
+def _build_textentry_chunk_payload(embedding: Embedding, chunk: Chunk, textentry: TextEntry) -> Dict[str, Any]:
+    """ساخت payload برای Chunk از TextEntry."""
+    
+    # Convert vector
+    if hasattr(embedding.vector, 'tolist'):
+        vector = embedding.vector.tolist()
+    elif isinstance(embedding.vector, str):
+        import numpy as np
+        vector = np.fromstring(embedding.vector.strip('[]'), sep=',').tolist()
+    else:
+        vector = list(embedding.vector)
+    
+    # Get related units info
+    related_units = list(textentry.related_units.select_related(
+        'manifestation__expr__work'
+    ).all())
+    
+    # Use first related unit's work for document_id if available
+    first_unit = related_units[0] if related_units else None
+    first_work = None
+    if first_unit and first_unit.manifestation and first_unit.manifestation.expr:
+        first_work = first_unit.manifestation.expr.work
+    
+    document_id = str(first_work.id) if first_work else str(textentry.id)
+    
+    # Get chunk index from citation_payload_json
+    chunk_index = chunk.citation_payload_json.get('chunk_index', 0) if chunk.citation_payload_json else 0
+    
+    # Build payload
+    payload = {
+        'id': str(embedding.id),
+        'vector': vector,
+        'text': chunk.chunk_text,
+        'document_id': document_id,
+        'document_type': 'TEXT',
+        'chunk_index': chunk_index,
+        'language': 'fa',
+        'source': 'ingest',
+        'created_at': chunk.created_at.isoformat(),
+        
+        'metadata': {
+            'chunk_id': str(chunk.id),
+            'text_entry_id': str(textentry.id),
+            'title': textentry.title,
+            'original_filename': textentry.original_filename or '',
+            
+            # Related units info
+            'related_units': [
+                {
+                    'unit_id': str(u.id),
+                    'path_label': u.path_label or '',
+                    'unit_type': u.unit_type,
+                    'number': u.number or '',
+                    'work_title': u.manifestation.expr.work.title_official if u.manifestation and u.manifestation.expr and u.manifestation.expr.work else '',
+                }
+                for u in related_units
+            ],
+            
+            # Embedding Metadata
+            'embedding_model': embedding.model_id or embedding.model_name,
+            'embedding_dimension': embedding.dim,
+            'embedding_created_at': embedding.created_at.isoformat(),
+            
+            # Tags
+            'tags': [tag.term for tag in textentry.vocabulary_terms.all()],
+            
+            # System
+            'content_type': 'text_chunk',
+            'updated_at': chunk.updated_at.isoformat(),
+        }
+    }
+    
+    return payload
+
+
 def _build_qa_payload(embedding: Embedding, qa_entry: QAEntry) -> Dict[str, Any]:
-    """ساخت payload برای QA Entry."""
+    """ساخت payload برای QA Entry (deprecated - now uses chunks)."""
     
     # Convert vector
     if hasattr(embedding.vector, 'tolist'):

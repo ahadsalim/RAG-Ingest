@@ -261,12 +261,70 @@ class ChunkProcessingService(BaseProcessingService):
             'chunk_ids': [str(c.id) for c in created_chunks]
         }
     
+    def process_textentry(self, textentry_id: Union[str, UUID]) -> Dict:
+        """Process a TextEntry and create chunks.
+        
+        Args:
+            textentry_id: ID of the TextEntry to process
+            
+        Returns:
+            Dict containing processing results
+            
+        Raises:
+            ProcessingError: If processing fails
+        """
+        from ..models import TextEntry, Chunk
+        
+        try:
+            textentry = TextEntry.objects.get(id=textentry_id)
+        except TextEntry.DoesNotExist:
+            raise ProcessingError(f"TextEntry {textentry_id} not found")
+        
+        # Delete existing chunks for this TextEntry
+        Chunk.objects.filter(textentry=textentry).delete()
+        
+        # ترکیب عنوان و محتوا
+        combined_text = f"{textentry.title}\n\n{textentry.content}"
+        
+        chunks = self._split_into_chunks(combined_text)
+        
+        # Create chunk records
+        created_chunks = []
+        for i, chunk_text in enumerate(chunks):
+            # Generate unique hash for chunk
+            hash_input = f"{chunk_text}_{textentry_id}_{i}".encode('utf-8')
+            chunk_hash = hashlib.sha256(hash_input).hexdigest()
+            
+            chunk = Chunk.objects.create(
+                textentry=textentry,
+                chunk_text=chunk_text,
+                token_count=len(chunk_text.split()),
+                overlap_prev=self.chunk_overlap if i > 0 else 0,
+                citation_payload_json={
+                    'textentry_id': str(textentry_id),
+                    'title': textentry.title[:100],
+                    'chunk_index': i,
+                    'total_chunks': len(chunks)
+                },
+                hash=chunk_hash
+            )
+            created_chunks.append(chunk)
+        
+        logger.info(f"Created {len(created_chunks)} chunks for TextEntry {textentry_id}")
+        
+        return {
+            'success': True,
+            'textentry_id': str(textentry_id),
+            'chunks_created': len(created_chunks),
+            'chunk_ids': [str(c.id) for c in created_chunks]
+        }
+    
     def process_item(self, item_id: Union[str, UUID], item_type: str, **kwargs) -> Dict:
         """Process an item based on its type.
         
         Args:
             item_id: ID of the item to process
-            item_type: Type of item ('document', 'legal_unit', or 'qaentry')
+            item_type: Type of item ('document', 'legal_unit', 'qaentry', or 'textentry')
             **kwargs: Additional arguments for processing
             
         Returns:
@@ -281,8 +339,10 @@ class ChunkProcessingService(BaseProcessingService):
             return self.process_legal_unit(item_id, **kwargs)
         elif item_type == 'qaentry':
             return self.process_qaentry(item_id, **kwargs)
+        elif item_type == 'textentry':
+            return self.process_textentry(item_id, **kwargs)
         else:
-            raise ValueError(f"Invalid item_type: {item_type}. Must be 'document', 'legal_unit', or 'qaentry'.")
+            raise ValueError(f"Invalid item_type: {item_type}. Must be 'document', 'legal_unit', 'qaentry', or 'textentry'.")
 
 
 # Singleton instance

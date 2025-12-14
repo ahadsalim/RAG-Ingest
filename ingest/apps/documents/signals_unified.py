@@ -296,38 +296,38 @@ def track_qa_entry_changes(sender, instance, **kwargs):
 @receiver(post_save, sender='documents.QAEntry')
 def process_qa_entry_on_save(sender, instance, created, **kwargs):
     """
-    Process QA entry for embedding when created or updated.
+    Process QA entry for chunking when created or updated.
+    Chunks will then be embedded via Chunk post_save signal.
     """
-    should_process = created or getattr(instance, '_content_changed', False)
+    from .models import Chunk
+    
+    # Check if QAEntry has chunks
+    has_chunks = Chunk.objects.filter(qaentry_id=instance.id).exists()
+    
+    should_process = created or getattr(instance, '_content_changed', False) or not has_chunks
     
     if should_process:
-        logger.info(f"Enqueuing embedding for QA entry {instance.id} (created={created})")
+        reasons = []
+        if created:
+            reasons.append("created")
+        if getattr(instance, '_content_changed', False):
+            reasons.append("content_changed")
+        if not has_chunks:
+            reasons.append("no_chunks")
         
-        from ingest.apps.embeddings.tasks import batch_generate_embeddings_for_queryset
-        from django.conf import settings
+        logger.info(f"Enqueuing chunk processing for QAEntry {instance.id} ({', '.join(reasons)})")
         
-        batch_generate_embeddings_for_queryset.delay(
-            queryset_ids=[str(instance.id)],
-            model_class_name='QAEntry',
-            model_name=settings.EMBEDDING_E5_MODEL_NAME,
-            batch_size=1
-        )
+        from .processing.tasks import process_qa_entry_chunks
+        process_qa_entry_chunks.delay(str(instance.id))
 
 
 @receiver(post_delete, sender='documents.QAEntry')
-def delete_qa_entry_embeddings(sender, instance, **kwargs):
-    """Delete all embeddings when QAEntry is deleted."""
-    logger.info(f"Deleting embeddings for deleted QA entry {instance.id}")
+def delete_qa_entry_chunks(sender, instance, **kwargs):
+    """Delete all chunks when QAEntry is deleted (embeddings cascade via GenericRelation)."""
+    from .models import Chunk
     
-    from ingest.apps.embeddings.models import Embedding
-    from django.contrib.contenttypes.models import ContentType
-    from .models import QAEntry
-    
-    qa_ct = ContentType.objects.get_for_model(QAEntry)
-    Embedding.objects.filter(
-        content_type=qa_ct,
-        object_id=str(instance.id)
-    ).delete()
+    logger.info(f"Deleting chunks for deleted QAEntry {instance.id}")
+    Chunk.objects.filter(qaentry_id=instance.id).delete()
 
 
 # ============================================================================
@@ -337,38 +337,38 @@ def delete_qa_entry_embeddings(sender, instance, **kwargs):
 @receiver(post_save, sender='documents.TextEntry')
 def process_text_entry_on_save(sender, instance, created, **kwargs):
     """
-    Process TextEntry for embedding when created or updated.
+    Process TextEntry for chunking when created or updated.
+    Chunks will then be embedded via Chunk post_save signal.
     """
-    should_process = created or getattr(instance, '_content_changed', False)
+    from .models import Chunk
+    
+    # Check if TextEntry has chunks
+    has_chunks = Chunk.objects.filter(textentry_id=instance.id).exists()
+    
+    should_process = created or getattr(instance, '_content_changed', False) or not has_chunks
     
     if should_process:
-        logger.info(f"Enqueuing embedding for TextEntry {instance.id} (created={created})")
+        reasons = []
+        if created:
+            reasons.append("created")
+        if getattr(instance, '_content_changed', False):
+            reasons.append("content_changed")
+        if not has_chunks:
+            reasons.append("no_chunks")
         
-        from ingest.apps.embeddings.tasks import batch_generate_embeddings_for_queryset
-        from django.conf import settings
+        logger.info(f"Enqueuing chunk processing for TextEntry {instance.id} ({', '.join(reasons)})")
         
-        batch_generate_embeddings_for_queryset.delay(
-            queryset_ids=[str(instance.id)],
-            model_class_name='TextEntry',
-            model_name=settings.EMBEDDING_E5_MODEL_NAME,
-            batch_size=1
-        )
+        from .processing.tasks import process_text_entry_chunks
+        process_text_entry_chunks.delay(str(instance.id))
 
 
 @receiver(post_delete, sender='documents.TextEntry')
-def delete_text_entry_embeddings(sender, instance, **kwargs):
-    """Delete all embeddings when TextEntry is deleted."""
-    logger.info(f"Deleting embeddings for deleted TextEntry {instance.id}")
+def delete_text_entry_chunks(sender, instance, **kwargs):
+    """Delete all chunks when TextEntry is deleted (embeddings cascade via GenericRelation)."""
+    from .models import Chunk
     
-    from ingest.apps.embeddings.models import Embedding
-    from django.contrib.contenttypes.models import ContentType
-    from .models import TextEntry
-    
-    te_ct = ContentType.objects.get_for_model(TextEntry)
-    Embedding.objects.filter(
-        content_type=te_ct,
-        object_id=str(instance.id)
-    ).delete()
+    logger.info(f"Deleting chunks for deleted TextEntry {instance.id}")
+    Chunk.objects.filter(textentry_id=instance.id).delete()
 
 
 # ============================================================================

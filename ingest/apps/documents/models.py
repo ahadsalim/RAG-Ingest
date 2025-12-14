@@ -695,6 +695,14 @@ class Chunk(BaseModel):
         null=True,
         blank=True
     )
+    textentry = models.ForeignKey(
+        'TextEntry',
+        on_delete=models.CASCADE,
+        related_name='chunks',
+        verbose_name='متن',
+        null=True,
+        blank=True
+    )
     
     chunk_text = models.TextField(verbose_name='متن چانک')
     token_count = models.PositiveIntegerField(verbose_name='تعداد توکن')
