@@ -133,15 +133,12 @@ class CoreSyncService:
         batch_size = batch_size or self.config.sync_batch_size
         
         # Get embeddings that need metadata resync
+        # Note: prefetch_related removed because it causes errors with QAEntry
         embeddings = Embedding.objects.filter(
-            synced_to_core=True
+            synced_to_core=True,
+            metadata_hash=''  # Only get embeddings with invalidated metadata
         ).select_related(
             'content_type'
-        ).prefetch_related(
-            'content_object__unit__work',
-            'content_object__unit__manifestation',
-            'content_object__expr__work',
-            'content_object__unit__vocabulary_terms'
         )[:batch_size]
         
         # Check which ones have changed metadata
