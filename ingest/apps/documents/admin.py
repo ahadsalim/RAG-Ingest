@@ -1067,40 +1067,17 @@ class ChunkAdminRegistered(ChunkAdmin):
         }
 
 # QA Entry Admin
-@admin.action(description='تأیید ورودی‌های انتخاب شده')
-def approve_qa_entries(modeladmin, request, queryset):
-    """Bulk approve QA entries."""
-    for qa_entry in queryset:
-        qa_entry.approve(request.user)
-    modeladmin.message_user(request, f'{queryset.count()} ورودی تأیید شد.')
-
-
-@admin.action(description='رد ورودی‌های انتخاب شده')
-def reject_qa_entries(modeladmin, request, queryset):
-    """Bulk reject QA entries."""
-    for qa_entry in queryset:
-        qa_entry.reject()
-    modeladmin.message_user(request, f'{queryset.count()} ورودی رد شد.')
-
-
-class QAEntryTagsInline(admin.TabularInline):
-    """Inline برای تگ‌های QAEntry با autocomplete."""
-    model = QAEntry.tags.through
-    extra = 1
-    autocomplete_fields = ['vocabularyterm']
-    verbose_name = 'برچسب'
-    verbose_name_plural = 'برچسب‌ها'
-
-
 class QAEntryAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
+    """Admin برای پرسش و پاسخ با تگ و ارتباط با بندها."""
+    
     list_display = (
-        'id', 'short_question', 'created_by', 
-        'jalali_created_at_display', 'jalali_updated_at_display'
+        'id', 'short_question', 'tags_display', 'units_display',
+        'created_by', 'jalali_created_at_display', 'jalali_updated_at_display'
     )
     list_filter = ('tags', 'created_at')
     search_fields = ('question', 'answer', 'canonical_question')
     readonly_fields = ('created_by_display', 'jalali_created_at_display', 'jalali_updated_at_display')
-    filter_horizontal = ('tags',)
+    filter_horizontal = ('tags', 'related_units')
     
     fieldsets = (
         ('محتوای پرسش و پاسخ', {
@@ -1108,6 +1085,10 @@ class QAEntryAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
         }),
         ('برچسب‌ها', {
             'fields': ('tags',),
+        }),
+        ('بندهای مرتبط', {
+            'fields': ('related_units',),
+            'description': 'بندهای قانونی مرتبط با این پرسش و پاسخ را انتخاب کنید'
         }),
         ('اطلاعات سیستم', {
             'fields': ('created_by_display', 'jalali_created_at_display', 'jalali_updated_at_display'),
@@ -1133,6 +1114,35 @@ class QAEntryAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
     jalali_updated_at_display.short_description = 'زمان ویرایش (شمسی)'
     jalali_updated_at_display.admin_order_field = 'updated_at'
     
+    def tags_display(self, obj):
+        """نمایش تگ‌ها."""
+        tags = obj.tags.all()[:3]
+        if tags:
+            tag_names = [t.term for t in tags]
+            result = ', '.join(tag_names)
+            if obj.tags.count() > 3:
+                result += f' (+{obj.tags.count() - 3})'
+            return result
+        return '-'
+    tags_display.short_description = 'برچسب‌ها'
+    
+    def units_display(self, obj):
+        """نمایش بندهای مرتبط."""
+        units = obj.related_units.all()[:2]
+        if units:
+            unit_labels = []
+            for unit in units:
+                label = unit.get_unit_type_display()
+                if unit.number:
+                    label += f" {unit.number}"
+                unit_labels.append(label)
+            result = ', '.join(unit_labels)
+            if obj.related_units.count() > 2:
+                result += f' (+{obj.related_units.count() - 2})'
+            return result
+        return '-'
+    units_display.short_description = 'بندهای مرتبط'
+    
     def get_form(self, request, obj=None, **kwargs):
         # ذخیره request برای استفاده در created_by_display
         self._current_request = request
@@ -1148,7 +1158,7 @@ class QAEntryAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
         """Optimize queryset with select_related."""
         return super().get_queryset(request).select_related(
             'created_by'
-        ).prefetch_related('tags')
+        ).prefetch_related('tags', 'related_units')
 
 
 # IngestLogRAG moved to embeddings/admin.py to group with EmbeddingProxy

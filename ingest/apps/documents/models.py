@@ -825,14 +825,6 @@ class QAEntry(BaseModel):
     question = models.TextField(verbose_name='سؤال')
     answer = models.TextField(verbose_name='پاسخ')
     
-    # Status and workflow
-    status = models.CharField(
-        max_length=20,
-        choices=QAStatus.choices,
-        default=QAStatus.DRAFT,
-        verbose_name='وضعیت'
-    )
-    
     # Tags for categorization
     tags = models.ManyToManyField(
         'masterdata.VocabularyTerm',
@@ -841,26 +833,15 @@ class QAEntry(BaseModel):
         verbose_name='برچسب‌ها'
     )
     
-    # Provenance - link to source documents
-    source_unit = models.ForeignKey(
+    # ارتباط با LegalUnit ها (چند به چند)
+    related_units = models.ManyToManyField(
         'LegalUnit',
-        on_delete=models.CASCADE,
-        null=True,
         blank=True,
-        related_name='qa_entries',
-        verbose_name='واحد حقوقی مرجع'
+        related_name='related_qa_entries',
+        verbose_name='بندهای مرتبط'
     )
     
-    source_work = models.ForeignKey(
-        'InstrumentWork',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='qa_entries',
-        verbose_name='سند حقوقی مرجع'
-    )
-    
-    # Moderation and approval workflow
+    # ایجادکننده
     created_by = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
@@ -868,21 +849,6 @@ class QAEntry(BaseModel):
         blank=True,
         related_name='created_qa_entries',
         verbose_name='ایجادکننده'
-    )
-    
-    approved_by = models.ForeignKey(
-        User,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='approved_qa_entries',
-        verbose_name='تأیید کننده'
-    )
-    
-    approved_at = models.DateTimeField(
-        null=True,
-        blank=True,
-        verbose_name='زمان تأیید'
     )
     
     # Indexing and search optimization
@@ -905,14 +871,13 @@ class QAEntry(BaseModel):
         verbose_name_plural = 'پرسش و پاسخ'
         ordering = ['-created_at']
         indexes = [
-            models.Index(fields=['status', 'created_at']),
+            models.Index(fields=['created_at']),
             models.Index(fields=['canonical_question']),
-            models.Index(fields=['approved_at']),
         ]
     
     def __str__(self):
         question_preview = self.question[:50] + "..." if len(self.question) > 50 else self.question
-        return f"Q: {question_preview} ({self.get_status_display()})"
+        return f"Q: {question_preview}"
     
     def save(self, *args, **kwargs):
         """Override save to generate canonical question and normalize answer for indexing."""
@@ -931,29 +896,27 @@ class QAEntry(BaseModel):
         
         super().save(*args, **kwargs)
     
-    def approve(self, approved_by_user):
-        """Approve this QA entry."""
-        self.status = QAStatus.APPROVED
-        self.approved_by = approved_by_user
-        self.approved_at = timezone.now()
-        self.save(update_fields=['status', 'approved_by', 'approved_at'])
-    
-    def reject(self):
-        """Reject this QA entry."""
-        self.status = QAStatus.REJECTED
-        self.approved_by = None
-        self.approved_at = None
-        self.save(update_fields=['status', 'approved_by', 'approved_at'])
-    
     @property
     def short_question(self):
         """Return shortened question for admin display."""
         return self.question[:100] + "..." if len(self.question) > 100 else self.question
     
     @property
-    def is_approved(self):
-        """Check if entry is approved."""
-        return self.status == QAStatus.APPROVED
+    def related_units_info(self):
+        """اطلاعات بندهای مرتبط برای metadata."""
+        units_info = []
+        for unit in self.related_units.all():
+            info = {
+                'unit_id': str(unit.id),
+                'path_label': unit.path_label or '',
+                'unit_type': unit.unit_type,
+                'number': unit.number or '',
+            }
+            if unit.manifestation and unit.manifestation.expr and unit.manifestation.expr.work:
+                info['work_title'] = unit.manifestation.expr.work.title_official
+                info['work_id'] = str(unit.manifestation.expr.work.id)
+            units_info.append(info)
+        return units_info
     
     @property
     def embedding_text(self):
