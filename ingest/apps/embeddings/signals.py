@@ -9,7 +9,7 @@ from django.contrib.auth import get_user_model
 
 from ingest.apps.documents.models import (
     LegalUnit, InstrumentWork, InstrumentExpression, 
-    InstrumentManifestation, Chunk, QAEntry
+    InstrumentManifestation, Chunk, QAEntry, TextEntry
 )
 from ingest.apps.embeddings.models import Embedding
 
@@ -139,6 +139,70 @@ def invalidate_qa_embeddings(sender, instance, **kwargs):
 @receiver(m2m_changed, sender=QAEntry.tags.through)
 def invalidate_qa_tags_embeddings(sender, instance, action, **kwargs):
     """When tags are changed on QA entry, invalidate its embedding."""
+    if action not in ['post_add', 'post_remove', 'post_clear']:
+        return
+    
+    qa_ct = ContentType.objects.get_for_model(QAEntry)
+    
+    Embedding.objects.filter(
+        content_type=qa_ct,
+        object_id=instance.id,
+        synced_to_core=True
+    ).update(metadata_hash='')
+
+
+# ============================================================================
+# TEXT ENTRY METADATA SIGNALS
+# ============================================================================
+
+@receiver(post_save, sender=TextEntry)
+def invalidate_text_entry_embeddings(sender, instance, **kwargs):
+    """Mark TextEntry embedding for re-sync when updated."""
+    if kwargs.get('created', False):
+        return
+    
+    te_ct = ContentType.objects.get_for_model(TextEntry)
+    
+    Embedding.objects.filter(
+        content_type=te_ct,
+        object_id=instance.id,
+        synced_to_core=True
+    ).update(metadata_hash='')
+
+
+@receiver(m2m_changed, sender=TextEntry.vocabulary_terms.through)
+def invalidate_text_entry_tags_embeddings(sender, instance, action, **kwargs):
+    """When tags are changed on TextEntry, invalidate its embedding."""
+    if action not in ['post_add', 'post_remove', 'post_clear']:
+        return
+    
+    te_ct = ContentType.objects.get_for_model(TextEntry)
+    
+    Embedding.objects.filter(
+        content_type=te_ct,
+        object_id=instance.id,
+        synced_to_core=True
+    ).update(metadata_hash='')
+
+
+@receiver(m2m_changed, sender=TextEntry.related_units.through)
+def invalidate_text_entry_units_embeddings(sender, instance, action, **kwargs):
+    """When related_units are changed on TextEntry, invalidate its embedding."""
+    if action not in ['post_add', 'post_remove', 'post_clear']:
+        return
+    
+    te_ct = ContentType.objects.get_for_model(TextEntry)
+    
+    Embedding.objects.filter(
+        content_type=te_ct,
+        object_id=instance.id,
+        synced_to_core=True
+    ).update(metadata_hash='')
+
+
+@receiver(m2m_changed, sender=QAEntry.related_units.through)
+def invalidate_qa_units_embeddings(sender, instance, action, **kwargs):
+    """When related_units are changed on QAEntry, invalidate its embedding."""
     if action not in ['post_add', 'post_remove', 'post_clear']:
         return
     

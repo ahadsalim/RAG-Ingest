@@ -7,7 +7,7 @@ from typing import Dict, Any, Optional
 from django.utils import timezone
 
 from ingest.apps.embeddings.models import Embedding
-from ingest.apps.documents.models import Chunk, QAEntry
+from ingest.apps.documents.models import Chunk, QAEntry, TextEntry
 
 
 def build_summary_payload(embedding: Embedding) -> Optional[Dict[str, Any]]:
@@ -27,6 +27,8 @@ def build_summary_payload(embedding: Embedding) -> Optional[Dict[str, Any]]:
             return _build_chunk_payload(embedding, source_obj)
         elif isinstance(source_obj, QAEntry):
             return _build_qa_payload(embedding, source_obj)
+        elif isinstance(source_obj, TextEntry):
+            return _build_text_entry_payload(embedding, source_obj)
         else:
             return None
             
@@ -167,59 +169,48 @@ def _build_qa_payload(embedding: Embedding, qa_entry: QAEntry) -> Dict[str, Any]
     else:
         vector = list(embedding.vector)
     
-    source_unit = qa_entry.source_unit
-    source_work = qa_entry.source_work
+    # Get related units info
+    related_units = list(qa_entry.related_units.select_related(
+        'manifestation__expr__work'
+    ).all())
     
-    # Ensure document_id is always set
-    if source_work:
-        document_id = str(source_work.id)
-    elif source_unit:
-        document_id = str(source_unit.id)
-    else:
-        document_id = str(qa_entry.id)
+    # Use first related unit's work for document_id if available
+    first_unit = related_units[0] if related_units else None
+    first_work = None
+    if first_unit and first_unit.manifestation and first_unit.manifestation.expr:
+        first_work = first_unit.manifestation.expr.work
     
-    # Determine document_type for QA
-    document_type = 'QA'
-    if source_work and hasattr(source_work, 'doc_type'):
-        document_type = f"QA_{source_work.doc_type}"
+    document_id = str(first_work.id) if first_work else str(qa_entry.id)
     
-    # Build payload according to new Core API structure
+    # Build payload
     payload = {
-        # ====== فیلدهای سطح بالا (مطابق API جدید Core) ======
         'id': str(embedding.id),
         'vector': vector,
         'text': f"Q: {qa_entry.question}\nA: {qa_entry.answer}",
         'document_id': document_id,
-        
-        # فیلدهای جدید اختیاری
-        'document_type': document_type,
-        'chunk_index': None,  # QA entries don't have chunk index
+        'document_type': 'QA',
+        'chunk_index': None,
         'language': 'fa',
         'source': 'ingest',
         'created_at': qa_entry.created_at.isoformat(),
         
-        # ====== metadata (تمام اطلاعات تکمیلی) ======
         'metadata': {
-            # IDs
             'qa_entry_id': str(qa_entry.id),
-            'unit_id': str(source_unit.id) if source_unit else None,
-            'work_id': str(source_work.id) if source_work else None,
-            
-            # Content
             'question': qa_entry.question,
             'answer': qa_entry.answer,
             'canonical_question': qa_entry.canonical_question or '',
             
-            # Document Info
-            'work_title': source_work.title_official if source_work else '',
-            
-            # Legal Info
-            'jurisdiction': source_work.jurisdiction.name if source_work and source_work.jurisdiction else '',
-            'authority': source_work.authority.name if source_work and source_work.authority else '',
-            
-            # Status
-            'status': qa_entry.status,
-            'is_active': qa_entry.is_approved,
+            # Related units info
+            'related_units': [
+                {
+                    'unit_id': str(u.id),
+                    'path_label': u.path_label or '',
+                    'unit_type': u.unit_type,
+                    'number': u.number or '',
+                    'work_title': u.manifestation.expr.work.title_official if u.manifestation and u.manifestation.expr and u.manifestation.expr.work else '',
+                }
+                for u in related_units
+            ],
             
             # Embedding Metadata
             'embedding_model': embedding.model_id or embedding.model_name,
@@ -232,6 +223,75 @@ def _build_qa_payload(embedding: Embedding, qa_entry: QAEntry) -> Dict[str, Any]
             # System
             'content_type': 'qa_entry',
             'updated_at': qa_entry.updated_at.isoformat(),
+        }
+    }
+    
+    return payload
+
+
+def _build_text_entry_payload(embedding: Embedding, text_entry: TextEntry) -> Dict[str, Any]:
+    """ساخت payload برای TextEntry."""
+    
+    # Convert vector
+    if hasattr(embedding.vector, 'tolist'):
+        vector = embedding.vector.tolist()
+    else:
+        vector = list(embedding.vector)
+    
+    # Get related units info
+    related_units = list(text_entry.related_units.select_related(
+        'manifestation__expr__work'
+    ).all())
+    
+    # Use first related unit's work for document_id if available
+    first_unit = related_units[0] if related_units else None
+    first_work = None
+    if first_unit and first_unit.manifestation and first_unit.manifestation.expr:
+        first_work = first_unit.manifestation.expr.work
+    
+    document_id = str(first_work.id) if first_work else str(text_entry.id)
+    
+    # Build payload
+    payload = {
+        'id': str(embedding.id),
+        'vector': vector,
+        'text': f"{text_entry.title}\n\n{text_entry.content}",
+        'document_id': document_id,
+        'document_type': 'TEXT',
+        'chunk_index': None,
+        'language': 'fa',
+        'source': 'ingest',
+        'created_at': text_entry.created_at.isoformat(),
+        
+        'metadata': {
+            'text_entry_id': str(text_entry.id),
+            'title': text_entry.title,
+            'content_preview': text_entry.content[:500] if text_entry.content else '',
+            'original_filename': text_entry.original_filename or '',
+            
+            # Related units info
+            'related_units': [
+                {
+                    'unit_id': str(u.id),
+                    'path_label': u.path_label or '',
+                    'unit_type': u.unit_type,
+                    'number': u.number or '',
+                    'work_title': u.manifestation.expr.work.title_official if u.manifestation and u.manifestation.expr and u.manifestation.expr.work else '',
+                }
+                for u in related_units
+            ],
+            
+            # Embedding Metadata
+            'embedding_model': embedding.model_id or embedding.model_name,
+            'embedding_dimension': embedding.dim,
+            'embedding_created_at': embedding.created_at.isoformat(),
+            
+            # Tags
+            'tags': [tag.term for tag in text_entry.vocabulary_terms.all()],
+            
+            # System
+            'content_type': 'text_entry',
+            'updated_at': text_entry.updated_at.isoformat(),
         }
     }
     

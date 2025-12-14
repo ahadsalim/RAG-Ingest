@@ -297,13 +297,7 @@ def track_qa_entry_changes(sender, instance, **kwargs):
 def process_qa_entry_on_save(sender, instance, created, **kwargs):
     """
     Process QA entry for embedding when created or updated.
-    Only processes approved QA entries.
     """
-    # Only process if approved
-    if instance.status != 'approved':
-        logger.debug(f"Skipping QA entry {instance.id} - status is {instance.status}")
-        return
-    
     should_process = created or getattr(instance, '_content_changed', False)
     
     if should_process:
@@ -332,6 +326,47 @@ def delete_qa_entry_embeddings(sender, instance, **kwargs):
     qa_ct = ContentType.objects.get_for_model(QAEntry)
     Embedding.objects.filter(
         content_type=qa_ct,
+        object_id=str(instance.id)
+    ).delete()
+
+
+# ============================================================================
+# TEXT ENTRY SIGNALS
+# ============================================================================
+
+@receiver(post_save, sender='documents.TextEntry')
+def process_text_entry_on_save(sender, instance, created, **kwargs):
+    """
+    Process TextEntry for embedding when created or updated.
+    """
+    should_process = created or getattr(instance, '_content_changed', False)
+    
+    if should_process:
+        logger.info(f"Enqueuing embedding for TextEntry {instance.id} (created={created})")
+        
+        from ingest.apps.embeddings.tasks import batch_generate_embeddings_for_queryset
+        from django.conf import settings
+        
+        batch_generate_embeddings_for_queryset.delay(
+            queryset_ids=[str(instance.id)],
+            model_class_name='TextEntry',
+            model_name=settings.EMBEDDING_E5_MODEL_NAME,
+            batch_size=1
+        )
+
+
+@receiver(post_delete, sender='documents.TextEntry')
+def delete_text_entry_embeddings(sender, instance, **kwargs):
+    """Delete all embeddings when TextEntry is deleted."""
+    logger.info(f"Deleting embeddings for deleted TextEntry {instance.id}")
+    
+    from ingest.apps.embeddings.models import Embedding
+    from django.contrib.contenttypes.models import ContentType
+    from .models import TextEntry
+    
+    te_ct = ContentType.objects.get_for_model(TextEntry)
+    Embedding.objects.filter(
+        content_type=te_ct,
         object_id=str(instance.id)
     ).delete()
 

@@ -8,7 +8,7 @@ from django.db.models import Model
 from django.db import transaction
 
 from .models import Embedding
-from ingest.apps.documents.models import LegalUnit, Chunk, QAEntry
+from ingest.apps.documents.models import LegalUnit, Chunk, QAEntry, TextEntry
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +21,8 @@ def get_text_content(content_object: Model) -> str:
         return content_object.chunk_text or ""
     elif isinstance(content_object, QAEntry):
         return f"{content_object.question or ''} {content_object.answer or ''}"
+    elif isinstance(content_object, TextEntry):
+        return f"{content_object.title or ''}\n\n{content_object.content or ''}"
     return str(content_object)
 
 
@@ -53,6 +55,8 @@ def batch_generate_embeddings_for_queryset(self, queryset_ids: List[str], model_
             model_class = Chunk
         elif model_class_name == 'QAEntry':
             model_class = QAEntry
+        elif model_class_name == 'TextEntry':
+            model_class = TextEntry
         else:
             raise ValueError(f"Unsupported model class: {model_class_name}")
     except Exception as e:
