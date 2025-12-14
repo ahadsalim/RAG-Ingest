@@ -37,8 +37,8 @@ class Command(BaseCommand):
         parser.add_argument(
             '--model',
             type=str,
-            default='multilingual-e5-large',
-            help='Model name to use for embeddings (default: multilingual-e5-large)'
+            default='intfloat/multilingual-e5-base',
+            help='Model name to use for embeddings (default: intfloat/multilingual-e5-base)'
         )
         parser.add_argument(
             '--batch-size',
@@ -81,7 +81,7 @@ class Command(BaseCommand):
         )
         return count
 
-    def list_items_needing_embeddings(self, model_name: str = 'multilingual-e5-large'):
+    def list_items_needing_embeddings(self, model_name: str = 'intfloat/multilingual-e5-base'):
         """List items that need embeddings without generating them."""
         self.stdout.write('\n' + '='*50)
         self.stdout.write(self.style.SUCCESS('Items Needing Embeddings'))
@@ -92,7 +92,7 @@ class Command(BaseCommand):
         chunks_count = Chunk.objects.exclude(
             id__in=Embedding.objects.filter(
                 content_type=chunk_ct,
-                model_name=model_name
+                model_id=model_name
             ).values_list('object_id', flat=True)
         ).count()
         
@@ -103,7 +103,7 @@ class Command(BaseCommand):
         ).exclude(
             id__in=Embedding.objects.filter(
                 content_type=qa_ct,
-                model_name=model_name
+                model_id=model_name
             ).values_list('object_id', flat=True)
         ).count()
         
@@ -142,18 +142,20 @@ class Command(BaseCommand):
         chunks_to_process = Chunk.objects.exclude(
             id__in=Embedding.objects.filter(
                 content_type=chunk_ct,
-                model_name=model_name
+                model_id=model_name
             ).values_list('object_id', flat=True)
         )
         
         if chunks_to_process.exists():
             self.stdout.write('\nProcessing chunks...')
-            chunk_results = batch_generate_embeddings_for_queryset(
-                queryset=chunks_to_process,
-                model_name=model_name,
-                batch_size=batch_size
+            chunk_ids = list(chunks_to_process.values_list('id', flat=True))
+            async_result = batch_generate_embeddings_for_queryset.delay(
+                [str(i) for i in chunk_ids],
+                'Chunk',
+                model_name,
+                batch_size,
             )
-            self._print_results('Chunks', chunk_results)
+            self.stdout.write(self.style.SUCCESS(f"Enqueued chunks embedding task: {async_result.id} ({len(chunk_ids)} items)"))
         
         # Process QA Entries (only approved ones)
         qa_ct = ContentType.objects.get_for_model(QAEntry)
@@ -162,18 +164,20 @@ class Command(BaseCommand):
         ).exclude(
             id__in=Embedding.objects.filter(
                 content_type=qa_ct,
-                model_name=model_name
+                model_id=model_name
             ).values_list('object_id', flat=True)
         )
         
         if qa_to_process.exists():
             self.stdout.write('\nProcessing QA entries...')
-            qa_results = batch_generate_embeddings_for_queryset(
-                queryset=qa_to_process,
-                model_name=model_name,
-                batch_size=batch_size
+            qa_ids = list(qa_to_process.values_list('id', flat=True))
+            async_result = batch_generate_embeddings_for_queryset.delay(
+                [str(i) for i in qa_ids],
+                'QAEntry',
+                model_name,
+                batch_size,
             )
-            self._print_results('QA Entries', qa_results)
+            self.stdout.write(self.style.SUCCESS(f"Enqueued QA entries embedding task: {async_result.id} ({len(qa_ids)} items)"))
         
         return True
     
@@ -201,22 +205,22 @@ class Command(BaseCommand):
         total_chunks = Chunk.objects.count()
         chunks_with_embeddings = Embedding.objects.filter(
             content_type=chunk_ct
-        ).values('model_name').annotate(count=models.Count('id'))
+        ).values('model_id').annotate(count=models.Count('id'))
         
         self.stdout.write(f'\n{self.style.SUCCESS("Chunks:")} {total_chunks} total')
         for stat in chunks_with_embeddings:
-            self.stdout.write(f"  - {stat['model_name']}: {stat['count']} embeddings")
+            self.stdout.write(f"  - {stat['model_id']}: {stat['count']} embeddings")
         
         # QA Entries status
         qa_ct = ContentType.objects.get_for_model(QAEntry)
         total_qa = QAEntry.objects.filter(status='approved').count()
         qa_with_embeddings = Embedding.objects.filter(
             content_type=qa_ct
-        ).values('model_name').annotate(count=models.Count('id'))
+        ).values('model_id').annotate(count=models.Count('id'))
         
         self.stdout.write(f'\n{self.style.SUCCESS("QA Entries:")} {total_qa} approved')
         for stat in qa_with_embeddings:
-            self.stdout.write(f"  - {stat['model_name']}: {stat['count']} embeddings")
+            self.stdout.write(f"  - {stat['model_id']}: {stat['count']} embeddings")
     
     def interactive_menu(self):
         """Display an interactive menu for managing embeddings."""
@@ -253,7 +257,7 @@ class Command(BaseCommand):
             elif choice == '3':
                 # Generate embeddings with confirmation
                 self.generate_embeddings(
-                    model_name='multilingual-e5-large',
+                    model_name='intfloat/multilingual-e5-base',
                     batch_size=50,
                     interactive=True
                 )
@@ -274,16 +278,18 @@ class Command(BaseCommand):
         queryset = model_class.objects.filter(**filters).exclude(
             id__in=Embedding.objects.filter(
                 content_type=ct,
-                model_name=model_name
+                model_id=model_name
             ).values_list('object_id', flat=True)
         )
         
         if queryset.exists():
-            results = batch_generate_embeddings_for_queryset(
-                queryset=queryset,
-                model_name=model_name,
-                batch_size=batch_size
+            ids = list(queryset.values_list('id', flat=True))
+            async_result = batch_generate_embeddings_for_queryset.delay(
+                [str(i) for i in ids],
+                model_class.__name__,
+                model_name,
+                batch_size,
             )
-            self._print_results(model_class.__name__, results)
+            self.stdout.write(self.style.SUCCESS(f"Enqueued {model_class.__name__} embedding task: {async_result.id} ({len(ids)} items)"))
         else:
             self.stdout.write(self.style.SUCCESS(f"No {model_class.__name__} need embeddings."))

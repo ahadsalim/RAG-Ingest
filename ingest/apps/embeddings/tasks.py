@@ -25,7 +25,7 @@ def get_text_content(content_object: Model) -> str:
 
 
 @shared_task(bind=True)
-def batch_generate_embeddings_for_queryset(self, queryset_ids: List[str], model_class_name: str, model_name: str = "multilingual-e5-large", batch_size: int = 10) -> Dict[str, Any]:
+def batch_generate_embeddings_for_queryset(self, queryset_ids: List[str], model_class_name: str, model_name: str = "intfloat/multilingual-e5-base", batch_size: int = 10) -> Dict[str, Any]:
     """
     Generate embeddings for a queryset of objects in batches.
     Returns a dictionary with statistics about the operation.
@@ -174,9 +174,9 @@ def generate_stub_embedding(text: str) -> list:
     return [0.0] * dimension
 
 
-def generate_real_embedding(text: str, model_name: str = "multilingual-e5-large") -> list:
+def generate_real_embedding(text: str, model_name: str = "intfloat/multilingual-e5-base") -> list:
     """
-    Real embedding generator using multilingual-e5-large model.
+    Real embedding generator using multilingual-e5-base model.
     """
     try:
         from sentence_transformers import SentenceTransformer
@@ -258,7 +258,7 @@ def generate_single_embedding(text: str, model_name: str = None) -> Dict[str, An
 
 
 @shared_task
-def generate_embeddings_for_new_content(model_name: str = "multilingual-e5-large", batch_size: int = 50) -> Dict[str, Any]:
+def generate_embeddings_for_new_content(model_name: str = "intfloat/multilingual-e5-base", batch_size: int = 50) -> Dict[str, Any]:
     """
     Task to generate embeddings for all content that doesn't have them yet.
     This is the main task that should be called on a schedule.

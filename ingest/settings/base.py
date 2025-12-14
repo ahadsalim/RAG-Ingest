@@ -301,7 +301,7 @@ EMBEDDING_TIMEOUT = int(os.getenv('EMBEDDING_TIMEOUT', '60'))
 EMBEDDING_MAX_RETRIES = int(os.getenv('EMBEDDING_MAX_RETRIES', '3'))
 
 # E5 Multilingual Backend Configuration
-EMBEDDING_E5_MODEL_NAME = os.getenv('EMBEDDING_E5_MODEL_NAME', 'intfloat/multilingual-e5-large')
+EMBEDDING_E5_MODEL_NAME = os.getenv('EMBEDDING_E5_MODEL_NAME', 'intfloat/multilingual-e5-base')
 EMBEDDING_DEVICE = os.getenv('EMBEDDING_DEVICE', 'cuda' if 'cuda' in str(os.getenv('EMBEDDING_DEVICE', '')) else 'cpu')
 EMBEDDING_MAX_SEQ_LENGTH = int(os.getenv('EMBEDDING_MAX_SEQ_LENGTH', '512'))
 EMBEDDING_MODEL_CACHE_DIR = os.getenv('EMBEDDING_MODEL_CACHE_DIR', '/app/models')

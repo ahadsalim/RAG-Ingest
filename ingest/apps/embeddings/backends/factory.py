@@ -63,7 +63,7 @@ def validate_provider_config(provider: str) -> dict:
     
     if provider == "e5":
         # Check E5 configuration
-        model_name = os.getenv('EMBEDDING_E5_MODEL_NAME', 'intfloat/multilingual-e5-large')
+        model_name = os.getenv('EMBEDDING_E5_MODEL_NAME', 'intfloat/multilingual-e5-base')
         if not model_name:
             validation['warnings'].append('EMBEDDING_E5_MODEL_NAME not set, using default')
         
@@ -100,7 +100,7 @@ def get_backend_info(provider: Optional[str] = None) -> dict:
         backend = get_backend(provider)
         
         info = {
-            'provider': provider or os.getenv("EMBEDDING_PROVIDER", "hakim"),
+            'provider': provider or os.getenv("EMBEDDING_PROVIDER", "e5"),
             'model_id': backend.model_id(),
             'default_dim': backend.default_dim(),
             'supports_dual_encoder': backend.supports_dual_encoder(),
@@ -119,7 +119,7 @@ def get_backend_info(provider: Optional[str] = None) -> dict:
         
     except Exception as e:
         return {
-            'provider': provider or os.getenv("EMBEDDING_PROVIDER", "hakim"),
+            'provider': provider or os.getenv("EMBEDDING_PROVIDER", "e5"),
             'error': str(e),
             'valid': False
         }
