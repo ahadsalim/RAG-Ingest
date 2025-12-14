@@ -1,7 +1,7 @@
 # AI Memory - پروژه Ingest
 
 > این فایل حافظه پروژه است. قبل از هر اقدام این فایل را بخوانید.
-> آخرین به‌روزرسانی: 2025-12-14
+> آخرین به‌روزرسانی: 2025-12-14 (بهبود فرم‌های Admin)
 
 ---
 
@@ -109,6 +109,40 @@ CHUNK_OVERLAP=80
 - ✅ Provider fallback از `hakim` به `e5` اصلاح شد
 - ✅ اسکریپت‌های خالی حذف شدند
 
+### 2025-12-04: بهبود فرم‌های Admin
+#### فرم یکپارچه سند حقوقی (`admin_document.py`)
+- ✅ ایجاد فرم یکپارچه برای Work + Expression + Manifestation
+- ✅ تمام فیلدهای تاریخ به شمسی (JalaliDateField) تبدیل شدند
+- ✅ بخش "نسخه و زبان" از حالت collapse خارج شد
+- ✅ نام "روزنامه رسمی" به "محل انتشار" تغییر کرد
+- ✅ فیلدهای تاریخ در یک بخش جداگانه گروه‌بندی شدند
+- ✅ خلاصه موضوع بزرگتر شد (8 سطر، 70% عرض)
+- ✅ مرتب‌سازی پیش‌فرض بر اساس عنوان سند
+- ✅ اگر "اجرا از تاریخ" خالی باشد، "تاریخ انتشار" کپی می‌شود
+
+#### فرم بندهای حقوقی (`admin_lunit.py` و `forms.py`)
+- ✅ نوع واحد "همه متن" (FULL_TEXT) به enum اضافه شد
+- ✅ فیلد "ترتیب" از عددی به متنی تغییر کرد (migration 0013)
+- ✅ "تاریخ تصویب/اجرا" به "تاریخ ابلاغ/اجرا" تغییر کرد
+- ✅ اگر تاریخ ابلاغ خالی باشد، از `in_force_from` سند اصلی استفاده می‌شود
+- ✅ تاریخ‌ها در یک سطر با CSS flex
+- ✅ محتوا از 12 به 20 سطر افزایش یافت
+- ✅ placeholder های پیش‌فرض حذف شدند
+
+#### صفحه لیست LUnit
+- ✅ ستون "نوع سند" اضافه شد
+- ✅ صفحه انتخاب سند: ستون‌های تاریخ تصویب، نوع سند، تعداد بندها اضافه شد
+- ✅ مرتب‌سازی بر اساس عنوان سند
+
+#### ترتیب منوی Admin
+- ✅ بندهای اسناد حقوقی (LUnit) - اول
+- ✅ پرسش و پاسخ - دوم
+- ✅ اسناد حقوقی (فرم یکپارچه) - قبل از Work/Expression/Manifestation
+
+#### Migration داده‌ها
+- ✅ 3375 رکورد LegalUnit: `valid_from` از `publication_date` به `in_force_from` تغییر کرد
+- ✅ 1 رکورد InstrumentManifestation: `in_force_from` با `publication_date` پر شد
+
 ### نکات فنی
 - دانلود مدل در Dockerfile غیرفعال است (حجم بالا)
 - مدل در اولین استفاده دانلود می‌شود یا دستی به `/app/models` کپی شود
@@ -122,11 +156,16 @@ CHUNK_OVERLAP=80
 | `/srv/.env` | تنظیمات محیطی اصلی |
 | `/srv/ingest/settings/base.py` | تنظیمات Django |
 | `/srv/ingest/apps/documents/models.py` | مدل‌های اصلی |
-| `/srv/ingest/apps/documents/admin.py` | پنل ادمین |
+| `/srv/ingest/apps/documents/admin.py` | پنل ادمین اصلی |
+| `/srv/ingest/apps/documents/admin_document.py` | فرم یکپارچه سند حقوقی |
+| `/srv/ingest/apps/documents/admin_lunit.py` | ادمین بندهای حقوقی |
 | `/srv/ingest/apps/documents/forms.py` | فرم‌های ادمین |
+| `/srv/ingest/apps/documents/enums.py` | انواع داده (UnitType, DocumentType, ...) |
 | `/srv/ingest/apps/embeddings/tasks.py` | تسک‌های Celery |
 | `/srv/ingest/apps/documents/signals_unified.py` | سیگنال‌های یکپارچه |
 | `/srv/ingest/core/text_processing.py` | پردازش متن |
+| `/srv/ingest/static/admin/css/legalunit-changes.css` | استایل‌های سفارشی ادمین |
+| `/srv/ingest/templates/admin/documents/legalunit_manifestation_list.html` | صفحه انتخاب سند برای LUnit |
 
 ---
 
@@ -137,6 +176,11 @@ CHUNK_OVERLAP=80
 3. **سیگنال‌ها**: فقط از `signals_unified.py` استفاده کنید
 4. **Admin**: کلاس‌های utility در `ingest.core.admin_utils` هستند
 5. **Commit**: بعد از هر تغییر موفق، خودکار commit کنید
+6. **تاریخ شمسی**: از `JalaliDateField` و `JalaliDateWidget` استفاده کنید (در `ingest.core.forms`)
+7. **فرم یکپارچه**: برای سند حقوقی از `admin_document.py` استفاده کنید
+8. **مقادیر پیش‌فرض تاریخ**:
+   - در Document: اگر `in_force_from` خالی باشد → `publication_date`
+   - در LUnit: اگر `valid_from` خالی باشد → `manifestation.in_force_from`
 
 ---
 
