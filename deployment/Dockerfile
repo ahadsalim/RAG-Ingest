@@ -21,8 +21,6 @@ RUN apt-get update && apt-get upgrade -y \
         pkg-config \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-# TEMPORARILY DISABLED - ML-specific dependencies (libblas-dev, liblapack-dev, gfortran)
-# Uncomment when re-enabling embedding models
 
 # Install Python build tools first
 RUN python -m pip install --upgrade pip setuptools==69.5.1 wheel

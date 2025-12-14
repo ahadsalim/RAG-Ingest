@@ -6,13 +6,6 @@ DEPRECATED: این فایل منسوخ شده و به signals_unified.py منت�
 این فایل فقط برای backward compatibility نگه داشته شده.
 """
 
-import warnings
-warnings.warn(
-    "signals_complete.py is deprecated. Use signals_unified.py instead.",
-    DeprecationWarning,
-    stacklevel=2
-)
-
 # Re-export everything from unified signals for backward compatibility
 from .signals_unified import (
     track_legal_unit_changes,

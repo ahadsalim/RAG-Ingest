@@ -140,3 +140,23 @@ class BaseProcessingService(ABC, Generic[T]):
         )
         
         return results
+
+    def _handle_processing_error(
+        self,
+        item_id: str,
+        error_message: str,
+        results: Dict[str, Any],
+        stats: ProcessingStats,
+    ) -> None:
+        """Record a processing error for a single item."""
+        results['failed'] += 1
+        results['errors'].append({'item_id': item_id, 'error': error_message})
+        stats.errors.append({'item_id': item_id, 'error': error_message})
+
+        try:
+            self.metrics['processing_counter'].labels(status='failed').inc()
+        except Exception:
+            # Metrics should never break processing
+            pass
+
+        self.logger.error("Failed processing item %s: %s", item_id, error_message)

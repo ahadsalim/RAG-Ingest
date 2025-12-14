@@ -33,20 +33,19 @@ def batch_generate_embeddings_for_queryset(self, queryset_ids: List[str], model_
     import time
     from datetime import datetime
     from sentence_transformers import SentenceTransformer
-    from django.apps import apps
     
     # Start timing
     start_time = time.time()
     start_datetime = datetime.now()
     
-    print(f"\n🚀 EMBEDDING TASK STARTED")
-    print(f"Task ID: {self.request.id}")
-    print(f"Start Time: {start_datetime.strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"Model: {model_name}")
-    print(f"Class: {model_class_name}")
-    print(f"Items: {len(queryset_ids)}")
-    print(f"Batch Size: {batch_size}")
-    print("=" * 50)
+    logger.info(
+        "Embedding task started: task_id=%s model=%s class=%s items=%s batch_size=%s",
+        getattr(self.request, 'id', None),
+        model_name,
+        model_class_name,
+        len(queryset_ids),
+        batch_size,
+    )
     
     # Get the model class
     try:
@@ -104,13 +103,11 @@ def batch_generate_embeddings_for_queryset(self, queryset_ids: List[str], model_
                         embedding, created_flag = Embedding.objects.update_or_create(
                             content_type=content_type,
                             object_id=obj.id,
-                            model_name=model_name,
+                            model_id=model_name,
                             defaults={
                                 'vector': vector.tolist(),
                                 'text_content': text,
-                                'model_id': model_name,
                                 'dim': len(vector),
-                                'dimension': len(vector)
                             }
                         )
                         
@@ -121,13 +118,13 @@ def batch_generate_embeddings_for_queryset(self, queryset_ids: List[str], model_
                             
                     except Exception as e:
                         errors += 1
-                        print(f"Error processing {content_type} {obj.id}: {str(e)}")
+                        logger.exception("Error processing %s %s", content_type, obj.id)
                     
                     processed += 1
                     
         except Exception as e:
             errors += len(batch)
-            print(f"Batch error: {str(e)}")
+            logger.exception("Batch error")
             continue
     
     # End timing and logging
@@ -135,18 +132,25 @@ def batch_generate_embeddings_for_queryset(self, queryset_ids: List[str], model_
     end_datetime = datetime.now()
     total_duration = end_time - start_time
     
-    print(f"\n✅ EMBEDDING TASK COMPLETED")
-    print(f"Task ID: {self.request.id}")
-    print(f"End Time: {end_datetime.strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"Total Duration: {total_duration:.2f} seconds")
-    print(f"Processed: {processed}")
-    print(f"Created: {created}")
-    print(f"Updated: {updated}")
-    print(f"Errors: {errors}")
-    if processed > 0:
-        print(f"Average per Item: {total_duration/processed:.3f} seconds")
-        print(f"Items per Second: {processed/total_duration:.2f}")
-    print("=" * 50)
+    logger.info(
+        "Embedding task completed: task_id=%s end_time=%s duration=%.2fs processed=%s/%s created=%s updated=%s errors=%s",
+        getattr(self.request, 'id', None),
+        end_datetime.strftime('%Y-%m-%d %H:%M:%S'),
+        total_duration,
+        processed,
+        total,
+        created,
+        updated,
+        errors,
+    )
+    logger.debug(
+        "Average per Item: %.3f seconds",
+        total_duration/processed if processed > 0 else 0,
+    )
+    logger.debug(
+        "Items per Second: %.2f",
+        processed/total_duration if total_duration > 0 else 0
+    )
     
     return {
         'success': True,
@@ -197,7 +201,7 @@ def generate_real_embedding(text: str, model_name: str = "multilingual-e5-large"
         
     except Exception as e:
         # Fallback to stub if model loading fails
-        print(f"Error loading multilingual-e5-large model: {e}")
+        logger.exception("Error loading embedding model %s", model_name)
         return generate_stub_embedding(text)
 
 
@@ -262,46 +266,48 @@ def generate_embeddings_for_new_content(model_name: str = "multilingual-e5-large
     results = {}
     
     # 1. Process Chunks
+    chunk_ct = ContentType.objects.get_for_model(Chunk)
     chunks_to_process = Chunk.objects.exclude(
         id__in=Embedding.objects.filter(
-            content_type=ContentType.objects.get_for_model(Chunk),
-            model_name=model_name
+            content_type=chunk_ct,
+            model_id=model_name,
         ).values_list('object_id', flat=True)
     )
     
     if chunks_to_process.exists():
-        chunk_results = batch_generate_embeddings_for_queryset(
-            queryset=chunks_to_process,
-            model_name=model_name,
-            batch_size=batch_size
+        queryset_ids = list(chunks_to_process.values_list('id', flat=True))
+        async_result = batch_generate_embeddings_for_queryset.delay(
+            [str(i) for i in queryset_ids],
+            'Chunk',
+            model_name,
+            batch_size,
         )
-        results['chunks'] = chunk_results
+        results['chunks'] = {'enqueued': True, 'task_id': async_result.id, 'count': len(queryset_ids)}
     else:
         results['chunks'] = {'message': 'No chunks need processing'}
     
     # 2. Process QA Entries (only approved ones)
+    qa_ct = ContentType.objects.get_for_model(QAEntry)
     qa_entries_to_process = QAEntry.objects.filter(
-        is_approved=True
+        status='approved'
     ).exclude(
         id__in=Embedding.objects.filter(
-            content_type=ContentType.objects.get_for_model(QAEntry),
-            model_name=model_name
+            content_type=qa_ct,
+            model_id=model_name,
         ).values_list('object_id', flat=True)
     )
     
     if qa_entries_to_process.exists():
-        qa_results = batch_generate_embeddings_for_queryset(
-            queryset=qa_entries_to_process,
-            model_name=model_name,
-            batch_size=batch_size
+        queryset_ids = list(qa_entries_to_process.values_list('id', flat=True))
+        async_result = batch_generate_embeddings_for_queryset.delay(
+            [str(i) for i in queryset_ids],
+            'QAEntry',
+            model_name,
+            batch_size,
         )
-        results['qa_entries'] = qa_results
+        results['qa_entries'] = {'enqueued': True, 'task_id': async_result.id, 'count': len(queryset_ids)}
     else:
         results['qa_entries'] = {'message': 'No QA entries need processing'}
-    
-    return results
-    
-    # QAEntry processing removed - model no longer exists in simplified version
     
     return results
 

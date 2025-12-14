@@ -170,9 +170,10 @@ class Command(BaseCommand):
                     f"⚠️  Dimension mismatch: existing={existing_dim}, new={backend_dim}"
                 )
             )
-            self.stdout.write("🔄 Dimension migration will be performed")
-            # TODO: Implement zero-downtime dimension migration
-            # This would involve creating new vector column, backfilling, and swapping
+            raise CommandError(
+                "Dimension migration is not implemented. "
+                "Re-run without --allow-dim-migration, or migrate embeddings manually."
+            )
 
     def truncate_existing_embeddings(self, model_id: str):
         """Delete existing embeddings for the model."""

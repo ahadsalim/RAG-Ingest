@@ -6,7 +6,17 @@ from rest_framework.permissions import IsAuthenticated
 from django.db import connection
 from django.conf import settings
 
-# from ingest.common.s3 import generate_presigned_upload_url, generate_presigned_url
+try:
+    import boto3
+    from botocore.config import Config
+    from botocore.exceptions import ClientError
+
+    _S3_AVAILABLE = True
+except Exception:
+    boto3 = None
+    Config = None
+    ClientError = Exception
+    _S3_AVAILABLE = False
 
 
 class HealthCheckView(APIView):
@@ -51,9 +61,29 @@ class HealthCheckView(APIView):
             minio_endpoint = getattr(settings, 'AWS_S3_ENDPOINT_URL', None)
             if not minio_endpoint:
                 return {"status": "disabled", "message": "MinIO endpoint not configured"}
+
+            if not _S3_AVAILABLE:
+                return {"status": "disabled", "message": "S3 dependencies not installed"}
+
+            bucket = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', None)
+            access_key = getattr(settings, 'AWS_ACCESS_KEY_ID', None)
+            secret_key = getattr(settings, 'AWS_SECRET_ACCESS_KEY', None)
+            if not bucket or not access_key or not secret_key:
+                return {"status": "disabled", "message": "S3 credentials/bucket not configured"}
+
+            s3 = boto3.client(
+                's3',
+                endpoint_url=minio_endpoint,
+                aws_access_key_id=access_key,
+                aws_secret_access_key=secret_key,
+                config=Config(signature_version='s3v4'),
+                region_name=getattr(settings, 'AWS_S3_REGION_NAME', 'us-east-1'),
+            )
+
+            # Validate connectivity with a lightweight call
+            s3.head_bucket(Bucket=bucket)
+            return {"status": "ok", "message": "Storage connection successful", "endpoint": minio_endpoint, "bucket": bucket}
             
-            # Storage functionality temporarily disabled
-            return {"status": "disabled", "message": "Storage functionality temporarily disabled", "endpoint": minio_endpoint}
         except Exception as e:
             return {"status": "disabled", "message": f"Storage disabled: {str(e)}"}
 
@@ -99,10 +129,60 @@ class PresignURLView(APIView):
             object_key = f"uploads/{request.user.id}/{filename}"
         
         try:
-            # Storage functionality temporarily disabled
+            if not _S3_AVAILABLE:
+                return Response(
+                    {"error": "Storage dependencies not installed"},
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                )
+
+            endpoint = getattr(settings, 'AWS_S3_ENDPOINT_URL', None)
+            bucket = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', None)
+            access_key = getattr(settings, 'AWS_ACCESS_KEY_ID', None)
+            secret_key = getattr(settings, 'AWS_SECRET_ACCESS_KEY', None)
+
+            if not endpoint or not bucket or not access_key or not secret_key:
+                return Response(
+                    {"error": "Storage is not configured"},
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                )
+
+            s3 = boto3.client(
+                's3',
+                endpoint_url=endpoint,
+                aws_access_key_id=access_key,
+                aws_secret_access_key=secret_key,
+                config=Config(signature_version='s3v4'),
+                region_name=getattr(settings, 'AWS_S3_REGION_NAME', 'us-east-1'),
+            )
+
+            upload_url = s3.generate_presigned_url(
+                ClientMethod='put_object',
+                Params={
+                    'Bucket': bucket,
+                    'Key': object_key,
+                    'ContentType': content_type,
+                },
+                ExpiresIn=60 * 10,
+            )
+
+            download_url = s3.generate_presigned_url(
+                ClientMethod='get_object',
+                Params={
+                    'Bucket': bucket,
+                    'Key': object_key,
+                },
+                ExpiresIn=60 * 10,
+            )
+
             return Response(
-                {"error": "Storage functionality temporarily disabled"},
-                status=status.HTTP_503_SERVICE_UNAVAILABLE
+                {
+                    'object_key': object_key,
+                    'bucket': bucket,
+                    'upload_url': upload_url,
+                    'download_url': download_url,
+                    'expires_in': 60 * 10,
+                },
+                status=status.HTTP_200_OK,
             )
             
         except Exception as e:

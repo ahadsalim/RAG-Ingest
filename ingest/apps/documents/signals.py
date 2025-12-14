@@ -16,14 +16,6 @@ from .signals_unified import (
     SafeDeletionMixin,
     cleanup_orphaned_synclogs,
 )
-
-import warnings
-warnings.warn(
-    "signals.py is deprecated. Use signals_unified.py instead.",
-    DeprecationWarning,
-    stacklevel=2
-)
-
 import logging
 logger = logging.getLogger(__name__)
 

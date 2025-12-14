@@ -8,14 +8,6 @@ DEPRECATED: این فایل دیگر استفاده نمی‌شود.
 برای استفاده از admin بهینه‌شده، به admin.py مراجعه کنید.
 """
 
-import warnings
-warnings.warn(
-    "admin_fast.py is deprecated and not in use. "
-    "Optimizations have been merged into admin.py",
-    DeprecationWarning,
-    stacklevel=2
-)
-
 # این فایل فقط برای مستندسازی و تاریخچه نگه داشته شده
 # هیچ کدی در اینجا اجرا نمی‌شود
 # 

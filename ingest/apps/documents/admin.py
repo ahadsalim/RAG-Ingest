@@ -1192,6 +1192,3 @@ admin_site.register(InstrumentWork, InstrumentWorkAdmin)
 admin_site.register(InstrumentExpression, InstrumentExpressionAdmin)
 admin_site.register(InstrumentManifestation, InstrumentManifestationAdmin)
 admin_site.register(InstrumentRelation, InstrumentRelationAdmin)
-
-# LegalUnit حذف شد - فقط از LUnit استفاده کنید
-# admin_site.register(LegalUnit, LegalUnitAdmin)  # REMOVED

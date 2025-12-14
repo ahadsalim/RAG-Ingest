@@ -6,14 +6,6 @@ DEPRECATED: این فایل منسوخ شده است.
 کلاس‌های utility به ingest.core.admin_utils منتقل شده‌اند.
 """
 
-import warnings
-warnings.warn(
-    "admin_optimized.py is deprecated. "
-    "Use ingest.core.admin_utils instead.",
-    DeprecationWarning,
-    stacklevel=2
-)
-
 # Re-export utility classes for backward compatibility
 from ingest.core.admin_utils import (
     CachedCountPaginator,

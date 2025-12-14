@@ -48,16 +48,16 @@ class ChunkProcessingService(BaseProcessingService):
         Raises:
             ProcessingError: If processing fails
         """
-        from ..models import Document, Chunk
+        from ..models import InstrumentManifestation
         
         try:
-            document = Document.objects.get(id=document_id)
-        except Document.DoesNotExist:
-            raise ProcessingError(f"Document {document_id} not found")
+            manifestation = InstrumentManifestation.objects.get(id=document_id)
+        except InstrumentManifestation.DoesNotExist:
+            raise ProcessingError(f"Manifestation {document_id} not found")
         
-        # Get or create chunks for the document's legal units
+        # Create chunks for the manifestation's legal units
         results = {}
-        for unit in document.legal_units.all():
+        for unit in manifestation.units.all():
             try:
                 result = self.process_legal_unit(unit.id)
                 results[str(unit.id)] = result

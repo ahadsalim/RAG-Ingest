@@ -7,16 +7,6 @@ DEPRECATED: این فایل منسوخ شده است.
 
 این فایل فقط برای backward compatibility نگه داشته شده است.
 """
-import warnings
-
-warnings.warn(
-    "ingest.apps.documents.services is deprecated. "
-    "Use ingest.apps.documents.processing.chunking or "
-    "ingest.apps.embeddings.embedding_service instead.",
-    DeprecationWarning,
-    stacklevel=2
-)
-
 import logging
 logger = logging.getLogger(__name__)
 
@@ -44,12 +34,6 @@ TextChunkingService = ChunkProcessingService  # Deprecated alias
 # Old function - deprecated
 def get_text_chunking_service():
     """DEPRECATED: Use get_chunk_processing_service instead."""
-    warnings.warn(
-        "get_text_chunking_service is deprecated. "
-        "Use get_chunk_processing_service from processing.chunking instead.",
-        DeprecationWarning,
-        stacklevel=2
-    )
     return get_chunk_processing_service()
 
 

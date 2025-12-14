@@ -9,8 +9,12 @@ from django.db.models.functions import Power, Sqrt
 from pgvector.django import VectorField, L2Distance, CosineDistance
 from simple_history.models import HistoricalRecords
 import numpy as np
+import logging
 
 from ingest.apps.masterdata.models import BaseModel
+
+
+logger = logging.getLogger(__name__)
 
 # Import SyncLog models
 from .models_synclog import SyncLog, SyncStats
@@ -352,11 +356,11 @@ class Embedding(BaseModel):
                 padded = np.zeros(required_dim, dtype=np.float32)
                 padded[:original_dim] = vec
                 self.vector = padded.tolist()
-                print(f"📦 Padded {original_dim}d vector to {required_dim}d for model {self.model_id}")
+                logger.debug("Padded %sd vector to %sd for model %s", original_dim, required_dim, self.model_id)
             elif original_dim > required_dim:
                 # Truncate if larger (should rarely happen with 4096d limit)
                 self.vector = vec[:required_dim].tolist()
-                print(f"⚠️  Truncated {original_dim}d vector to {required_dim}d for model {self.model_id}")
+                logger.debug("Truncated %sd vector to %sd for model %s", original_dim, required_dim, self.model_id)
             else:
                 # Perfect match
                 self.vector = vec.tolist()

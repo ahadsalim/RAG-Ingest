@@ -61,7 +61,6 @@ LOCAL_APPS = [
     'ingest.apps.accounts',
     'ingest.apps.masterdata',
     'ingest.apps.documents',
-    # 'ingest.apps.syncbridge',  # Deprecated - replaced by Summary Sync in embeddings
     'ingest.apps.embeddings.apps.EmbeddingsConfig',
     'ingest.app_config.IngestConfig',  # Main app - registers celery beat models in IngestConfig.ready()
 ]
@@ -206,23 +205,6 @@ REST_FRAMEWORK = {
         'rest_framework.filters.OrderingFilter',
     ],
 }
-
-# JWT Settings (temporarily disabled)
-# from datetime import timedelta
-# SIMPLE_JWT = {
-#     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
-#     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
-#     'ROTATE_REFRESH_TOKENS': True,
-# }
-
-# DRF Spectacular (OpenAPI) - temporarily disabled
-# SPECTACULAR_SETTINGS = {
-#     'TITLE': 'Ingest API',
-#     'DESCRIPTION': 'Legal Document Management System API',
-#     'VERSION': '1.0.0',
-#     'SERVE_INCLUDE_SCHEMA': False,
-#     'SCHEMA_PATH_PREFIX': '/api/',
-# }
 
 # MinIO Storage Settings
 DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"

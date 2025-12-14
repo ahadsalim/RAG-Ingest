@@ -2,12 +2,16 @@
 Views for documents app.
 """
 
+import logging
+
 from django.http import JsonResponse
-from django.contrib.admin.views.decorators import staff_member_required
 from django.views.decorators.http import require_GET
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth.decorators import login_required
 from .models import LegalUnit
+
+
+logger = logging.getLogger(__name__)
 
 
 @login_required
@@ -19,11 +23,8 @@ def get_parent_options(request):
     Used in admin interface to dynamically filter parent choices.
     """
     manifestation_id = request.GET.get('manifestation_id')
-    
-    print(f"DEBUG: get_parent_options called with manifestation_id: {manifestation_id}")
-    
+
     if not manifestation_id:
-        print("DEBUG: No manifestation_id provided")
         return JsonResponse({'options': []})
     
     try:
@@ -32,13 +33,10 @@ def get_parent_options(request):
             manifestation_id=manifestation_id
         ).select_related('work', 'expr', 'manifestation').order_by('path_label')
         
-        print(f"DEBUG: Found {legal_units.count()} legal units for manifestation {manifestation_id}")
-        
         # Exclude the current object if editing (to prevent circular reference)
         current_id = request.GET.get('current_id')
         if current_id:
             legal_units = legal_units.exclude(pk=current_id)
-            print(f"DEBUG: Excluded current object {current_id}, remaining: {legal_units.count()}")
         
         # Build options list
         options = []
@@ -57,10 +55,9 @@ def get_parent_options(request):
                 'value': unit.pk,
                 'text': option_text
             })
-            print(f"DEBUG: Added option - {unit.pk}: {option_text} (Active: {unit.is_active})")
-        
-        print(f"DEBUG: Returning {len(options)} options")
+
         return JsonResponse({'options': options})
         
     except Exception as e:
+        logger.exception("get_parent_options failed")
         return JsonResponse({'error': str(e)}, status=400)
