@@ -343,6 +343,8 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
         if object_id:
             try:
                 obj = self.get_object(request, object_id)
+                # ذخیره obj برای استفاده در inline (برای نمایش تگ‌ها)
+                request._obj_ = obj
                 if obj:
                     # ساخت path کامل
                     path_parts = []
