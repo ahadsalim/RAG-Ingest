@@ -14,7 +14,9 @@ from ingest.core.admin_mixins import JalaliAdminMixin as SimpleJalaliAdminMixin
 from .models import (
     InstrumentWork, InstrumentExpression, InstrumentManifestation,
     LegalUnit, LUnit, LegalUnitChange, LegalUnitVocabularyTerm, InstrumentRelation, PinpointCitation,
-    FileAsset, Chunk, IngestLog, QAEntry, TextEntry, TextEntryVocabularyTerm
+    FileAsset, Chunk, IngestLog, QAEntry, TextEntry, 
+    TextEntryVocabularyTerm, TextEntryRelatedUnit,
+    QAEntryVocabularyTerm, QAEntryRelatedUnit
 )
 from .forms import (
     InstrumentExpressionForm, InstrumentManifestationForm, InstrumentRelationForm, LegalUnitForm, FileAssetForm
@@ -1066,7 +1068,27 @@ class ChunkAdminRegistered(ChunkAdmin):
             'view': self.has_view_permission(request),
         }
 
-# QA Entry Admin
+# QA Entry Admin - Inlines
+class QAEntryVocabularyTermInline(admin.TabularInline):
+    """Inline برای تگ‌های QAEntry با autocomplete."""
+    model = QAEntryVocabularyTerm
+    extra = 1
+    fields = ('vocabulary_term', 'weight')
+    autocomplete_fields = ['vocabulary_term']
+    verbose_name = 'برچسب'
+    verbose_name_plural = 'برچسب‌ها'
+
+
+class QAEntryRelatedUnitInline(admin.TabularInline):
+    """Inline برای بندهای مرتبط QAEntry با autocomplete."""
+    model = QAEntryRelatedUnit
+    extra = 1
+    fields = ('legal_unit',)
+    autocomplete_fields = ['legal_unit']
+    verbose_name = 'بند مرتبط'
+    verbose_name_plural = 'بندهای مرتبط'
+
+
 class QAEntryAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
     """Admin برای پرسش و پاسخ با تگ و ارتباط با بندها."""
     
@@ -1077,18 +1099,11 @@ class QAEntryAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
     list_filter = ('tags', 'created_at')
     search_fields = ('question', 'answer', 'canonical_question')
     readonly_fields = ('created_by_display', 'jalali_created_at_display', 'jalali_updated_at_display')
-    filter_horizontal = ('tags', 'related_units')
+    inlines = [QAEntryVocabularyTermInline, QAEntryRelatedUnitInline]
     
     fieldsets = (
         ('محتوای پرسش و پاسخ', {
             'fields': ('question', 'answer')
-        }),
-        ('برچسب‌ها', {
-            'fields': ('tags',),
-        }),
-        ('بندهای مرتبط', {
-            'fields': ('related_units',),
-            'description': 'بندهای قانونی مرتبط با این پرسش و پاسخ را انتخاب کنید'
         }),
         ('اطلاعات سیستم', {
             'fields': ('created_by_display', 'jalali_created_at_display', 'jalali_updated_at_display'),
@@ -1178,6 +1193,16 @@ class TextEntryVocabularyTermInline(admin.TabularInline):
     verbose_name_plural = 'برچسب‌ها'
 
 
+class TextEntryRelatedUnitInline(admin.TabularInline):
+    """Inline برای بندهای مرتبط TextEntry با autocomplete."""
+    model = TextEntryRelatedUnit
+    extra = 1
+    fields = ('legal_unit',)
+    autocomplete_fields = ['legal_unit']
+    verbose_name = 'بند مرتبط'
+    verbose_name_plural = 'بندهای مرتبط'
+
+
 class TextEntryAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
     """Admin برای متون با قابلیت آپلود فایل و ارتباط با بندها."""
     
@@ -1188,16 +1213,11 @@ class TextEntryAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
     list_filter = ('created_at', 'vocabulary_terms')
     search_fields = ('title', 'content')
     readonly_fields = ('jalali_created_at_display', 'jalali_updated_at_display', 'original_filename', 'content_extracted')
-    filter_horizontal = ('related_units',)
-    inlines = [TextEntryVocabularyTermInline]
+    inlines = [TextEntryVocabularyTermInline, TextEntryRelatedUnitInline]
     
     fieldsets = (
         ('محتوا', {
             'fields': ('title', 'content', 'source_file', 'original_filename')
-        }),
-        ('بندهای مرتبط', {
-            'fields': ('related_units',),
-            'description': 'بندهای قانونی مرتبط با این متن را انتخاب کنید'
         }),
         ('اطلاعات سیستم', {
             'fields': ('jalali_created_at_display', 'jalali_updated_at_display'),
@@ -1323,6 +1343,17 @@ class TextEntryAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
 # ============================================================================
 # ثبت مدل‌ها در admin - ترتیب مهم است!
 # ============================================================================
+
+# 0. LegalUnit برای autocomplete (بدون نمایش در منو)
+class LegalUnitAutocompleteAdmin(admin.ModelAdmin):
+    """Admin مخفی برای LegalUnit - فقط برای autocomplete استفاده می‌شود."""
+    search_fields = ('content', 'path_label', 'number', 'manifestation__expr__work__title_official')
+    
+    def has_module_permission(self, request):
+        """مخفی کردن از منوی admin."""
+        return False
+
+admin_site.register(LegalUnit, LegalUnitAutocompleteAdmin)
 
 # 1. بندهای اسناد حقوقی - اول
 from .admin_lunit import LUnitAdmin

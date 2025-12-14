@@ -828,6 +828,7 @@ class QAEntry(BaseModel):
     # Tags for categorization
     tags = models.ManyToManyField(
         'masterdata.VocabularyTerm',
+        through='QAEntryVocabularyTerm',
         blank=True,
         related_name='qa_entries',
         verbose_name='برچسب‌ها'
@@ -836,6 +837,7 @@ class QAEntry(BaseModel):
     # ارتباط با LegalUnit ها (چند به چند)
     related_units = models.ManyToManyField(
         'LegalUnit',
+        through='QAEntryRelatedUnit',
         blank=True,
         related_name='related_qa_entries',
         verbose_name='بندهای مرتبط'
@@ -979,6 +981,7 @@ class TextEntry(BaseModel):
     # ارتباط با LegalUnit ها (چند به چند)
     related_units = models.ManyToManyField(
         'LegalUnit',
+        through='TextEntryRelatedUnit',
         blank=True,
         related_name='related_text_entries',
         verbose_name='بندهای مرتبط'
@@ -1119,3 +1122,74 @@ class TextEntryVocabularyTerm(models.Model):
     
     def __str__(self):
         return f"{self.text_entry} - {self.vocabulary_term}"
+
+
+class TextEntryRelatedUnit(models.Model):
+    """Through model for TextEntry related LegalUnits."""
+    text_entry = models.ForeignKey(
+        TextEntry,
+        on_delete=models.CASCADE,
+        verbose_name='متن'
+    )
+    legal_unit = models.ForeignKey(
+        'LegalUnit',
+        on_delete=models.CASCADE,
+        verbose_name='بند مرتبط'
+    )
+    
+    class Meta:
+        verbose_name = 'بند مرتبط متن'
+        verbose_name_plural = 'بندهای مرتبط متن'
+        unique_together = ['text_entry', 'legal_unit']
+    
+    def __str__(self):
+        return f"{self.text_entry} - {self.legal_unit}"
+
+
+class QAEntryVocabularyTerm(models.Model):
+    """Through model for QAEntry vocabulary terms."""
+    qa_entry = models.ForeignKey(
+        QAEntry,
+        on_delete=models.CASCADE,
+        verbose_name='پرسش و پاسخ'
+    )
+    vocabulary_term = models.ForeignKey(
+        'masterdata.VocabularyTerm',
+        on_delete=models.CASCADE,
+        verbose_name='برچسب'
+    )
+    weight = models.FloatField(
+        default=1.0,
+        verbose_name='وزن',
+        help_text='وزن برچسب (1.0 = عادی)'
+    )
+    
+    class Meta:
+        verbose_name = 'برچسب پرسش و پاسخ'
+        verbose_name_plural = 'برچسب‌های پرسش و پاسخ'
+        unique_together = ['qa_entry', 'vocabulary_term']
+    
+    def __str__(self):
+        return f"{self.qa_entry} - {self.vocabulary_term}"
+
+
+class QAEntryRelatedUnit(models.Model):
+    """Through model for QAEntry related LegalUnits."""
+    qa_entry = models.ForeignKey(
+        QAEntry,
+        on_delete=models.CASCADE,
+        verbose_name='پرسش و پاسخ'
+    )
+    legal_unit = models.ForeignKey(
+        'LegalUnit',
+        on_delete=models.CASCADE,
+        verbose_name='بند مرتبط'
+    )
+    
+    class Meta:
+        verbose_name = 'بند مرتبط پرسش و پاسخ'
+        verbose_name_plural = 'بندهای مرتبط پرسش و پاسخ'
+        unique_together = ['qa_entry', 'legal_unit']
+    
+    def __str__(self):
+        return f"{self.qa_entry} - {self.legal_unit}"
