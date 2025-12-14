@@ -63,7 +63,7 @@ def validate_provider_config(provider: str) -> dict:
     
     if provider == "e5":
         # Check E5 configuration
-        model_name = os.getenv('EMBEDDING_E5_MODEL_NAME', 'intfloat/multilingual-e5-base')
+        model_name = os.getenv('EMBEDDING_E5_MODEL_NAME', 'intfloat/multilingual-e5-large')
         if not model_name:
             validation['warnings'].append('EMBEDDING_E5_MODEL_NAME not set, using default')
         

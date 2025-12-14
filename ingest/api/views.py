@@ -2,7 +2,6 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
-# from drf_spectacular.utils import extend_schema
 from django.db import connection
 from django.conf import settings
 
@@ -23,10 +22,6 @@ class HealthCheckView(APIView):
     """Health check endpoint."""
     permission_classes = []
 
-    # @extend_schema(
-    #     summary="Health Check",
-    #     description="Check system health including database and storage connectivity"
-    # )
     def get(self, request):
         health_data = {
             "status": "healthy",
@@ -92,22 +87,6 @@ class PresignURLView(APIView):
     """Generate presigned URLs for file upload and download."""
     permission_classes = [IsAuthenticated]
 
-    # @extend_schema(
-    #     summary="Generate Presigned URLs",
-    #     description="Generate presigned URLs for file upload (PUT) and download (GET)",
-    #     request={
-    #         'application/json': {
-    #             'type': 'object',
-    #             'properties': {
-    #                 'filename': {'type': 'string', 'description': 'Original filename'},
-    #                 'content_type': {'type': 'string', 'description': 'MIME content type'},
-    #                 'document_id': {'type': 'string', 'format': 'uuid', 'description': 'Document ID (optional)'},
-    #                 'unit_id': {'type': 'string', 'format': 'uuid', 'description': 'Unit ID (optional)'}
-    #             },
-    #             'required': ['filename', 'content_type']
-    #         }
-    #     }
-    # )
     def post(self, request):
         filename = request.data.get('filename')
         content_type = request.data.get('content_type')

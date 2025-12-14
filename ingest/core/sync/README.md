@@ -67,8 +67,8 @@ ingest/core/sync/
     "chunk_hash": "sha256...",
     
     # Embedding Metadata
-    "embedding_model": "intfloat/multilingual-e5-base",
-    "embedding_dimension": 768,
+    "embedding_model": "intfloat/multilingual-e5-large",
+    "embedding_dimension": 1024,
     "embedding_created_at": "2025-11-02T...",
     
     # Tags

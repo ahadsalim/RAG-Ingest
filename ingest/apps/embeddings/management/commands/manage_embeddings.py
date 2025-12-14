@@ -37,8 +37,8 @@ class Command(BaseCommand):
         parser.add_argument(
             '--model',
             type=str,
-            default='intfloat/multilingual-e5-base',
-            help='Model name to use for embeddings (default: intfloat/multilingual-e5-base)'
+            default='intfloat/multilingual-e5-large',
+            help='Model name to use for embeddings (default: intfloat/multilingual-e5-large)'
         )
         parser.add_argument(
             '--batch-size',
@@ -81,7 +81,7 @@ class Command(BaseCommand):
         )
         return count
 
-    def list_items_needing_embeddings(self, model_name: str = 'intfloat/multilingual-e5-base'):
+    def list_items_needing_embeddings(self, model_name: str = 'intfloat/multilingual-e5-large'):
         """List items that need embeddings without generating them."""
         self.stdout.write('\n' + '='*50)
         self.stdout.write(self.style.SUCCESS('Items Needing Embeddings'))
@@ -257,7 +257,7 @@ class Command(BaseCommand):
             elif choice == '3':
                 # Generate embeddings with confirmation
                 self.generate_embeddings(
-                    model_name='intfloat/multilingual-e5-base',
+                    model_name='intfloat/multilingual-e5-large',
                     batch_size=50,
                     interactive=True
                 )

@@ -5,9 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db import transaction
-from django.utils.timezone import localdate
 from datetime import datetime, date
-# from drf_spectacular.utils import extend_schema_view, extend_schema
 
 from ingest.apps.documents.models import (
     LegalUnit, FileAsset, QAEntry,
@@ -20,16 +18,6 @@ from .serializers import (
 from ingest.api.mixins import FullyOptimizedViewMixin
 
 
-"""Legacy LegalDocument API removed. Use FRBR endpoints (Work/Expression/Manifestation) if needed."""
-
-
-# @extend_schema_view(
-#     list=extend_schema(summary="List legal units", tags=["Documents"]),
-#     create=extend_schema(summary="Create legal unit", tags=["Documents"]),
-#     retrieve=extend_schema(summary="Get legal unit", tags=["Documents"]),
-#     update=extend_schema(summary="Update legal unit", tags=["Documents"]),
-#     destroy=extend_schema(summary="Delete legal unit", tags=["Documents"]),
-# )
 class LegalUnitViewSet(FullyOptimizedViewMixin, viewsets.ModelViewSet):
     queryset = LegalUnit.objects.all()
     serializer_class = LegalUnitSerializer
@@ -114,13 +102,6 @@ class LegalUnitViewSet(FullyOptimizedViewMixin, viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
-# @extend_schema_view(
-#     list=extend_schema(summary="List file assets", tags=["Documents"]),
-#     create=extend_schema(summary="Create file asset", tags=["Documents"]),
-#     retrieve=extend_schema(summary="Get file asset", tags=["Documents"]),
-#     update=extend_schema(summary="Update file asset", tags=["Documents"]),
-#     destroy=extend_schema(summary="Delete file asset", tags=["Documents"]),
-# )
 class FileAssetViewSet(FullyOptimizedViewMixin, viewsets.ModelViewSet):
     queryset = FileAsset.objects.all()
     serializer_class = FileAssetSerializer
@@ -193,13 +174,6 @@ class FileAssetViewSet(FullyOptimizedViewMixin, viewsets.ModelViewSet):
         file_upload_service.delete_file(instance)
 
 
-# @extend_schema_view(
-#     list=extend_schema(summary="List QA entries", tags=["Documents"]),
-#     create=extend_schema(summary="Create QA entry", tags=["Documents"]),
-#     retrieve=extend_schema(summary="Get QA entry", tags=["Documents"]),
-#     update=extend_schema(summary="Update QA entry", tags=["Documents"]),
-#     destroy=extend_schema(summary="Delete QA entry", tags=["Documents"]),
-# )
 class QAEntryViewSet(FullyOptimizedViewMixin, viewsets.ModelViewSet):
     """
     ViewSet for QAEntry with permission-based access.

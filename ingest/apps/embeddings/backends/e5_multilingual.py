@@ -1,5 +1,5 @@
 """
-E5 Multilingual embedding backend using intfloat/multilingual-e5-base model.
+E5 Multilingual embedding backend using intfloat/multilingual-e5-large model.
 """
 import os
 import logging
@@ -13,14 +13,14 @@ logger = logging.getLogger(__name__)
 
 class E5Multilingual(EmbeddingBackend):
     """
-    E5 Multilingual embedding backend using intfloat/multilingual-e5-base.
+    E5 Multilingual embedding backend using intfloat/multilingual-e5-large.
     
     This model supports multiple languages including Persian and provides
     high-quality embeddings for semantic search and RAG applications.
     """
     
     def __init__(self):
-        self.model_name = os.getenv('EMBEDDING_E5_MODEL_NAME', 'intfloat/multilingual-e5-base')
+        self.model_name = os.getenv('EMBEDDING_E5_MODEL_NAME', 'intfloat/multilingual-e5-large')
         self.batch_size = int(os.getenv('EMBEDDING_BATCH_SIZE', '16'))
         self.device = os.getenv('EMBEDDING_DEVICE', 'cuda' if torch.cuda.is_available() else 'cpu')
         self.max_seq_length = int(os.getenv('EMBEDDING_MAX_SEQ_LENGTH', '512'))
@@ -179,7 +179,7 @@ class E5Multilingual(EmbeddingBackend):
     
     def model_id(self) -> str:
         """Return model identifier."""
-        # Return the full model name (e.g., intfloat/multilingual-e5-base)
+        # Return the full model name (e.g., intfloat/multilingual-e5-large)
         return self.model_name
     
     def model_version(self) -> Optional[str]:
@@ -191,8 +191,8 @@ class E5Multilingual(EmbeddingBackend):
         if self._cached_dim is not None:
             return self._cached_dim
         
-        # Default dimension for multilingual-e5-base
-        return 768
+        # Default dimension for multilingual-e5-large
+        return 1024
     
     def supports_dual_encoder(self) -> bool:
         """E5 models support dual encoder with instruction prefixes."""

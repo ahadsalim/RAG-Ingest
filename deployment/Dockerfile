@@ -52,7 +52,7 @@ RUN chmod -R 755 /app/staticfiles /app/models
 
 # TEMPORARILY DISABLED - Model downloads disabled due to large size
 # Download required Hugging Face models into /app/models at build time
-# We place it as /app/models/intfloat__multilingual-e5-base
+# We place it as /app/models/intfloat__multilingual-e5-large
 # to match code that checks for model_name.replace('/', '__')
 # RUN python - << 'PY'
 # from huggingface_hub import snapshot_download
@@ -62,7 +62,7 @@ RUN chmod -R 755 /app/staticfiles /app/models
 # os.makedirs(target_dir, exist_ok=True)
 # 
 # models = [
-#     "intfloat/multilingual-e5-base",
+#     "intfloat/multilingual-e5-large",
 # ]
 # 
 # for repo_id in models:

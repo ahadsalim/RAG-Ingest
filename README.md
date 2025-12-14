@@ -241,13 +241,11 @@ CHUNK_SIZE=512
 ```python
 # در settings/base.py
 EMBEDDING_CONFIG = {
-    'models': {
-        'base': 'intfloat/multilingual-e5-base',
-        'large': 'intfloat/multilingual-e5-large'
-    },
-    'chunk_size': 512,
-    'overlap': 50,
-    'batch_size': 32
+    'model': 'intfloat/multilingual-e5-large',
+    'dimension': 1024,
+    'chunk_size': 350,
+    'overlap': 80,
+    'batch_size': 16
 }
 ```
 

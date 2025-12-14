@@ -1,7 +1,5 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-# from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-# from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
 
 from .views import HealthCheckView, PresignURLView
 from .masterdata import views as masterdata_views
