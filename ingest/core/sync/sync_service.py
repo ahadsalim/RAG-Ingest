@@ -36,15 +36,12 @@ class CoreSyncService:
         batch_size = batch_size or self.config.sync_batch_size
         
         # Get unsynced embeddings
+        # Note: prefetch_related removed because it causes errors with QAEntry
+        # which doesn't have unit_id field. Prefetching is done in payload_builder.
         embeddings = Embedding.objects.filter(
             synced_to_core=False
         ).select_related(
             'content_type'
-        ).prefetch_related(
-            'content_object__unit__work',
-            'content_object__unit__manifestation',
-            'content_object__expr__work',
-            'content_object__unit__vocabulary_terms'
         )[:batch_size]
         
         if not embeddings:
