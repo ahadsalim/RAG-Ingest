@@ -1,7 +1,7 @@
 # AI Memory - پروژه Ingest
 
 > این فایل حافظه پروژه است. قبل از هر اقدام این فایل را بخوانید.
-> آخرین به‌روزرسانی: 2025-12-14 (بهبود فرم‌های Admin)
+> آخرین به‌روزرسانی: 2025-12-14 (بهبود جستجوی والد + حل مشکل حذف LUnit)
 
 ---
 
@@ -98,6 +98,48 @@ CHUNK_OVERLAP=80
 
 ## 🛠️ تغییرات انجام‌شده (تاریخچه)
 
+### 2025-12-14: حل مشکل حذف LUnit و بهبود جستجوی والد
+
+#### مشکل حذف LUnit
+- ❌ **مشکل**: هنگام حذف LUnit از صفحه ویرایش، خطا می‌داد: "دسترسی لازم برای حذف Sync Log"
+- ✅ **علت**: Django برای نمایش related objects در صفحه delete confirmation، permission نمایش آنها را چک می‌کند
+- ✅ **راه‌حل**: Override کردن `get_deleted_objects` در `LUnitAdmin` برای bypass کردن permission check
+- ✅ **فایل**: `/srv/ingest/apps/documents/admin_lunit.py`
+
+```python
+def get_deleted_objects(self, objs, request):
+    """Override برای bypass کردن permission check در delete confirmation."""
+    collector = NestedObjects(using=router.db_for_write(self.model))
+    collector.collect(objs)
+    # ... بدون چک permission
+    return to_delete, model_count, set(), protected
+```
+
+#### Auto-grant Permission برای SyncLog
+- ✅ Signal در `embeddings/signals.py` برای auto-grant `delete_synclog` به کاربران با `change_lunit` یا `change_legalunit`
+- ✅ Management command: `python manage.py grant_synclog_delete_permission`
+
+#### بهبود جستجوی والد (Parent Search)
+- ❌ **مشکل قبلی**: برای پیدا کردن "تبصره 3 ماده 47" باید تایپ می‌کردید "تبصره 3" و لیست خیلی طولانی می‌شد
+- ✅ **راه‌حل**: پشتیبانی از جستجوی ترکیبی در `search_parents_view`
+- ✅ **مثال‌ها**:
+  - `ماده 47` → همه ماده 47 ها
+  - `تبصره 3 ماده 47` → فقط تبصره 3 های زیر ماده 47 ✅
+  - `بند 2 تبصره 3 ماده 47` → فقط بند 2 های زیر تبصره 3 ماده 47 ✅
+  - ترتیب مهم نیست: `ماده 47 تبصره 3` هم کار می‌کند
+
+```python
+# جستجو در path_label برای ترکیب چند نوع واحد
+q_filters = Q(path_label__icontains='تبصره 3') & Q(path_label__icontains='ماده 47')
+```
+
+### 2025-12-14: اصلاح FileAsset Admin
+- ✅ فیلد "جزء سند حقوقی" (`legal_unit`) از فرم حذف شد
+- ✅ بخش "اطلاعات سیستم (نمایش)" کاملاً حذف شد
+- ✅ فیلد توضیحات بزرگتر شد (Textarea با 4 سطر)
+- ✅ لینک دانلود فایل (`file_link`) به لیست و فرم اضافه شد
+- ✅ فقط فیلدهای: فایل، لینک دانلود، انتشار سند، توضیحات نمایش داده می‌شوند
+
 ### 2025-12-14: پاکسازی کد
 - ✅ مدل embedding به `multilingual-e5-large` استاندارد شد
 - ✅ فایل‌های deprecated حذف شدند:
@@ -158,11 +200,13 @@ CHUNK_OVERLAP=80
 | `/srv/ingest/apps/documents/models.py` | مدل‌های اصلی |
 | `/srv/ingest/apps/documents/admin.py` | پنل ادمین اصلی |
 | `/srv/ingest/apps/documents/admin_document.py` | فرم یکپارچه سند حقوقی |
-| `/srv/ingest/apps/documents/admin_lunit.py` | ادمین بندهای حقوقی |
+| `/srv/ingest/apps/documents/admin_lunit.py` | ادمین بندهای حقوقی (شامل `get_deleted_objects` و `search_parents_view`) |
 | `/srv/ingest/apps/documents/forms.py` | فرم‌های ادمین |
 | `/srv/ingest/apps/documents/enums.py` | انواع داده (UnitType, DocumentType, ...) |
 | `/srv/ingest/apps/embeddings/tasks.py` | تسک‌های Celery |
+| `/srv/ingest/apps/embeddings/signals.py` | سیگنال‌های embedding (شامل auto-grant permission) |
 | `/srv/ingest/apps/documents/signals_unified.py` | سیگنال‌های یکپارچه |
+| `/srv/ingest/apps/documents/management/commands/grant_synclog_delete_permission.py` | دادن permission حذف SyncLog |
 | `/srv/ingest/core/text_processing.py` | پردازش متن |
 | `/srv/ingest/static/admin/css/legalunit-changes.css` | استایل‌های سفارشی ادمین |
 | `/srv/ingest/templates/admin/documents/legalunit_manifestation_list.html` | صفحه انتخاب سند برای LUnit |
@@ -188,7 +232,8 @@ CHUNK_OVERLAP=80
 
 | مشکل | وضعیت |
 |------|-------|
-| حذف والد از LegalUnit در ادمین | در حال بررسی |
+| حذف LUnit از صفحه ویرایش | ✅ حل شد (override `get_deleted_objects`) |
+| جستجوی والد با ترکیب چند نوع واحد | ✅ حل شد (جستجوی ترکیبی) |
 
 ---
 
@@ -197,3 +242,67 @@ CHUNK_OVERLAP=80
 - کاربر فارسی‌زبان است
 - ترجیح می‌دهد توضیحات به فارسی باشد
 - می‌خواهد کد تمیز و بدون bloat باشد
+
+---
+
+## 🔐 اطلاعات MinIO (Object Storage)
+
+### Web Console
+| پارامتر | مقدار |
+|---------|-------|
+| URL | `http://127.0.0.1:9001` |
+| Username | `eH01EjH7zdlIHEzlJ9Sb` |
+| Password | `5mswuxXYnZtNHSWhEDw8WUe51ztiOTlRCQa40r7i` |
+
+### S3-Compatible API
+| پارامتر | مقدار |
+|---------|-------|
+| Endpoint (خارج Docker) | `http://127.0.0.1:9000` |
+| Endpoint (داخل Docker) | `http://minio:9000` |
+| Access Key | `eH01EjH7zdlIHEzlJ9Sb` |
+| Secret Key | `5mswuxXYnZtNHSWhEDw8WUe51ztiOTlRCQa40r7i` |
+| Bucket | `advisor-docs` |
+| Region | `us-east-1` |
+| SSL | `false` |
+
+### نمونه کد Python (boto3)
+```python
+import boto3
+
+s3 = boto3.client(
+    's3',
+    endpoint_url='http://127.0.0.1:9000',
+    aws_access_key_id='eH01EjH7zdlIHEzlJ9Sb',
+    aws_secret_access_key='5mswuxXYnZtNHSWhEDw8WUe51ztiOTlRCQa40r7i',
+    region_name='us-east-1'
+)
+
+# آپلود
+s3.upload_file('local.pdf', 'advisor-docs', 'documents/file.pdf')
+
+# دانلود
+s3.download_file('advisor-docs', 'documents/file.pdf', 'downloaded.pdf')
+
+# Presigned URL (1 ساعت)
+url = s3.generate_presigned_url('get_object', Params={'Bucket': 'advisor-docs', 'Key': 'path/file.pdf'}, ExpiresIn=3600)
+```
+
+---
+
+## 🔄 نکته مهم: کپی فایل به Container
+
+فایل‌های Python داخل container جدا از host هستند. بعد از هر تغییر:
+
+```bash
+# کپی فایل به container
+docker compose -f deployment/docker-compose.ingest.yml cp <local_path> web:/app/<container_path>
+
+# restart سرور
+docker compose -f deployment/docker-compose.ingest.yml restart web
+```
+
+مثال:
+```bash
+docker compose -f deployment/docker-compose.ingest.yml cp ingest/apps/documents/admin.py web:/app/ingest/apps/documents/admin.py
+docker compose -f deployment/docker-compose.ingest.yml restart web
+```
