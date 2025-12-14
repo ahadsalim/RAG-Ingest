@@ -14,7 +14,7 @@ from ingest.core.admin_mixins import JalaliAdminMixin as SimpleJalaliAdminMixin
 from .models import (
     InstrumentWork, InstrumentExpression, InstrumentManifestation,
     LegalUnit, LUnit, LegalUnitChange, LegalUnitVocabularyTerm, InstrumentRelation, PinpointCitation,
-    FileAsset, Chunk, IngestLog, QAEntry
+    FileAsset, Chunk, IngestLog, QAEntry, TextEntry, TextEntryVocabularyTerm
 )
 from .forms import (
     InstrumentExpressionForm, InstrumentManifestationForm, InstrumentRelationForm, LegalUnitForm, FileAssetForm
@@ -1083,34 +1083,37 @@ def reject_qa_entries(modeladmin, request, queryset):
     modeladmin.message_user(request, f'{queryset.count()} ورودی رد شد.')
 
 
+class QAEntryTagsInline(admin.TabularInline):
+    """Inline برای تگ‌های QAEntry با autocomplete."""
+    model = QAEntry.tags.through
+    extra = 1
+    autocomplete_fields = ['vocabularyterm']
+    verbose_name = 'برچسب'
+    verbose_name_plural = 'برچسب‌ها'
+
+
 class QAEntryAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
     list_display = (
-        'id', 'short_question', 'status', 'created_by', 
-        'approved_by', 'jalali_created_at_display', 'jalali_approved_at_display'
+        'id', 'short_question', 'created_by', 
+        'jalali_created_at_display', 'jalali_updated_at_display'
     )
-    list_filter = ('status', 'tags', 'created_at', 'approved_at')
+    list_filter = ('tags', 'created_at')
     search_fields = ('question', 'answer', 'canonical_question')
-    readonly_fields = ('created_by_display', 'jalali_created_at_display', 'jalali_approved_at_display')
-    actions = [approve_qa_entries, reject_qa_entries]
+    readonly_fields = ('created_by_display', 'jalali_created_at_display', 'jalali_updated_at_display')
+    filter_horizontal = ('tags',)
     
     fieldsets = (
         ('محتوای پرسش و پاسخ', {
             'fields': ('question', 'answer')
         }),
-        ('وضعیت و تأیید', {
-            'fields': ('status', 'approved_by', 'jalali_approved_at_display')
-        }),
-        ('منابع و ارجاعات', {
-            'fields': ('source_work', 'source_unit', 'tags'),
-            'classes': ('collapse',)
+        ('برچسب‌ها', {
+            'fields': ('tags',),
         }),
         ('اطلاعات سیستم', {
-            'fields': ('created_by_display', 'jalali_created_at_display'),
+            'fields': ('created_by_display', 'jalali_created_at_display', 'jalali_updated_at_display'),
             'classes': ('collapse',)
         }),
     )
-    
-    filter_horizontal = ('tags',)
     
     def created_by_display(self, obj):
         """نمایش ایجادکننده یا کاربر جاری برای ورودی جدید"""
@@ -1121,37 +1124,19 @@ class QAEntryAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
         return "کاربر جاری"
     created_by_display.short_description = "ایجادکننده"
     
-    def jalali_approved_at_display(self, obj):
-        """Display approved_at in Jalali format."""
-        if obj.approved_at:
+    def jalali_updated_at_display(self, obj):
+        """Display updated_at in Jalali format."""
+        if obj.updated_at:
             from ingest.core.jalali import to_jalali_datetime
-            return to_jalali_datetime(obj.approved_at)
+            return to_jalali_datetime(obj.updated_at)
         return '-'
-    jalali_approved_at_display.short_description = 'زمان تأیید (شمسی)'
-    jalali_approved_at_display.admin_order_field = 'approved_at'
+    jalali_updated_at_display.short_description = 'زمان ویرایش (شمسی)'
+    jalali_updated_at_display.admin_order_field = 'updated_at'
     
     def get_form(self, request, obj=None, **kwargs):
         # ذخیره request برای استفاده در created_by_display
         self._current_request = request
         return super().get_form(request, obj, **kwargs)
-    
-    def get_readonly_fields(self, request, obj=None):
-        """Make different fields readonly based on create/edit mode."""
-        readonly = list(self.readonly_fields)
-        
-        if obj:  # Editing existing object
-            # In edit mode, only approved_by can be changed (for moderation)
-            # All other fields including created_by should be readonly
-            readonly.extend(['question', 'answer', 'source_work', 'source_unit'])
-            # Remove approved_by from readonly if user has permission to moderate
-            if request.user.has_perm('documents.change_qaentry'):
-                # approved_by can be changed for moderation
-                pass
-        else:  # Creating new object
-            # In create mode, created_by is automatically set and readonly
-            pass
-            
-        return readonly
     
     def save_model(self, request, obj, form, change):
         """Set created_by when creating new QA entry."""
@@ -1162,11 +1147,168 @@ class QAEntryAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
     def get_queryset(self, request):
         """Optimize queryset with select_related."""
         return super().get_queryset(request).select_related(
-            'created_by', 'approved_by', 'source_work', 'source_unit'
+            'created_by'
         ).prefetch_related('tags')
 
 
 # IngestLogRAG moved to embeddings/admin.py to group with EmbeddingProxy
+
+
+# ============================================================================
+# TextEntry Admin - متون
+# ============================================================================
+
+class TextEntryVocabularyTermInline(admin.TabularInline):
+    """Inline برای تگ‌های TextEntry با autocomplete."""
+    model = TextEntryVocabularyTerm
+    extra = 1
+    fields = ('vocabulary_term', 'weight')
+    autocomplete_fields = ['vocabulary_term']
+    verbose_name = 'برچسب'
+    verbose_name_plural = 'برچسب‌ها'
+
+
+class TextEntryAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
+    """Admin برای متون با قابلیت آپلود فایل و ارتباط با بندها."""
+    
+    list_display = (
+        'title', 'content_preview', 'file_info', 'tags_display',
+        'created_by', 'jalali_created_at_display', 'jalali_updated_at_display'
+    )
+    list_filter = ('created_at', 'vocabulary_terms')
+    search_fields = ('title', 'content')
+    readonly_fields = ('jalali_created_at_display', 'jalali_updated_at_display', 'original_filename', 'content_extracted')
+    filter_horizontal = ('related_units',)
+    inlines = [TextEntryVocabularyTermInline]
+    
+    fieldsets = (
+        ('محتوا', {
+            'fields': ('title', 'content', 'source_file', 'original_filename')
+        }),
+        ('بندهای مرتبط', {
+            'fields': ('related_units',),
+            'description': 'بندهای قانونی مرتبط با این متن را انتخاب کنید'
+        }),
+        ('اطلاعات سیستم', {
+            'fields': ('jalali_created_at_display', 'jalali_updated_at_display'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def content_preview(self, obj):
+        """نمایش پیش‌نمایش محتوا."""
+        if obj.content:
+            preview = obj.content[:100]
+            if len(obj.content) > 100:
+                preview += '...'
+            return preview
+        return '-'
+    content_preview.short_description = 'پیش‌نمایش محتوا'
+    
+    def file_info(self, obj):
+        """نمایش اطلاعات فایل."""
+        if obj.source_file:
+            return format_html(
+                '<a href="{}" target="_blank">{}</a>',
+                obj.source_file.url,
+                obj.original_filename or 'دانلود'
+            )
+        return '-'
+    file_info.short_description = 'فایل'
+    
+    def tags_display(self, obj):
+        """نمایش تگ‌ها."""
+        tags = obj.vocabulary_terms.all()[:3]
+        if tags:
+            tag_names = [t.term for t in tags]
+            result = ', '.join(tag_names)
+            if obj.vocabulary_terms.count() > 3:
+                result += f' (+{obj.vocabulary_terms.count() - 3})'
+            return result
+        return '-'
+    tags_display.short_description = 'برچسب‌ها'
+    
+    def jalali_updated_at_display(self, obj):
+        """Display updated_at in Jalali format."""
+        if obj.updated_at:
+            from ingest.core.jalali import to_jalali_datetime
+            return to_jalali_datetime(obj.updated_at)
+        return '-'
+    jalali_updated_at_display.short_description = 'زمان ویرایش (شمسی)'
+    jalali_updated_at_display.admin_order_field = 'updated_at'
+    
+    def content_extracted(self, obj):
+        """نمایش وضعیت استخراج محتوا."""
+        if obj.source_file and obj.content:
+            return '✅ استخراج شده'
+        elif obj.source_file:
+            return '⏳ در انتظار استخراج'
+        return '-'
+    content_extracted.short_description = 'وضعیت استخراج'
+    
+    def save_model(self, request, obj, form, change):
+        """Set created_by when creating new entry."""
+        if not change:
+            obj.created_by = request.user
+        
+        # اگر فایل آپلود شده و محتوا خالی است، استخراج کن
+        if obj.source_file and not obj.content:
+            obj.extract_content_from_file()
+        
+        super().save_model(request, obj, form, change)
+    
+    def get_urls(self):
+        """اضافه کردن URL برای AJAX search بندها."""
+        from django.urls import path
+        urls = super().get_urls()
+        custom_urls = [
+            path('search-units/', self.admin_site.admin_view(self.search_units_view), name='textentry_search_units'),
+        ]
+        return custom_urls + urls
+    
+    def search_units_view(self, request):
+        """AJAX endpoint برای جستجوی بندها."""
+        from django.http import JsonResponse
+        
+        query = request.GET.get('q', '').strip()
+        if not query or len(query) < 2:
+            return JsonResponse({'results': []})
+        
+        # جستجو در عنوان، شماره و path_label
+        units = LegalUnit.objects.filter(
+            models.Q(content__icontains=query) |
+            models.Q(number__icontains=query) |
+            models.Q(path_label__icontains=query) |
+            models.Q(manifestation__expr__work__title_official__icontains=query)
+        ).select_related(
+            'manifestation__expr__work'
+        )[:20]
+        
+        results = []
+        for unit in units:
+            work_title = ''
+            if unit.manifestation and unit.manifestation.expr and unit.manifestation.expr.work:
+                work_title = unit.manifestation.expr.work.title_official
+            
+            label = f"{work_title} - {unit.get_unit_type_display()}"
+            if unit.number:
+                label += f" {unit.number}"
+            if unit.path_label:
+                label += f" ({unit.path_label})"
+            
+            results.append({
+                'id': str(unit.id),
+                'text': label
+            })
+        
+        return JsonResponse({'results': results})
+    
+    def get_queryset(self, request):
+        """Optimize queryset."""
+        return super().get_queryset(request).select_related(
+            'created_by'
+        ).prefetch_related('vocabulary_terms', 'related_units')
+
 
 # ============================================================================
 # ثبت مدل‌ها در admin - ترتیب مهم است!
@@ -1179,7 +1321,10 @@ admin_site.register(LUnit, LUnitAdmin)
 # 2. پرسش و پاسخ - دوم
 admin_site.register(QAEntry, QAEntryAdmin)
 
-# 3. سایر مدل‌های مدیریت اسناد
+# 3. متون - سوم
+admin_site.register(TextEntry, TextEntryAdmin)
+
+# 4. سایر مدل‌های مدیریت اسناد
 admin_site.register(PinpointCitation, PinpointCitationAdmin)
 admin_site.register(FileAsset, FileAssetAdmin)
 admin_site.register(Chunk, ChunkAdminRegistered)

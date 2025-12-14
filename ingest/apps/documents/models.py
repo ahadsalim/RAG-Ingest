@@ -967,3 +967,192 @@ class QAEntry(BaseModel):
         normalized_answer = prepare_for_embedding(self.answer) if self.answer else ""
         
         return f"Q: {normalized_question}\nA: {normalized_answer}"
+
+
+class TextEntry(BaseModel):
+    """
+    متون آزاد برای ذخیره محتوای متنی با قابلیت استخراج از فایل.
+    مشابه QAEntry اما با عنوان و متن بزرگ یا فایل.
+    """
+    
+    # عنوان یک خطی
+    title = models.CharField(
+        max_length=500,
+        verbose_name='عنوان'
+    )
+    
+    # محتوای متنی (می‌تواند مستقیم وارد شود یا از فایل استخراج شود)
+    content = models.TextField(
+        blank=True,
+        verbose_name='محتوا',
+        help_text='متن را مستقیم وارد کنید یا فایل آپلود کنید'
+    )
+    
+    # فایل متنی (اختیاری)
+    source_file = models.FileField(
+        upload_to='text_entries/%Y/%m/',
+        blank=True,
+        null=True,
+        verbose_name='فایل منبع',
+        help_text='فرمت‌های مجاز: md, txt, xml, html, htm, doc, docx'
+    )
+    
+    # نام فایل اصلی
+    original_filename = models.CharField(
+        max_length=255,
+        blank=True,
+        verbose_name='نام فایل اصلی'
+    )
+    
+    # Tags for categorization (مانند LegalUnit)
+    vocabulary_terms = models.ManyToManyField(
+        'masterdata.VocabularyTerm',
+        through='TextEntryVocabularyTerm',
+        blank=True,
+        related_name='text_entries',
+        verbose_name='برچسب‌ها'
+    )
+    
+    # ارتباط با LegalUnit ها (چند به چند)
+    related_units = models.ManyToManyField(
+        'LegalUnit',
+        blank=True,
+        related_name='related_text_entries',
+        verbose_name='بندهای مرتبط'
+    )
+    
+    # ایجادکننده
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='created_text_entries',
+        verbose_name='ایجادکننده'
+    )
+    
+    # Generic relation for embeddings
+    embeddings = GenericRelation('embeddings.Embedding')
+    
+    # History tracking
+    history = HistoricalRecords()
+    
+    class Meta:
+        verbose_name = 'متن'
+        verbose_name_plural = 'متون'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['title']),
+            models.Index(fields=['created_at']),
+        ]
+    
+    def __str__(self):
+        title_preview = self.title[:50] + "..." if len(self.title) > 50 else self.title
+        return title_preview
+    
+    def save(self, *args, **kwargs):
+        """Override save to extract content from file if uploaded."""
+        # اگر فایل جدید آپلود شده، محتوا را استخراج کن
+        if self.source_file and not self.content:
+            self.extract_content_from_file()
+        
+        super().save(*args, **kwargs)
+    
+    def extract_content_from_file(self):
+        """استخراج محتوا از فایل آپلود شده."""
+        if not self.source_file:
+            return
+        
+        filename = self.source_file.name.lower()
+        self.original_filename = self.source_file.name.split('/')[-1]
+        
+        try:
+            if filename.endswith(('.txt', '.md')):
+                # فایل‌های متنی ساده
+                self.content = self.source_file.read().decode('utf-8')
+            
+            elif filename.endswith(('.html', '.htm')):
+                # فایل‌های HTML
+                from bs4 import BeautifulSoup
+                html_content = self.source_file.read().decode('utf-8')
+                soup = BeautifulSoup(html_content, 'html.parser')
+                # حذف script و style
+                for tag in soup(['script', 'style']):
+                    tag.decompose()
+                self.content = soup.get_text(separator='\n', strip=True)
+            
+            elif filename.endswith('.xml'):
+                # فایل‌های XML
+                from bs4 import BeautifulSoup
+                xml_content = self.source_file.read().decode('utf-8')
+                soup = BeautifulSoup(xml_content, 'xml')
+                self.content = soup.get_text(separator='\n', strip=True)
+            
+            elif filename.endswith('.docx'):
+                # فایل‌های Word (docx)
+                import docx
+                doc = docx.Document(self.source_file)
+                paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
+                self.content = '\n\n'.join(paragraphs)
+            
+            elif filename.endswith('.doc'):
+                # فایل‌های Word قدیمی - نیاز به antiword یا تبدیل
+                # فعلاً پیام خطا
+                self.content = "[خطا: فرمت .doc پشتیبانی نمی‌شود. لطفاً به .docx تبدیل کنید]"
+            
+        except Exception as e:
+            self.content = f"[خطا در استخراج محتوا: {str(e)}]"
+    
+    @property
+    def embedding_text(self):
+        """Generate normalized text for embedding generation."""
+        from ingest.core.text_processing import prepare_for_embedding
+        
+        normalized_title = prepare_for_embedding(self.title) if self.title else ""
+        normalized_content = prepare_for_embedding(self.content) if self.content else ""
+        
+        return f"{normalized_title}\n\n{normalized_content}"
+    
+    @property
+    def related_units_info(self):
+        """اطلاعات بندهای مرتبط برای metadata."""
+        units_info = []
+        for unit in self.related_units.all():
+            info = {
+                'unit_id': str(unit.id),
+                'path_label': unit.path_label or '',
+                'unit_type': unit.unit_type,
+                'number': unit.number or '',
+            }
+            if unit.manifestation and unit.manifestation.expr and unit.manifestation.expr.work:
+                info['work_title'] = unit.manifestation.expr.work.title_official
+                info['work_id'] = str(unit.manifestation.expr.work.id)
+            units_info.append(info)
+        return units_info
+
+
+class TextEntryVocabularyTerm(models.Model):
+    """Through model for TextEntry vocabulary terms with weight."""
+    text_entry = models.ForeignKey(
+        TextEntry,
+        on_delete=models.CASCADE,
+        verbose_name='متن'
+    )
+    vocabulary_term = models.ForeignKey(
+        'masterdata.VocabularyTerm',
+        on_delete=models.CASCADE,
+        verbose_name='برچسب'
+    )
+    weight = models.FloatField(
+        default=1.0,
+        verbose_name='وزن',
+        help_text='وزن برچسب (1.0 = عادی)'
+    )
+    
+    class Meta:
+        verbose_name = 'برچسب متن'
+        verbose_name_plural = 'برچسب‌های متن'
+        unique_together = ['text_entry', 'vocabulary_term']
+    
+    def __str__(self):
+        return f"{self.text_entry} - {self.vocabulary_term}"
