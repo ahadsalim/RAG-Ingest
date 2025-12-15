@@ -1,17 +1,18 @@
-# 🚀 Ingest - سیستم هوشمند مدیریت اسناد حقوقی
+# 🚀 RAG-Ingest - سیستم هوشمند مدیریت اسناد حقوقی
 
 <div align="center">
 
+![Version](https://img.shields.io/badge/Version-2.0-brightgreen.svg)
 ![Python](https://img.shields.io/badge/Python-3.11-blue.svg)
-![Django](https://img.shields.io/badge/Django-5.0-green.svg)
+![Django](https://img.shields.io/badge/Django-5.1-green.svg)
 ![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-blue.svg)
-![Redis](https://img.shields.io/badge/Redis-7.2-red.svg)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16+pgvector-blue.svg)
+![Redis](https://img.shields.io/badge/Redis-7-red.svg)
 ![License](https://img.shields.io/badge/License-Private-red.svg)
 
-**پلتفرم جامع پردازش، ذخیره‌سازی و جستجوی معنایی اسناد حقوقی با قابلیت‌های AI**
+**پلتفرم جامع پردازش، Embedding و جستجوی معنایی اسناد حقوقی با RAG**
 
-[نصب سریع](#نصب-سریع) • [ویژگی‌ها](#ویژگی‌های-کلیدی) • [مستندات](#مستندات) • [API](#api) • [پشتیبانی](#پشتیبانی)
+[نصب سریع](#نصب-سریع) • [ویژگی‌ها](#ویژگیهای-کلیدی) • [معماری](#معماری-سیستم) • [مستندات](#مستندات) • [API](#api)
 
 </div>
 
@@ -31,17 +32,18 @@
 
 ## ✨ ویژگی‌های کلیدی
 
-### 🤖 هوش مصنوعی
-- **Embedding خودکار**: تولید بردارهای معنایی با Multilingual E5
-- **جستجوی معنایی**: یافتن اسناد مرتبط بر اساس مفهوم
-- **Chunking هوشمند**: تقسیم خودکار اسناد به بخش‌های معنادار
-- **پردازش چندزبانه**: پشتیبانی کامل فارسی و انگلیسی
+### 🤖 هوش مصنوعی و RAG
+- **Embedding خودکار**: تولید بردارهای معنایی با `intfloat/multilingual-e5-large` (1024 بعد)
+- **جستجوی معنایی**: Vector Search با pgvector و Qdrant
+- **Chunking هوشمند**: تقسیم خودکار با 350 توکن و 80 overlap
+- **پردازش فارسی**: استفاده از hazm برای جمله‌بندی
+- **همگام‌سازی Core**: ارسال خودکار به سیستم مرکزی RAG
 
 ### 📄 مدیریت اسناد
-- **پشتیبانی فرمت‌ها**: PDF, DOCX, TXT, HTML
-- **متادیتا FRBR**: استاندارد بین‌المللی توصیف اسناد
-- **نسخه‌بندی**: تاریخچه کامل تغییرات
-- **دسته‌بندی خودکار**: بر اساس نوع و موضوع
+- **ساختار FRBR**: Work → Expression → Manifestation → LegalUnit
+- **انواع محتوا**: LegalUnit (بندهای قانونی)، QAEntry (پرسش و پاسخ)، TextEntry (متون)
+- **نسخه‌بندی**: تاریخچه کامل با django-simple-history
+- **درخت سلسله‌مراتبی**: MPTT برای ساختار قوانین (باب، فصل، ماده، تبصره)
 
 ### 🔐 امنیت و کارایی
 - **رمزنگاری End-to-End**: حفاظت از داده‌ها
@@ -92,24 +94,30 @@ cd deployment
 
 ```
 /srv/
-├── 📱 ingest/              # کد اصلی Django
-│   ├── apps/               # اپلیکیشن‌های دامنه
-│   │   ├── documents/      # مدیریت اسناد
-│   │   ├── embeddings/     # سیستم AI/ML
-│   │   ├── accounts/       # احراز هویت
-│   │   └── masterdata/     # داده‌های مرجع
-│   ├── api/                # REST API endpoints
-│   ├── core/               # هسته سیستم
-│   ├── settings/           # تنظیمات محیط‌ها
-│   └── templates/          # قالب‌های UI
-├── 🚀 deployment/          # اسکریپت‌های استقرار
-│   ├── docker-compose.*.yml
-│   ├── backup_manager.sh
-│   └── start.sh
-├── 📚 Documentation/       # مستندات کامل
-├── 🧪 Tests/              # تست‌های سیستم
-├── 🔧 scripts/            # ابزارهای کمکی
-└── 📊 .github/workflows/  # CI/CD pipelines
+├── 📱 ingest/                    # کد اصلی Django
+│   ├── apps/
+│   │   ├── documents/            # مدیریت اسناد و بندها
+│   │   │   ├── models.py         # LegalUnit, QAEntry, TextEntry, Chunk
+│   │   │   ├── admin.py          # تنظیمات Admin
+│   │   │   ├── admin_lunit.py    # LUnit Admin (بهینه‌شده)
+│   │   │   ├── signals_unified.py # سیگنال‌های Chunking
+│   │   │   └── processing/       # سرویس Chunking
+│   │   ├── embeddings/           # سیستم Embedding
+│   │   │   ├── models.py         # Embedding, CoreConfig
+│   │   │   ├── admin.py          # گزارشات
+│   │   │   └── tasks.py          # Celery Tasks
+│   │   ├── accounts/             # احراز هویت
+│   │   └── masterdata/           # VocabularyTerm, Tags
+│   ├── core/
+│   │   ├── sync/                 # همگام‌سازی با Core
+│   │   └── text_processing.py    # پردازش متن فارسی
+│   └── settings/
+├── 🚀 deployment/
+│   └── docker-compose.ingest.yml
+├── 📚 documents/                 # مستندات پروژه
+│   ├── PROJECT_DOCUMENTATION.md  # مستندات جامع
+│   └── AI_MEMORY.md              # حافظه AI
+└── .env                          # تنظیمات محیطی
 ```
 
 ---
@@ -318,21 +326,27 @@ docker exec deployment-web-1 python manage.py process_embeddings
 
 ## 📚 مستندات
 
-### 📖 مستندات کامل
-مستندات جامع پروژه در پوشه `Documentation/` قرار دارد:
+### 📖 مستندات اصلی
+مستندات جامع پروژه در پوشه `documents/` قرار دارد:
 
-- **[MASTER_GUIDE.md](Documentation/MASTER_GUIDE.md)** - راهنمای جامع سیستم
-- **[EMBEDDING_SYSTEM_COMPLETE.md](Documentation/EMBEDDING_SYSTEM_COMPLETE.md)** - جزئیات سیستم AI
-- **[Backup_Restore_Guide.md](Documentation/Backup_Restore_Guide.md)** - راهنمای Backup
+- **[PROJECT_DOCUMENTATION.md](documents/PROJECT_DOCUMENTATION.md)** - مستندات جامع سیستم
+- **[AI_MEMORY.md](documents/AI_MEMORY.md)** - حافظه AI و نکات مهم
 
-### 🧪 تست‌ها
+### 🔧 دستورات مفید
 ```bash
-# اجرای همه تست‌ها
-cd /srv/Tests
-for test in *.py; do
-    docker cp "$test" deployment-web-1:/app/
-    docker exec deployment-web-1 python3 "/app/$test"
-done
+# وضعیت سرویس‌ها
+docker ps
+
+# لاگ‌ها
+docker logs deployment-web-1 -f
+docker logs deployment-worker-1 -f
+
+# Django Shell
+docker exec -it deployment-web-1 python manage.py shell
+
+# کپی فایل به container
+docker cp /srv/ingest/apps/documents/admin.py deployment-web-1:/app/ingest/apps/documents/admin.py
+docker compose -f docker-compose.ingest.yml restart web worker
 ```
 
 ---
