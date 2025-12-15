@@ -133,8 +133,8 @@ class UserProfile(models.Model):
     """Extended user profile with mobile number for OTP authentication."""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.OneToOneField('auth.User', on_delete=models.CASCADE, related_name='profile')
-    mobile = models.CharField(max_length=15, unique=True, verbose_name='شماره موبایل')
-    bale_chat_id = models.CharField(max_length=50, blank=True, null=True, verbose_name='شناسه چت بله')
+    mobile = models.CharField(max_length=15, unique=True, verbose_name='شماره موبایل',
+                              help_text='شماره موبایل باید در پیام‌رسان بله ثبت‌نام شده باشد')
     is_mobile_verified = models.BooleanField(default=False, verbose_name='موبایل تایید شده')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

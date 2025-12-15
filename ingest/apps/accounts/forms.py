@@ -73,16 +73,11 @@ class UserProfileForm(forms.ModelForm):
     
     class Meta:
         model = UserProfile
-        fields = ['mobile', 'bale_chat_id']
+        fields = ['mobile']
         widgets = {
             'mobile': forms.TextInput(attrs={
                 'class': 'form-control',
                 'placeholder': '09123456789',
-                'dir': 'ltr'
-            }),
-            'bale_chat_id': forms.TextInput(attrs={
-                'class': 'form-control',
-                'placeholder': 'شناسه چت بله',
                 'dir': 'ltr'
             })
         }
@@ -95,18 +90,10 @@ class UserWithProfileForm(forms.ModelForm):
         min_length=11,
         label='شماره موبایل',
         validators=[mobile_validator],
+        help_text='شماره موبایل باید در پیام‌رسان بله ثبت‌نام شده باشد',
         widget=forms.TextInput(attrs={
             'class': 'form-control',
             'placeholder': '09123456789',
-            'dir': 'ltr'
-        })
-    )
-    bale_chat_id = forms.CharField(
-        max_length=50,
-        label='شناسه چت بله',
-        required=False,
-        widget=forms.TextInput(attrs={
-            'class': 'form-control',
             'dir': 'ltr'
         })
     )
@@ -122,7 +109,6 @@ class UserWithProfileForm(forms.ModelForm):
                 user=user,
                 defaults={
                     'mobile': self.cleaned_data['mobile'],
-                    'bale_chat_id': self.cleaned_data.get('bale_chat_id', ''),
                     'is_mobile_verified': True
                 }
             )

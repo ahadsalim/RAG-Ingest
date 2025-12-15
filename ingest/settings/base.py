@@ -368,6 +368,11 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = 50 * 1024 * 1024  # 50MB
 # Embedding Settings
 EMBEDDINGS_ENABLED = os.getenv('EMBEDDINGS_ENABLED', 'true').lower() == 'true'
 
+# Bale Messenger OTP Authentication (Safir API)
+BALE_API_URL = os.getenv('BALE_API_URL', 'https://safir.bale.ai/api/v2')
+BALE_CLIENT_ID = os.getenv('BALE_CLIENT_ID', '')
+BALE_CLIENT_SECRET = os.getenv('BALE_CLIENT_SECRET', '')
+
 # Jalali Date Settings
 JALALI_DATE_DEFAULTS = {
     "STATIC_HOST": "/static/",

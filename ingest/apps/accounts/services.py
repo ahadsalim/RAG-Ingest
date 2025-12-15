@@ -1,91 +1,191 @@
 """
 Bale Messenger OTP Service
-Sends OTP codes via Bale messenger bot API
+Sends OTP codes via Bale Safir API (https://safir.bale.ai)
 """
 import logging
 import requests
 from django.conf import settings
+from django.core.cache import cache
 
 logger = logging.getLogger(__name__)
 
 
 class BaleMessengerService:
-    """Service for sending OTP codes via Bale messenger."""
+    """
+    Service for sending OTP codes via Bale Safir API.
     
-    BASE_URL = "https://tapi.bale.ai/bot"
+    API Documentation: https://safir.bale.ai
+    
+    Required settings:
+        BALE_API_URL: Base URL for Safir API (default: https://safir.bale.ai/api/v2)
+        BALE_CLIENT_ID: OAuth2 client ID
+        BALE_CLIENT_SECRET: OAuth2 client secret
+    """
+    
+    TOKEN_CACHE_KEY = 'bale_access_token'
+    TOKEN_CACHE_TIMEOUT = 3500  # ~58 minutes (tokens usually valid for 1 hour)
     
     def __init__(self):
-        self.token = getattr(settings, 'BALE_BOT_TOKEN', None)
-        if not self.token:
-            logger.warning("BALE_BOT_TOKEN not configured")
+        self.api_url = getattr(settings, 'BALE_API_URL', 'https://safir.bale.ai/api/v2')
+        self.client_id = getattr(settings, 'BALE_CLIENT_ID', None)
+        self.client_secret = getattr(settings, 'BALE_CLIENT_SECRET', None)
+        
+        if not self.client_id or not self.client_secret:
+            logger.warning("Bale API credentials not configured (BALE_CLIENT_ID, BALE_CLIENT_SECRET)")
     
-    @property
-    def api_url(self):
-        return f"{self.BASE_URL}{self.token}"
-    
-    def send_message(self, chat_id: str, text: str) -> bool:
-        """Send a message to a Bale chat."""
-        if not self.token:
-            logger.error("Bale bot token not configured")
-            return False
+    def _get_access_token(self) -> str:
+        """Get OAuth2 access token from Bale Safir API."""
+        # Check cache first
+        cached_token = cache.get(self.TOKEN_CACHE_KEY)
+        if cached_token:
+            return cached_token
+        
+        if not self.client_id or not self.client_secret:
+            logger.error("Bale API credentials not configured")
+            return None
         
         try:
-            url = f"{self.api_url}/sendMessage"
+            # OAuth2 token endpoint
+            token_url = f"{self.api_url}/oauth/token"
+            
             payload = {
-                "chat_id": chat_id,
-                "text": text,
-                "parse_mode": "Markdown"
+                'grant_type': 'client_credentials',
+                'client_id': self.client_id,
+                'client_secret': self.client_secret
             }
             
-            response = requests.post(url, json=payload, timeout=10)
+            response = requests.post(token_url, data=payload, timeout=10)
             response.raise_for_status()
             
             result = response.json()
-            if result.get('ok'):
-                logger.info(f"Message sent to chat_id: {chat_id}")
-                return True
+            access_token = result.get('access_token')
+            
+            if access_token:
+                # Cache the token
+                cache.set(self.TOKEN_CACHE_KEY, access_token, self.TOKEN_CACHE_TIMEOUT)
+                logger.info("Bale access token obtained successfully")
+                return access_token
             else:
-                logger.error(f"Bale API error: {result}")
-                return False
+                logger.error(f"No access token in response: {result}")
+                return None
                 
         except requests.exceptions.RequestException as e:
-            logger.error(f"Failed to send Bale message: {e}")
-            return False
+            logger.error(f"Failed to get Bale access token: {e}")
+            return None
     
-    def send_otp(self, chat_id: str, code: str) -> bool:
-        """Send OTP code to user via Bale."""
-        message = f"""🔐 *کد تایید ورود*
-
-کد تایید شما: `{code}`
-
-⏱ این کد تا ۵ دقیقه معتبر است.
-
-⚠️ این کد را با کسی به اشتراک نگذارید."""
+    def _normalize_phone(self, mobile: str) -> str:
+        """
+        Normalize phone number to Bale format (98XXXXXXXXX).
         
-        return self.send_message(chat_id, message)
+        Input formats:
+            - 09123456789 -> 989123456789
+            - 9123456789 -> 989123456789
+            - +989123456789 -> 989123456789
+            - 989123456789 -> 989123456789
+        """
+        # Remove spaces, dashes, and plus sign
+        phone = mobile.replace(' ', '').replace('-', '').replace('+', '')
+        
+        # Remove leading zero if present
+        if phone.startswith('0'):
+            phone = phone[1:]
+        
+        # Add country code if not present
+        if not phone.startswith('98'):
+            phone = '98' + phone
+        
+        return phone
     
-    def get_updates(self, offset: int = None) -> list:
-        """Get updates from Bale bot (for receiving chat_id from users)."""
-        if not self.token:
-            return []
+    def send_otp(self, mobile: str, code: str) -> dict:
+        """
+        Send OTP code to user via Bale Safir API.
+        
+        Args:
+            mobile: User's mobile number (any format)
+            code: OTP code (3-8 digits)
+        
+        Returns:
+            dict with 'success', 'message' or 'error', and optionally 'balance'
+        """
+        access_token = self._get_access_token()
+        if not access_token:
+            return {
+                'success': False,
+                'error': 'خطا در اتصال به سرویس بله. لطفاً بعداً تلاش کنید.'
+            }
         
         try:
-            url = f"{self.api_url}/getUpdates"
-            params = {}
-            if offset:
-                params['offset'] = offset
+            url = f"{self.api_url}/send_otp"
             
-            response = requests.get(url, params=params, timeout=10)
+            headers = {
+                'Authorization': f'Bearer {access_token}',
+                'Content-Type': 'application/json'
+            }
+            
+            payload = {
+                'phone': self._normalize_phone(mobile),
+                'otp': int(code)
+            }
+            
+            response = requests.post(url, json=payload, headers=headers, timeout=10)
+            
+            # Handle specific error codes
+            if response.status_code == 400:
+                result = response.json()
+                if result.get('code') == 8:
+                    return {
+                        'success': False,
+                        'error': 'شماره موبایل نامعتبر است.'
+                    }
+                return {
+                    'success': False,
+                    'error': f"خطای درخواست: {result.get('message', 'نامشخص')}"
+                }
+            
+            elif response.status_code == 404:
+                return {
+                    'success': False,
+                    'error': 'این شماره در پیام‌رسان بله ثبت‌نام نکرده است.'
+                }
+            
+            elif response.status_code == 402:
+                logger.error("Bale OTP service: insufficient balance")
+                return {
+                    'success': False,
+                    'error': 'خطای سرویس. لطفاً با پشتیبانی تماس بگیرید.'
+                }
+            
+            elif response.status_code == 429:
+                return {
+                    'success': False,
+                    'error': 'تعداد درخواست‌ها بیش از حد مجاز است. لطفاً کمی صبر کنید.'
+                }
+            
+            elif response.status_code == 500:
+                return {
+                    'success': False,
+                    'error': 'خطای سرور بله. لطفاً بعداً تلاش کنید.'
+                }
+            
             response.raise_for_status()
             
             result = response.json()
-            if result.get('ok'):
-                return result.get('result', [])
-            return []
+            balance = result.get('balance', 0)
+            
+            logger.info(f"OTP sent to {mobile[:4]}****. Balance: {balance}")
+            
+            return {
+                'success': True,
+                'message': 'کد تایید به پیام‌رسان بله ارسال شد.',
+                'balance': balance
+            }
             
         except requests.exceptions.RequestException as e:
-            logger.error(f"Failed to get Bale updates: {e}")
-            return []
+            logger.error(f"Failed to send OTP via Bale: {e}")
+            return {
+                'success': False,
+                'error': 'خطا در ارسال کد تایید. لطفاً دوباره تلاش کنید.'
+            }
 
 
 class OTPService:
@@ -94,41 +194,33 @@ class OTPService:
     def __init__(self):
         self.bale_service = BaleMessengerService()
     
-    def send_otp(self, mobile: str, bale_chat_id: str = None) -> dict:
-        """Generate and send OTP to user."""
+    def send_otp(self, mobile: str) -> dict:
+        """Generate and send OTP to user via Bale Safir API."""
         from .models import OTPCode, UserProfile
         
         # Check if user exists with this mobile
         try:
             profile = UserProfile.objects.get(mobile=mobile)
-            chat_id = bale_chat_id or profile.bale_chat_id
         except UserProfile.DoesNotExist:
             return {
                 'success': False,
                 'error': 'شماره موبایل در سیستم ثبت نشده است.'
             }
         
-        if not chat_id:
-            return {
-                'success': False,
-                'error': 'شناسه چت بله برای این کاربر تنظیم نشده است.'
-            }
-        
         # Generate OTP
         otp = OTPCode.generate_code(mobile)
         
-        # Send via Bale
-        if self.bale_service.send_otp(chat_id, otp.code):
+        # Send via Bale Safir API (uses phone number directly, no chat_id needed)
+        result = self.bale_service.send_otp(mobile, otp.code)
+        
+        if result['success']:
             return {
                 'success': True,
-                'message': 'کد تایید به پیام‌رسان بله ارسال شد.',
+                'message': result.get('message', 'کد تایید به پیام‌رسان بله ارسال شد.'),
                 'expires_in': 300  # 5 minutes
             }
         else:
-            return {
-                'success': False,
-                'error': 'خطا در ارسال کد تایید. لطفاً دوباره تلاش کنید.'
-            }
+            return result
     
     def verify_otp(self, mobile: str, code: str) -> dict:
         """Verify OTP code and return user if valid."""

@@ -173,7 +173,8 @@ generate_credentials() {
     REDIS_PASSWORD=$(generate_password 32)
     MINIO_ACCESS_KEY=$(generate_password 20)
     MINIO_SECRET_KEY=$(generate_password 40)
-    BALE_BOT_TOKEN=""  # User must provide this
+    BALE_CLIENT_ID=""
+    BALE_CLIENT_SECRET=""
     
     print_success "رمزهای امن تولید شدند"
 }
@@ -191,24 +192,25 @@ configure_domain() {
     print_success "دامنه تنظیم شد: $DOMAIN_NAME"
 }
 
-configure_bale_bot() {
-    print_header "تنظیم ربات بله"
+configure_bale_api() {
+    print_header "تنظیم سرویس بله (Safir API)"
     
     echo ""
-    echo "برای استفاده از احراز هویت OTP، به یک ربات بله نیاز دارید."
+    echo "برای استفاده از احراز هویت OTP، به اکانت Safir بله نیاز دارید."
     echo ""
-    echo "مراحل ایجاد ربات بله:"
-    echo "  1. در بله به @BotFather پیام دهید"
-    echo "  2. دستور /newbot را ارسال کنید"
-    echo "  3. نام و username ربات را وارد کنید"
-    echo "  4. توکن دریافتی را اینجا وارد کنید"
+    echo "مراحل دریافت اطلاعات دسترسی:"
+    echo "  1. به سایت https://safir.bale.ai مراجعه کنید"
+    echo "  2. ثبت‌نام کنید و یک Application بسازید"
+    echo "  3. Client ID و Client Secret را دریافت کنید"
+    echo "  4. موجودی پیامک OTP را شارژ کنید"
     echo ""
-    read -p "توکن ربات بله (اختیاری - بعداً قابل تنظیم): " BALE_BOT_TOKEN
+    read -p "Client ID (اختیاری - بعداً قابل تنظیم): " BALE_CLIENT_ID
+    read -p "Client Secret (اختیاری - بعداً قابل تنظیم): " BALE_CLIENT_SECRET
     
-    if [ -n "$BALE_BOT_TOKEN" ]; then
-        print_success "توکن ربات بله تنظیم شد"
+    if [ -n "$BALE_CLIENT_ID" ] && [ -n "$BALE_CLIENT_SECRET" ]; then
+        print_success "اطلاعات سرویس بله تنظیم شد"
     else
-        print_warning "توکن ربات بله تنظیم نشد. بعداً در فایل .env تنظیم کنید."
+        print_warning "اطلاعات سرویس بله تنظیم نشد. بعداً در فایل .env تنظیم کنید."
     fi
 }
 
@@ -277,9 +279,11 @@ AWS_S3_REGION_NAME=us-east-1
 AWS_S3_USE_SSL=false
 
 # =============================================================================
-# Bale Messenger (OTP Authentication)
+# Bale Messenger OTP Authentication (Safir API)
 # =============================================================================
-BALE_BOT_TOKEN=${BALE_BOT_TOKEN}
+BALE_API_URL=https://safir.bale.ai/api/v2
+BALE_CLIENT_ID=${BALE_CLIENT_ID}
+BALE_CLIENT_SECRET=${BALE_CLIENT_SECRET}
 
 # =============================================================================
 # Embedding Configuration
@@ -432,9 +436,10 @@ show_credentials() {
     echo -e "    Access Key: ${GREEN}${MINIO_ACCESS_KEY}${NC}"
     echo -e "    Secret Key: ${GREEN}${MINIO_SECRET_KEY}${NC}"
     echo ""
-    if [ -n "$BALE_BOT_TOKEN" ]; then
-        echo -e "  ${CYAN}Bale Bot:${NC}"
-        echo -e "    Token: ${GREEN}${BALE_BOT_TOKEN:0:20}...${NC}"
+    if [ -n "$BALE_CLIENT_ID" ]; then
+        echo -e "  ${CYAN}Bale Safir API:${NC}"
+        echo -e "    Client ID: ${GREEN}${BALE_CLIENT_ID}${NC}"
+        echo -e "    Client Secret: ${GREEN}${BALE_CLIENT_SECRET:0:10}...${NC}"
     fi
     echo -e "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 }
@@ -517,11 +522,12 @@ show_post_install_steps() {
     echo "2. ${RED}[فوری]${NC} شماره موبایل ادمین را تنظیم کنید"
     echo "   - به بخش پروفایل‌های کاربران بروید"
     echo "   - شماره موبایل واقعی را وارد کنید"
-    echo "   - شناسه چت بله را وارد کنید"
     echo ""
-    echo "3. ${YELLOW}[مهم]${NC} ربات بله را تنظیم کنید"
-    echo "   - در بله به @BotFather پیام دهید"
-    echo "   - ربات بسازید و توکن را در .env وارد کنید"
+    echo "3. ${YELLOW}[مهم]${NC} سرویس بله (Safir API) را تنظیم کنید"
+    echo "   - به سایت https://safir.bale.ai مراجعه کنید"
+    echo "   - ثبت‌نام کنید و Application بسازید"
+    echo "   - Client ID و Client Secret را در .env وارد کنید"
+    echo "   - موجودی پیامک OTP را شارژ کنید"
     echo "   - سرویس‌ها را restart کنید"
     echo ""
     echo "4. ${YELLOW}[مهم]${NC} Nginx Proxy Manager را نصب و تنظیم کنید"
@@ -604,7 +610,7 @@ main() {
     # Configuration
     generate_credentials
     configure_domain
-    configure_bale_bot
+    configure_bale_api
     create_env_file
     setup_directories
     
@@ -644,7 +650,9 @@ MinIO:
   Access Key: ${MINIO_ACCESS_KEY}
   Secret Key: ${MINIO_SECRET_KEY}
 
-Bale Bot Token: ${BALE_BOT_TOKEN:-"تنظیم نشده"}
+Bale Safir API:
+  Client ID: ${BALE_CLIENT_ID:-"تنظیم نشده"}
+  Client Secret: ${BALE_CLIENT_SECRET:-"تنظیم نشده"}
 EOF
     chmod 600 "$creds_file"
     

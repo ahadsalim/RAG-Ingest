@@ -192,14 +192,14 @@ class UserProfileInline(admin.StackedInline):
     can_delete = False
     verbose_name = 'پروفایل'
     verbose_name_plural = 'پروفایل'
-    fields = ('mobile', 'bale_chat_id', 'is_mobile_verified')
+    fields = ('mobile', 'is_mobile_verified')
 
 
 class UserProfileAdmin(SimpleJalaliAdminMixin, admin.ModelAdmin):
     """Admin for UserProfile model."""
-    list_display = ('user', 'mobile', 'bale_chat_id', 'is_mobile_verified', 'jalali_created_at')
+    list_display = ('user', 'mobile', 'is_mobile_verified', 'jalali_created_at')
     list_filter = ('is_mobile_verified',)
-    search_fields = ('user__username', 'mobile', 'bale_chat_id')
+    search_fields = ('user__username', 'mobile')
     readonly_fields = ('id', 'jalali_created_at', 'jalali_updated_at')
     
     def jalali_created_at(self, obj):
