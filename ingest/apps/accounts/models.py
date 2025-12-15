@@ -1,7 +1,10 @@
 import uuid
+import random
+import string
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.utils import timezone
+from django.conf import settings
 
 # Proxy models for Celery Beat to group under accounts app
 try:
@@ -124,3 +127,86 @@ class UserWorkSession(models.Model):
             self.save()
             return self.total_duration
         return None
+
+
+class UserProfile(models.Model):
+    """Extended user profile with mobile number for OTP authentication."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.OneToOneField('auth.User', on_delete=models.CASCADE, related_name='profile')
+    mobile = models.CharField(max_length=15, unique=True, verbose_name='شماره موبایل')
+    bale_chat_id = models.CharField(max_length=50, blank=True, null=True, verbose_name='شناسه چت بله')
+    is_mobile_verified = models.BooleanField(default=False, verbose_name='موبایل تایید شده')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'پروفایل کاربر'
+        verbose_name_plural = 'پروفایل‌های کاربران'
+
+    def __str__(self):
+        return f"{self.user.username} - {self.mobile}"
+
+
+class OTPCode(models.Model):
+    """OTP codes for mobile authentication via Bale messenger."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    mobile = models.CharField(max_length=15, verbose_name='شماره موبایل')
+    code = models.CharField(max_length=6, verbose_name='کد تایید')
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(verbose_name='زمان انقضا')
+    is_used = models.BooleanField(default=False, verbose_name='استفاده شده')
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    attempts = models.PositiveIntegerField(default=0, verbose_name='تعداد تلاش')
+
+    class Meta:
+        verbose_name = 'کد تایید OTP'
+        verbose_name_plural = 'کدهای تایید OTP'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['mobile', 'is_used']),
+            models.Index(fields=['expires_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.mobile} - {self.code}"
+
+    @classmethod
+    def generate_code(cls, mobile, ip_address=None, expiry_minutes=5):
+        """Generate a new OTP code for the given mobile number."""
+        # Invalidate previous unused codes
+        cls.objects.filter(mobile=mobile, is_used=False).update(is_used=True)
+        
+        # Generate 6-digit code
+        code = ''.join(random.choices(string.digits, k=6))
+        
+        # Create new OTP
+        otp = cls.objects.create(
+            mobile=mobile,
+            code=code,
+            expires_at=timezone.now() + timezone.timedelta(minutes=expiry_minutes),
+            ip_address=ip_address
+        )
+        return otp
+
+    def is_valid(self):
+        """Check if OTP is still valid."""
+        return (
+            not self.is_used and 
+            self.expires_at > timezone.now() and 
+            self.attempts < 5
+        )
+
+    def verify(self, code):
+        """Verify the OTP code."""
+        self.attempts += 1
+        self.save()
+        
+        if not self.is_valid():
+            return False
+        
+        if self.code == code:
+            self.is_used = True
+            self.save()
+            return True
+        
+        return False

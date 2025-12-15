@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/Version-2.0-brightgreen.svg)
+![Version](https://img.shields.io/badge/Version-2.1-brightgreen.svg)
 ![Python](https://img.shields.io/badge/Python-3.11-blue.svg)
 ![Django](https://img.shields.io/badge/Django-5.1-green.svg)
 ![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)
@@ -45,8 +45,8 @@
 - **نسخه‌بندی**: تاریخچه کامل با django-simple-history
 - **درخت سلسله‌مراتبی**: MPTT برای ساختار قوانین (باب، فصل، ماده، تبصره)
 
-### 🔐 امنیت و کارایی
-- **رمزنگاری End-to-End**: حفاظت از داده‌ها
+### 🔐 امنیت و احراز هویت
+- **احراز هویت OTP**: ورود با شماره موبایل و کد تایید از پیام‌رسان بله
 - **احراز هویت JWT**: دسترسی امن به API
 - **Backup خودکار**: پشتیبان‌گیری روزانه
 - **مقیاس‌پذیری**: معماری Microservices
@@ -77,15 +77,15 @@ curl -fsSL https://raw.githubusercontent.com/your-org/ingest/main/install.sh | b
 ### نصب دستی
 ```bash
 # 1. Clone repository
-git clone https://github.com/your-org/ingest.git /srv/ingest
+git clone https://github.com/your-org/ingest.git /srv
 cd /srv
 
 # 2. اجرای اسکریپت نصب
 chmod +x deployment/*.sh
 cd deployment
-./start.sh
+sudo ./start.sh
 
-# 3. انتخاب محیط (Development یا Production)
+# 3. دستورات اسکریپت را دنبال کنید
 ```
 
 ---
@@ -391,20 +391,33 @@ docker compose -f docker-compose.ingest.yml restart web worker
       <a href="https://github.com/username">
         <img src="https://github.com/username.png" width="100px;" alt=""/>
         <br />
-        <sub><b>نام توسعه‌دهنده</b></sub>
+        <sub><b>نام توسعه‌دهنده</b> : احد شخص سلیم</sub>
       </a>
       <br />
-      <a href="#" title="Code">💻</a>
-      <a href="#" title="Documentation">📖</a>
+      <a href="https://github.com/ahadsalim" title="Code">💻</a>
+      <a href="https://github.com/ahadsalim" title="Documentation">📖</a>
     </td>
   </tr>
 </table>
 
 ---
 
+## 📊 آمار پروژه
+
+| معیار | مقدار |
+|-------|-------|
+| **تعداد فایل‌های کد** | 219 |
+| **تعداد فایل‌های Python** | 160 |
+| **کل خطوط کد** | ~35,800 |
+| **خطوط Python** | ~26,500 |
+| **نسخه** | 2.1 |
+| **آخرین به‌روزرسانی** | آذر ۱۴۰۳ |
+
+---
+
 ## 📄 لایسنس
 
-Copyright © 2025 Your Organization. All rights reserved.
+Copyright © 2025 Ahad Salim. All rights reserved.
 
 این پروژه تحت لایسنس اختصاصی است. استفاده، کپی، تغییر یا توزیع بدون اجازه کتبی ممنوع است.
 
@@ -412,7 +425,7 @@ Copyright © 2025 Your Organization. All rights reserved.
 
 <div align="center">
 
-**ساخته شده با ❤️ توسط تیم Ingest**
+**ساخته شده با ❤️ توسط تیم احد شخص سلیم**
 
 ⭐ **اگر این پروژه مفید بود، لطفاً ستاره دهید!**
 

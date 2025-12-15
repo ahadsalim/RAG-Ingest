@@ -5,7 +5,7 @@ from django.http import HttpResponseRedirect
 from django.urls import reverse
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
-from .models import LoginEvent, UserActivityLog, UserWorkSession
+from .models import LoginEvent, UserActivityLog, UserWorkSession, UserProfile, OTPCode
 from ingest.admin import admin_site
 from ingest.core.admin_mixins import JalaliAdminMixin as SimpleJalaliAdminMixin
 from ingest.core.jalali import to_jalali_datetime
@@ -184,3 +184,56 @@ class ReportsModel:
         app_label = 'accounts'
 
 # Celery Beat models removed - not needed in admin interface
+
+
+class UserProfileInline(admin.StackedInline):
+    """Inline for UserProfile in User admin."""
+    model = UserProfile
+    can_delete = False
+    verbose_name = 'پروفایل'
+    verbose_name_plural = 'پروفایل'
+    fields = ('mobile', 'bale_chat_id', 'is_mobile_verified')
+
+
+class UserProfileAdmin(SimpleJalaliAdminMixin, admin.ModelAdmin):
+    """Admin for UserProfile model."""
+    list_display = ('user', 'mobile', 'bale_chat_id', 'is_mobile_verified', 'jalali_created_at')
+    list_filter = ('is_mobile_verified',)
+    search_fields = ('user__username', 'mobile', 'bale_chat_id')
+    readonly_fields = ('id', 'jalali_created_at', 'jalali_updated_at')
+    
+    def jalali_created_at(self, obj):
+        return self._format_jalali_datetime(obj.created_at) if obj.created_at else '-'
+    jalali_created_at.short_description = 'تاریخ ایجاد'
+    
+    def jalali_updated_at(self, obj):
+        return self._format_jalali_datetime(obj.updated_at) if obj.updated_at else '-'
+    jalali_updated_at.short_description = 'تاریخ به‌روزرسانی'
+
+
+class OTPCodeAdmin(SimpleJalaliAdminMixin, admin.ModelAdmin):
+    """Admin for OTPCode model."""
+    list_display = ('mobile', 'code', 'jalali_created_at', 'jalali_expires_at', 'is_used', 'attempts')
+    list_filter = ('is_used', 'created_at')
+    search_fields = ('mobile', 'code')
+    readonly_fields = ('id', 'mobile', 'code', 'jalali_created_at', 'jalali_expires_at', 'is_used', 'ip_address', 'attempts')
+    ordering = ('-created_at',)
+    
+    def jalali_created_at(self, obj):
+        return self._format_jalali_datetime(obj.created_at) if obj.created_at else '-'
+    jalali_created_at.short_description = 'تاریخ ایجاد'
+    
+    def jalali_expires_at(self, obj):
+        return self._format_jalali_datetime(obj.expires_at) if obj.expires_at else '-'
+    jalali_expires_at.short_description = 'زمان انقضا'
+    
+    def has_add_permission(self, request):
+        return False
+    
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+# Register new models
+admin_site.register(UserProfile, UserProfileAdmin)
+admin_site.register(OTPCode, OTPCodeAdmin)

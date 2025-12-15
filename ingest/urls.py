@@ -14,9 +14,16 @@ from ingest.apps.documents.views import get_parent_options
 def redirect_to_admin(request):
     return redirect('/admin/')
 
+def redirect_to_otp_login(request):
+    """Redirect admin login to OTP login."""
+    return redirect('accounts:otp_login')
+
 urlpatterns = [
     path('', redirect_to_admin, name='home'),
     path('ajax/documents/parent-options/', get_parent_options, name='documents_parent_options'),
+    # OTP Authentication (before admin)
+    path('accounts/', include('ingest.apps.accounts.urls')),
+    path('admin/login/', redirect_to_otp_login, name='admin_login_redirect'),
     path('admin/', admin_site.urls),
     path('admin/embeddings/', include('ingest.apps.embeddings.urls')),
     path('admin/documents/', include('ingest.apps.documents.urls')),

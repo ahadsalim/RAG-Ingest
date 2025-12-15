@@ -1,308 +1,0 @@
-# AI Memory - پروژه Ingest
-
-> این فایل حافظه پروژه است. قبل از هر اقدام این فایل را بخوانید.
-> آخرین به‌روزرسانی: 2025-12-14 (بهبود جستجوی والد + حل مشکل حذف LUnit)
-
----
-
-## 🎯 هدف پروژه
-
-سیستم **Ingest** برای مدیریت اسناد حقوقی طراحی شده است:
-- ذخیره و مدیریت متون قانونی با ساختار سلسله‌مراتبی (FRBR)
-- چانک‌کردن متون برای پردازش AI
-- تولید embedding برای جستجوی معنایی
-- همگام‌سازی با سیستم مرکزی (Hakim)
-
----
-
-## 📦 ساختار مدل‌ها
-
-### FRBR Hierarchy
-```
-InstrumentWork (اثر) → InstrumentExpression (بیان) → InstrumentManifestation (تجلی)
-                                                              ↓
-                                                         LegalUnit (بند حقوقی)
-                                                              ↓
-                                                           Chunk (قطعه متن)
-                                                              ↓
-                                                         Embedding (بردار)
-```
-
-### مدل‌های کلیدی
-- **LegalUnit**: بندهای حقوقی با ساختار درختی (MPTT)
-- **Chunk**: قطعات متن برای embedding
-- **QAEntry**: پرسش و پاسخ
-- **Embedding**: بردارهای embedding با پشتیبانی چند مدل
-
----
-
-## ⚙️ تنظیمات مهم
-
-### Embedding
-| پارامتر | مقدار |
-|---------|-------|
-| مدل | `intfloat/multilingual-e5-large` |
-| ابعاد | `1024` |
-| Cache | `/app/models` |
-
-### Chunking
-| پارامتر | مقدار |
-|---------|-------|
-| اندازه چانک | `350` توکن |
-| همپوشانی | `80` توکن |
-| اعداد فارسی | تبدیل به انگلیسی |
-
-### Environment Variables
-```bash
-EMBEDDING_E5_MODEL_NAME=intfloat/multilingual-e5-large
-EMBEDDING_DIMENSION=1024
-EMBEDDING_PROVIDER=e5
-CHUNK_SIZE=350
-CHUNK_OVERLAP=80
-```
-
----
-
-## 🔄 همگام‌سازی با سیستم مرکزی (Core)
-
-### تنظیمات در Admin
-تنظیمات sync در `/admin/embeddings/coreconfig/` قابل مشاهده و تغییر است.
-
-### Celery Beat Tasks (زمان‌بندی خودکار)
-| Task | زمان‌بندی | توضیح |
-|------|-----------|-------|
-| `auto_sync_new_embeddings` | هر 5 دقیقه | embeddings جدید را به Core ارسال می‌کند |
-| `sync_changed_metadata` | هر 15 دقیقه | تغییرات metadata (تگ، تاریخ، ...) را sync می‌کند |
-| `cleanup_orphaned_nodes` | روزانه 2:30 | نودهای حذف‌شده را از Core پاک می‌کند |
-| `check_missing_embeddings` | هر ساعت | چک می‌کند چانک‌هایی بدون embedding نمانده باشند |
-
-### زمان رسیدن تغییرات به Core
-| سناریو | زمان |
-|--------|------|
-| ایجاد/ویرایش متن بند | حداکثر **5 دقیقه** (بعد از چانک و embedding) |
-| اضافه کردن تگ | حداکثر **15 دقیقه** |
-| تغییر تاریخ اعتبار | حداکثر **15 دقیقه** |
-
-### شرایط فعال بودن Sync
-- `CoreConfig.is_active = True`
-- `CoreConfig.auto_sync_enabled = True`
-- `core_api_url` درست تنظیم شده باشد
-- Celery Beat در حال اجرا باشد
-
-### Signals
-- سیگنال‌ها در `signals_unified.py` متمرکز شده‌اند
-- بعد از ذخیره LegalUnit/QAEntry، چانک و embedding تولید می‌شود
-- تغییر metadata باعث `metadata_hash=''` می‌شود که در sync بعدی ارسال می‌شود
-
----
-
-## 🛠️ تغییرات انجام‌شده (تاریخچه)
-
-### 2025-12-14: حل مشکل حذف LUnit و بهبود جستجوی والد
-
-#### مشکل حذف LUnit
-- ❌ **مشکل**: هنگام حذف LUnit از صفحه ویرایش، خطا می‌داد: "دسترسی لازم برای حذف Sync Log"
-- ✅ **علت**: Django برای نمایش related objects در صفحه delete confirmation، permission نمایش آنها را چک می‌کند
-- ✅ **راه‌حل**: Override کردن `get_deleted_objects` در `LUnitAdmin` برای bypass کردن permission check
-- ✅ **فایل**: `/srv/ingest/apps/documents/admin_lunit.py`
-
-```python
-def get_deleted_objects(self, objs, request):
-    """Override برای bypass کردن permission check در delete confirmation."""
-    collector = NestedObjects(using=router.db_for_write(self.model))
-    collector.collect(objs)
-    # ... بدون چک permission
-    return to_delete, model_count, set(), protected
-```
-
-#### Auto-grant Permission برای SyncLog
-- ✅ Signal در `embeddings/signals.py` برای auto-grant `delete_synclog` به کاربران با `change_lunit` یا `change_legalunit`
-- ✅ Management command: `python manage.py grant_synclog_delete_permission`
-
-#### بهبود جستجوی والد (Parent Search)
-- ❌ **مشکل قبلی**: برای پیدا کردن "تبصره 3 ماده 47" باید تایپ می‌کردید "تبصره 3" و لیست خیلی طولانی می‌شد
-- ✅ **راه‌حل**: پشتیبانی از جستجوی ترکیبی در `search_parents_view`
-- ✅ **مثال‌ها**:
-  - `ماده 47` → همه ماده 47 ها
-  - `تبصره 3 ماده 47` → فقط تبصره 3 های زیر ماده 47 ✅
-  - `بند 2 تبصره 3 ماده 47` → فقط بند 2 های زیر تبصره 3 ماده 47 ✅
-  - ترتیب مهم نیست: `ماده 47 تبصره 3` هم کار می‌کند
-
-```python
-# جستجو در path_label برای ترکیب چند نوع واحد
-q_filters = Q(path_label__icontains='تبصره 3') & Q(path_label__icontains='ماده 47')
-```
-
-### 2025-12-14: اصلاح FileAsset Admin
-- ✅ فیلد "جزء سند حقوقی" (`legal_unit`) از فرم حذف شد
-- ✅ بخش "اطلاعات سیستم (نمایش)" کاملاً حذف شد
-- ✅ فیلد توضیحات بزرگتر شد (Textarea با 4 سطر)
-- ✅ لینک دانلود فایل (`file_link`) به لیست و فرم اضافه شد
-- ✅ فقط فیلدهای: فایل، لینک دانلود، انتشار سند، توضیحات نمایش داده می‌شوند
-
-### 2025-12-14: پاکسازی کد
-- ✅ مدل embedding به `multilingual-e5-large` استاندارد شد
-- ✅ فایل‌های deprecated حذف شدند:
-  - `admin_fast.py`, `admin_optimized.py`
-  - `fields.py`, `widgets.py` (در accounts)
-  - `services.py`, `signals.py`, `signals_complete.py`
-- ✅ کد کامنت‌شده `@extend_schema` حذف شد
-- ✅ import های بلااستفاده حذف شدند
-- ✅ Provider fallback از `hakim` به `e5` اصلاح شد
-- ✅ اسکریپت‌های خالی حذف شدند
-
-### 2025-12-04: بهبود فرم‌های Admin
-#### فرم یکپارچه سند حقوقی (`admin_document.py`)
-- ✅ ایجاد فرم یکپارچه برای Work + Expression + Manifestation
-- ✅ تمام فیلدهای تاریخ به شمسی (JalaliDateField) تبدیل شدند
-- ✅ بخش "نسخه و زبان" از حالت collapse خارج شد
-- ✅ نام "روزنامه رسمی" به "محل انتشار" تغییر کرد
-- ✅ فیلدهای تاریخ در یک بخش جداگانه گروه‌بندی شدند
-- ✅ خلاصه موضوع بزرگتر شد (8 سطر، 70% عرض)
-- ✅ مرتب‌سازی پیش‌فرض بر اساس عنوان سند
-- ✅ اگر "اجرا از تاریخ" خالی باشد، "تاریخ انتشار" کپی می‌شود
-
-#### فرم بندهای حقوقی (`admin_lunit.py` و `forms.py`)
-- ✅ نوع واحد "همه متن" (FULL_TEXT) به enum اضافه شد
-- ✅ فیلد "ترتیب" از عددی به متنی تغییر کرد (migration 0013)
-- ✅ "تاریخ تصویب/اجرا" به "تاریخ ابلاغ/اجرا" تغییر کرد
-- ✅ اگر تاریخ ابلاغ خالی باشد، از `in_force_from` سند اصلی استفاده می‌شود
-- ✅ تاریخ‌ها در یک سطر با CSS flex
-- ✅ محتوا از 12 به 20 سطر افزایش یافت
-- ✅ placeholder های پیش‌فرض حذف شدند
-
-#### صفحه لیست LUnit
-- ✅ ستون "نوع سند" اضافه شد
-- ✅ صفحه انتخاب سند: ستون‌های تاریخ تصویب، نوع سند، تعداد بندها اضافه شد
-- ✅ مرتب‌سازی بر اساس عنوان سند
-
-#### ترتیب منوی Admin
-- ✅ بندهای اسناد حقوقی (LUnit) - اول
-- ✅ پرسش و پاسخ - دوم
-- ✅ اسناد حقوقی (فرم یکپارچه) - قبل از Work/Expression/Manifestation
-
-#### Migration داده‌ها
-- ✅ 3375 رکورد LegalUnit: `valid_from` از `publication_date` به `in_force_from` تغییر کرد
-- ✅ 1 رکورد InstrumentManifestation: `in_force_from` با `publication_date` پر شد
-
-### نکات فنی
-- دانلود مدل در Dockerfile غیرفعال است (حجم بالا)
-- مدل در اولین استفاده دانلود می‌شود یا دستی به `/app/models` کپی شود
-
----
-
-## 📋 فایل‌های کلیدی
-
-| فایل | توضیح |
-|------|-------|
-| `/srv/.env` | تنظیمات محیطی اصلی |
-| `/srv/ingest/settings/base.py` | تنظیمات Django |
-| `/srv/ingest/apps/documents/models.py` | مدل‌های اصلی |
-| `/srv/ingest/apps/documents/admin.py` | پنل ادمین اصلی |
-| `/srv/ingest/apps/documents/admin_document.py` | فرم یکپارچه سند حقوقی |
-| `/srv/ingest/apps/documents/admin_lunit.py` | ادمین بندهای حقوقی (شامل `get_deleted_objects` و `search_parents_view`) |
-| `/srv/ingest/apps/documents/forms.py` | فرم‌های ادمین |
-| `/srv/ingest/apps/documents/enums.py` | انواع داده (UnitType, DocumentType, ...) |
-| `/srv/ingest/apps/embeddings/tasks.py` | تسک‌های Celery |
-| `/srv/ingest/apps/embeddings/signals.py` | سیگنال‌های embedding (شامل auto-grant permission) |
-| `/srv/ingest/apps/documents/signals_unified.py` | سیگنال‌های یکپارچه |
-| `/srv/ingest/apps/documents/management/commands/grant_synclog_delete_permission.py` | دادن permission حذف SyncLog |
-| `/srv/ingest/core/text_processing.py` | پردازش متن |
-| `/srv/ingest/static/admin/css/legalunit-changes.css` | استایل‌های سفارشی ادمین |
-| `/srv/ingest/templates/admin/documents/legalunit_manifestation_list.html` | صفحه انتخاب سند برای LUnit |
-
----
-
-## ⚠️ نکات مهم برای AI
-
-1. **مدل embedding**: فقط `intfloat/multilingual-e5-large` با dimension `1024`
-2. **فایل‌های deprecated**: حذف شده‌اند، از آنها استفاده نکنید
-3. **سیگنال‌ها**: فقط از `signals_unified.py` استفاده کنید
-4. **Admin**: کلاس‌های utility در `ingest.core.admin_utils` هستند
-5. **Commit**: بعد از هر تغییر موفق، خودکار commit کنید
-6. **تاریخ شمسی**: از `JalaliDateField` و `JalaliDateWidget` استفاده کنید (در `ingest.core.forms`)
-7. **فرم یکپارچه**: برای سند حقوقی از `admin_document.py` استفاده کنید
-8. **مقادیر پیش‌فرض تاریخ**:
-   - در Document: اگر `in_force_from` خالی باشد → `publication_date`
-   - در LUnit: اگر `valid_from` خالی باشد → `manifestation.in_force_from`
-
----
-
-## 🐛 مشکلات شناخته‌شده
-
-| مشکل | وضعیت |
-|------|-------|
-| حذف LUnit از صفحه ویرایش | ✅ حل شد (override `get_deleted_objects`) |
-| جستجوی والد با ترکیب چند نوع واحد | ✅ حل شد (جستجوی ترکیبی) |
-
----
-
-## 📝 یادداشت‌های کاربر
-
-- کاربر فارسی‌زبان است
-- ترجیح می‌دهد توضیحات به فارسی باشد
-- می‌خواهد کد تمیز و بدون bloat باشد
-
----
-
-## 🔐 اطلاعات MinIO (Object Storage)
-
-### Web Console
-| پارامتر | مقدار |
-|---------|-------|
-| URL | `http://127.0.0.1:9001` |
-| Username | `eH01EjH7zdlIHEzlJ9Sb` |
-| Password | `5mswuxXYnZtNHSWhEDw8WUe51ztiOTlRCQa40r7i` |
-
-### S3-Compatible API
-| پارامتر | مقدار |
-|---------|-------|
-| Endpoint (خارج Docker) | `http://127.0.0.1:9000` |
-| Endpoint (داخل Docker) | `http://minio:9000` |
-| Access Key | `eH01EjH7zdlIHEzlJ9Sb` |
-| Secret Key | `5mswuxXYnZtNHSWhEDw8WUe51ztiOTlRCQa40r7i` |
-| Bucket | `advisor-docs` |
-| Region | `us-east-1` |
-| SSL | `false` |
-
-### نمونه کد Python (boto3)
-```python
-import boto3
-
-s3 = boto3.client(
-    's3',
-    endpoint_url='http://127.0.0.1:9000',
-    aws_access_key_id='eH01EjH7zdlIHEzlJ9Sb',
-    aws_secret_access_key='5mswuxXYnZtNHSWhEDw8WUe51ztiOTlRCQa40r7i',
-    region_name='us-east-1'
-)
-
-# آپلود
-s3.upload_file('local.pdf', 'advisor-docs', 'documents/file.pdf')
-
-# دانلود
-s3.download_file('advisor-docs', 'documents/file.pdf', 'downloaded.pdf')
-
-# Presigned URL (1 ساعت)
-url = s3.generate_presigned_url('get_object', Params={'Bucket': 'advisor-docs', 'Key': 'path/file.pdf'}, ExpiresIn=3600)
-```
-
----
-
-## 🔄 نکته مهم: کپی فایل به Container
-
-فایل‌های Python داخل container جدا از host هستند. بعد از هر تغییر:
-
-```bash
-# کپی فایل به container
-docker compose -f deployment/docker-compose.ingest.yml cp <local_path> web:/app/<container_path>
-
-# restart سرور
-docker compose -f deployment/docker-compose.ingest.yml restart web
-```
-
-مثال:
-```bash
-docker compose -f deployment/docker-compose.ingest.yml cp ingest/apps/documents/admin.py web:/app/ingest/apps/documents/admin.py
-docker compose -f deployment/docker-compose.ingest.yml restart web
-```
