@@ -30,51 +30,108 @@
 
     <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
         <h2>📊 آمار کلی سیستم</h2>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-top: 15px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px;">
             <div style="background: white; padding: 15px; border-radius: 5px; border-right: 4px solid #4CAF50;">
-                <div style="color: #666; font-size: 12px;">Legal Units</div>
+                <div style="color: #666; font-size: 12px;">بندهای قانونی (Legal Units)</div>
                 <div style="font-size: 24px; font-weight: bold; color: #333;">{{ total_legal_units|default:0 }}</div>
             </div>
-            <div style="background: white; padding: 15px; border-radius: 5px; border-right: 4px solid #2196F3;">
-                <div style="color: #666; font-size: 12px;">چانک‌ها (Chunks)</div>
-                <div style="font-size: 24px; font-weight: bold; color: #333;">{{ total_chunks|default:0 }}</div>
-            </div>
             <div style="background: white; padding: 15px; border-radius: 5px; border-right: 4px solid #FF9800;">
-                <div style="color: #666; font-size: 12px;">پرسش و پاسخ</div>
+                <div style="color: #666; font-size: 12px;">پرسش و پاسخ (Q&A)</div>
                 <div style="font-size: 24px; font-weight: bold; color: #333;">{{ total_qa|default:0 }}</div>
+            </div>
+            <div style="background: white; padding: 15px; border-radius: 5px; border-right: 4px solid #9C27B0;">
+                <div style="color: #666; font-size: 12px;">متون (TextEntry)</div>
+                <div style="font-size: 24px; font-weight: bold; color: #333;">{{ total_text|default:0 }}</div>
+            </div>
+            <div style="background: white; padding: 15px; border-radius: 5px; border-right: 4px solid #2196F3;">
+                <div style="color: #666; font-size: 12px;">مجموع چانک‌ها</div>
+                <div style="font-size: 24px; font-weight: bold; color: #333;">{{ total_chunks|default:0 }}</div>
             </div>
         </div>
     </div>
 
     <div style="background: #e3f2fd; padding: 20px; border-radius: 8px; margin: 20px 0;">
-        <h2>🔢 آمار Embedding</h2>
+        <h2>🔢 آمار Chunking و Embedding</h2>
         <table style="width: 100%; background: white; border-radius: 5px; margin-top: 15px;">
             <tr style="background: #f5f5f5;">
-                <th style="padding: 12px; text-align: right; border-bottom: 2px solid #ddd;">نوع</th>
-                <th style="padding: 12px; text-align: center; border-bottom: 2px solid #ddd;">کل</th>
+                <th style="padding: 12px; text-align: right; border-bottom: 2px solid #ddd;">منبع</th>
+                <th style="padding: 12px; text-align: center; border-bottom: 2px solid #ddd;">تعداد منبع</th>
+                <th style="padding: 12px; text-align: center; border-bottom: 2px solid #ddd;">چانک‌ها</th>
                 <th style="padding: 12px; text-align: center; border-bottom: 2px solid #ddd;">دارای Embedding</th>
                 <th style="padding: 12px; text-align: center; border-bottom: 2px solid #ddd;">بدون Embedding</th>
-                <th style="padding: 12px; text-align: center; border-bottom: 2px solid #ddd;">درصد تکمیل</th>
+                <th style="padding: 12px; text-align: center; border-bottom: 2px solid #ddd;">درصد</th>
             </tr>
             <tr>
-                <td style="padding: 12px; border-bottom: 1px solid #eee;">چانک‌ها</td>
-                <td style="padding: 12px; text-align: center; border-bottom: 1px solid #eee;">{{ total_chunks|default:0 }}</td>
-                <td style="padding: 12px; text-align: center; border-bottom: 1px solid #eee; color: #4CAF50; font-weight: bold;">{{ chunks_with_embeddings|default:0 }}</td>
-                <td style="padding: 12px; text-align: center; border-bottom: 1px solid #eee; color: #f44336; font-weight: bold;">{{ chunks_missing|default:0 }}</td>
+                <td style="padding: 12px; border-bottom: 1px solid #eee;">🏛️ بندهای قانونی</td>
+                <td style="padding: 12px; text-align: center; border-bottom: 1px solid #eee;">{{ total_legal_units|default:0 }}</td>
+                <td style="padding: 12px; text-align: center; border-bottom: 1px solid #eee;">{{ lu_chunks|default:0 }}</td>
+                <td style="padding: 12px; text-align: center; border-bottom: 1px solid #eee; color: #4CAF50; font-weight: bold;">{{ lu_chunks_with_embeddings|default:0 }}</td>
+                <td style="padding: 12px; text-align: center; border-bottom: 1px solid #eee; color: #f44336; font-weight: bold;">{{ lu_chunks_missing|default:0 }}</td>
                 <td style="padding: 12px; text-align: center; border-bottom: 1px solid #eee;">
-                    {{ chunks_percentage|default:0 }}%
+                    <div style="background: #e0e0e0; border-radius: 10px; overflow: hidden;">
+                        <div style="background: #4CAF50; height: 20px; width: {{ lu_percentage|default:0 }}%;"></div>
+                    </div>
+                    {{ lu_percentage|default:0 }}%
                 </td>
             </tr>
             <tr>
-                <td style="padding: 12px; border-bottom: 1px solid #eee;">پرسش و پاسخ</td>
+                <td style="padding: 12px; border-bottom: 1px solid #eee;">❓ پرسش و پاسخ</td>
                 <td style="padding: 12px; text-align: center; border-bottom: 1px solid #eee;">{{ total_qa|default:0 }}</td>
-                <td style="padding: 12px; text-align: center; border-bottom: 1px solid #eee; color: #4CAF50; font-weight: bold;">{{ qa_with_embeddings|default:0 }}</td>
-                <td style="padding: 12px; text-align: center; border-bottom: 1px solid #eee; color: #f44336; font-weight: bold;">{{ qa_missing|default:0 }}</td>
+                <td style="padding: 12px; text-align: center; border-bottom: 1px solid #eee;">{{ qa_chunks|default:0 }}</td>
+                <td style="padding: 12px; text-align: center; border-bottom: 1px solid #eee; color: #4CAF50; font-weight: bold;">{{ qa_chunks_with_embeddings|default:0 }}</td>
+                <td style="padding: 12px; text-align: center; border-bottom: 1px solid #eee; color: #f44336; font-weight: bold;">{{ qa_chunks_missing|default:0 }}</td>
                 <td style="padding: 12px; text-align: center; border-bottom: 1px solid #eee;">
+                    <div style="background: #e0e0e0; border-radius: 10px; overflow: hidden;">
+                        <div style="background: #FF9800; height: 20px; width: {{ qa_percentage|default:0 }}%;"></div>
+                    </div>
                     {{ qa_percentage|default:0 }}%
                 </td>
             </tr>
+            <tr>
+                <td style="padding: 12px; border-bottom: 1px solid #eee;">📝 متون</td>
+                <td style="padding: 12px; text-align: center; border-bottom: 1px solid #eee;">{{ total_text|default:0 }}</td>
+                <td style="padding: 12px; text-align: center; border-bottom: 1px solid #eee;">{{ text_chunks|default:0 }}</td>
+                <td style="padding: 12px; text-align: center; border-bottom: 1px solid #eee; color: #4CAF50; font-weight: bold;">{{ text_chunks_with_embeddings|default:0 }}</td>
+                <td style="padding: 12px; text-align: center; border-bottom: 1px solid #eee; color: #f44336; font-weight: bold;">{{ text_chunks_missing|default:0 }}</td>
+                <td style="padding: 12px; text-align: center; border-bottom: 1px solid #eee;">
+                    <div style="background: #e0e0e0; border-radius: 10px; overflow: hidden;">
+                        <div style="background: #9C27B0; height: 20px; width: {{ text_percentage|default:0 }}%;"></div>
+                    </div>
+                    {{ text_percentage|default:0 }}%
+                </td>
+            </tr>
+            <tr style="background: #f5f5f5; font-weight: bold;">
+                <td style="padding: 12px; border-bottom: 1px solid #eee;">📊 مجموع</td>
+                <td style="padding: 12px; text-align: center; border-bottom: 1px solid #eee;">-</td>
+                <td style="padding: 12px; text-align: center; border-bottom: 1px solid #eee;">{{ total_chunks|default:0 }}</td>
+                <td style="padding: 12px; text-align: center; border-bottom: 1px solid #eee; color: #4CAF50;">{{ chunks_with_embeddings|default:0 }}</td>
+                <td style="padding: 12px; text-align: center; border-bottom: 1px solid #eee; color: #f44336;">{{ chunks_missing|default:0 }}</td>
+                <td style="padding: 12px; text-align: center; border-bottom: 1px solid #eee;">
+                    <div style="background: #e0e0e0; border-radius: 10px; overflow: hidden;">
+                        <div style="background: #2196F3; height: 20px; width: {{ chunks_percentage|default:0 }}%;"></div>
+                    </div>
+                    {{ chunks_percentage|default:0 }}%
+                </td>
+            </tr>
         </table>
+    </div>
+
+    <div style="background: #e8f5e9; padding: 20px; border-radius: 8px; margin: 20px 0;">
+        <h2>🔄 آمار همگام‌سازی با Core</h2>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px;">
+            <div style="background: white; padding: 15px; border-radius: 5px; border-right: 4px solid #4CAF50;">
+                <div style="color: #666; font-size: 12px;">همگام‌سازی شده</div>
+                <div style="font-size: 24px; font-weight: bold; color: #4CAF50;">{{ synced_embeddings|default:0 }}</div>
+            </div>
+            <div style="background: white; padding: 15px; border-radius: 5px; border-right: 4px solid #FF9800;">
+                <div style="color: #666; font-size: 12px;">در انتظار همگام‌سازی</div>
+                <div style="font-size: 24px; font-weight: bold; color: #FF9800;">{{ pending_sync|default:0 }}</div>
+            </div>
+            <div style="background: white; padding: 15px; border-radius: 5px; border-right: 4px solid #2196F3;">
+                <div style="color: #666; font-size: 12px;">درصد همگام‌سازی</div>
+                <div style="font-size: 24px; font-weight: bold; color: #2196F3;">{{ sync_percentage|default:0 }}%</div>
+            </div>
+        </div>
     </div>
 
     <div style="background: #fff3e0; padding: 20px; border-radius: 8px; margin: 20px 0;">
@@ -128,11 +185,12 @@
     <div style="background: #fce4ec; padding: 20px; border-radius: 8px; margin: 20px 0;">
         <h2>🔄 فرآیندهای خودکار</h2>
         <div style="background: white; padding: 15px; border-radius: 5px; margin-top: 15px;">
-            <p>✅ <strong>Chunking خودکار:</strong> هنگام ایجاد یا ویرایش Legal Unit</p>
-            <p>✅ <strong>Embedding خودکار:</strong> هنگام ایجاد Chunk یا QA Entry جدید</p>
+            <p>✅ <strong>Chunking خودکار:</strong> هنگام ایجاد یا ویرایش Legal Unit، QA Entry یا TextEntry</p>
+            <p>✅ <strong>Embedding خودکار:</strong> هنگام ایجاد Chunk جدید</p>
+            <p>✅ <strong>Sync خودکار:</strong> همگام‌سازی با سیستم مرکزی (Core) پس از ایجاد Embedding</p>
             <p>✅ <strong>بررسی دوره‌ای:</strong> هر ساعت چک می‌شود که آیا Chunk بدون Embedding وجود دارد</p>
             <p>✅ <strong>پاکسازی خودکار:</strong> روزانه Embedding های orphan حذف می‌شوند</p>
-            <p>✅ <strong>حذف خودکار:</strong> با حذف Legal Unit یا QA Entry، Chunk ها و Embedding های مرتبط حذف می‌شوند</p>
+            <p>✅ <strong>حذف خودکار:</strong> با حذف Legal Unit، QA Entry یا TextEntry، Chunk ها و Embedding های مرتبط حذف می‌شوند</p>
         </div>
     </div>
 

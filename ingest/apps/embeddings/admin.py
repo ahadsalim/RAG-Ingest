@@ -13,7 +13,7 @@ from simple_history.admin import SimpleHistoryAdmin
 from ingest.apps.embeddings.models import Embedding, CoreConfig, SyncLog, SyncStats
 from ingest.apps.embeddings.models_synclog import DeletionLog
 from ingest.admin import admin_site
-from ingest.apps.documents.models import Chunk, QAEntry, LegalUnit
+from ingest.apps.documents.models import Chunk, QAEntry, LegalUnit, TextEntry
 from ingest.core.admin_mixins import JalaliAdminMixin as SimpleJalaliAdminMixin
 from django.contrib import messages
 from django.utils.html import format_html_join
@@ -203,16 +203,34 @@ class EmbeddingAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
         
         # Get content types
         chunk_ct = ContentType.objects.get_for_model(Chunk)
-        qa_ct = ContentType.objects.get_for_model(QAEntry)
         
-        # Total counts
+        # === آمار LegalUnit ===
         total_legal_units = LegalUnit.objects.count()
-        total_chunks = Chunk.objects.count()
-        total_qa = QAEntry.objects.filter(status='approved').count()
+        lu_chunks = Chunk.objects.filter(unit__isnull=False).count()
+        lu_chunks_with_embeddings = Chunk.objects.filter(
+            unit__isnull=False,
+            embeddings__isnull=False
+        ).distinct().count()
         
-        # Counts with embeddings
+        # === آمار QAEntry ===
+        total_qa = QAEntry.objects.count()
+        qa_chunks = Chunk.objects.filter(qaentry__isnull=False).count()
+        qa_chunks_with_embeddings = Chunk.objects.filter(
+            qaentry__isnull=False,
+            embeddings__isnull=False
+        ).distinct().count()
+        
+        # === آمار TextEntry ===
+        total_text = TextEntry.objects.count()
+        text_chunks = Chunk.objects.filter(textentry__isnull=False).count()
+        text_chunks_with_embeddings = Chunk.objects.filter(
+            textentry__isnull=False,
+            embeddings__isnull=False
+        ).distinct().count()
+        
+        # === آمار کلی Chunks ===
+        total_chunks = Chunk.objects.count()
         chunks_with_embeddings = Embedding.objects.filter(content_type=chunk_ct).count()
-        qa_with_embeddings = Embedding.objects.filter(content_type=qa_ct).count()
         
         # Recent activity (last 24 hours)
         yesterday = datetime.now() - timedelta(days=1)
@@ -226,21 +244,54 @@ class EmbeddingAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
         
         # Calculate percentages
         chunks_percentage = round((chunks_with_embeddings / total_chunks * 100), 1) if total_chunks > 0 else 0
-        qa_percentage = round((qa_with_embeddings / total_qa * 100), 1) if total_qa > 0 else 0
+        lu_percentage = round((lu_chunks_with_embeddings / lu_chunks * 100), 1) if lu_chunks > 0 else 0
+        qa_percentage = round((qa_chunks_with_embeddings / qa_chunks * 100), 1) if qa_chunks > 0 else 0
+        text_percentage = round((text_chunks_with_embeddings / text_chunks * 100), 1) if text_chunks > 0 else 0
+        
+        # === آمار Sync ===
+        synced_embeddings = Embedding.objects.filter(synced_to_core=True).count()
+        pending_sync = Embedding.objects.filter(synced_to_core=False).count()
+        sync_percentage = round((synced_embeddings / chunks_with_embeddings * 100), 1) if chunks_with_embeddings > 0 else 0
         
         context.update({
+            # LegalUnit stats
             'total_legal_units': total_legal_units,
+            'lu_chunks': lu_chunks,
+            'lu_chunks_with_embeddings': lu_chunks_with_embeddings,
+            'lu_chunks_missing': lu_chunks - lu_chunks_with_embeddings,
+            'lu_percentage': lu_percentage,
+            
+            # QAEntry stats
+            'total_qa': total_qa,
+            'qa_chunks': qa_chunks,
+            'qa_chunks_with_embeddings': qa_chunks_with_embeddings,
+            'qa_chunks_missing': qa_chunks - qa_chunks_with_embeddings,
+            'qa_percentage': qa_percentage,
+            
+            # TextEntry stats
+            'total_text': total_text,
+            'text_chunks': text_chunks,
+            'text_chunks_with_embeddings': text_chunks_with_embeddings,
+            'text_chunks_missing': text_chunks - text_chunks_with_embeddings,
+            'text_percentage': text_percentage,
+            
+            # Overall chunk stats
             'total_chunks': total_chunks,
             'chunks_with_embeddings': chunks_with_embeddings,
             'chunks_missing': total_chunks - chunks_with_embeddings,
             'chunks_percentage': chunks_percentage,
-            'total_qa': total_qa,
-            'qa_with_embeddings': qa_with_embeddings,
-            'qa_missing': total_qa - qa_with_embeddings,
-            'qa_percentage': qa_percentage,
+            
+            # Sync stats
+            'synced_embeddings': synced_embeddings,
+            'pending_sync': pending_sync,
+            'sync_percentage': sync_percentage,
+            
+            # Recent activity
             'recent_chunks': recent_chunks,
             'recent_embeddings': recent_embeddings,
             'embedding_by_model': embedding_by_model,
+            
+            # Settings
             'current_model': settings.EMBEDDING_E5_MODEL_NAME,
             'current_dimension': settings.EMBEDDING_DIMENSION,
             'chunk_size': settings.DEFAULT_CHUNK_SIZE,
@@ -306,130 +357,7 @@ class EmbeddingAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
 
         return render(request, 'admin/embeddings/core_node_viewer.html', context)
 
-    verify_nodes_in_core.short_description = 'تایید نودها در Core (حداکثر 50 عدد)'
 
-    def get_queryset(self, request):
-        return super().get_queryset(request).select_related('content_type')
-
-    def has_add_permission(self, request):
-        return False  # Auto-generated
-
-    def has_change_permission(self, request, obj=None):
-        return True  # Allow viewing details
-
-    def changelist_view(self, request, extra_context=None):
-        """Add custom buttons to changelist"""
-        extra_context = extra_context or {}
-        extra_context['show_core_viewer_button'] = True
-        # show_reports_button را حذف کردیم چون حالا در sidebar داریم
-        return super().changelist_view(request, extra_context=extra_context)
-
-    def get_urls(self):
-        urls = super().get_urls()
-        custom_urls = [
-            path('reports/', self.admin_site.admin_view(self.view_reports), name='embedding_reports'),
-            path('core-node-viewer/', self.admin_site.admin_view(self.core_node_viewer), name='core_node_viewer'),
-        ]
-        return custom_urls + urls
-
-    def view_reports(self, request):
-        """Show embedding statistics and system reports"""
-        from ingest.apps.embeddings.models_synclog import SyncLog, SyncStats
-        
-        context = self.admin_site.each_context(request)
-        context['title'] = 'گزارش بردارسازی'
-        
-        # Handle rebuild action
-        if request.method == 'POST' and 'rebuild_all_embeddings' in request.POST:
-            try:
-                # Delete all embeddings and sync data
-                embedding_count = Embedding.objects.count()
-                Embedding.objects.all().delete()
-                SyncLog.objects.all().delete()
-                SyncStats.objects.all().delete()
-                Chunk.objects.filter(node_id__isnull=False).update(node_id=None)
-                
-                # Reset CoreConfig stats
-                config = CoreConfig.get_config()
-                config.total_synced = 0
-                config.total_errors = 0
-                config.last_successful_sync = None
-                config.last_sync_error = ''
-                config.save()
-                
-                # Start re-embedding using celery task
-                from ingest.apps.embeddings.tasks import generate_missing_embeddings
-                task = generate_missing_embeddings.delay()
-                
-                messages.success(
-                    request, 
-                    f'✅ {embedding_count} Embedding حذف شد و بردارسازی مجدد شروع شد (Task: {task.id})'
-                )
-            except Exception as e:
-                messages.error(request, f'❌ خطا: {str(e)}')
-        
-        # Get content types
-        chunk_ct = ContentType.objects.get_for_model(Chunk)
-        qa_ct = ContentType.objects.get_for_model(QAEntry)
-        
-        # Total counts
-        total_legal_units = LegalUnit.objects.count()
-        total_chunks = Chunk.objects.count()
-        total_qa = QAEntry.objects.filter(status='approved').count()
-        
-        # Counts with embeddings
-        chunks_with_embeddings = Embedding.objects.filter(content_type=chunk_ct).count()
-        qa_with_embeddings = Embedding.objects.filter(content_type=qa_ct).count()
-        
-        # Recent activity (last 24 hours)
-        yesterday = datetime.now() - timedelta(days=1)
-        recent_chunks = Chunk.objects.filter(created_at__gte=yesterday).count()
-        recent_embeddings = Embedding.objects.filter(created_at__gte=yesterday).count()
-        
-        # Stats by model
-        embedding_by_model = Embedding.objects.values('model_id').annotate(
-            count=Count('id')
-        ).order_by('-count')
-        
-        # Calculate percentages
-        chunks_percentage = round((chunks_with_embeddings / total_chunks * 100), 1) if total_chunks > 0 else 0
-        qa_percentage = round((qa_with_embeddings / total_qa * 100), 1) if total_qa > 0 else 0
-        
-        context.update({
-            'total_legal_units': total_legal_units,
-            'total_chunks': total_chunks,
-            'chunks_with_embeddings': chunks_with_embeddings,
-            'chunks_missing': total_chunks - chunks_with_embeddings,
-            'chunks_percentage': chunks_percentage,
-            'total_qa': total_qa,
-            'qa_with_embeddings': qa_with_embeddings,
-            'qa_missing': total_qa - qa_with_embeddings,
-            'qa_percentage': qa_percentage,
-            'recent_chunks': recent_chunks,
-            'recent_embeddings': recent_embeddings,
-            'embedding_by_model': embedding_by_model,
-            'current_model': settings.EMBEDDING_E5_MODEL_NAME,
-            'current_dimension': settings.EMBEDDING_DIMENSION,
-            'chunk_size': settings.DEFAULT_CHUNK_SIZE,
-            'chunk_overlap': settings.DEFAULT_CHUNK_OVERLAP,
-        })
-        
-        return render(request, 'admin/embeddings/embedding_reports.html', context)
-
-def core_node_viewer(self, request):
-    """نمایش اطلاعات Node از Core API"""
-    context = self.admin_site.each_context(request)
-    context['title'] = 'مشاهده نود در سیستم مرکزی'
-    
-    # دریافت لیست node_id های موجود
-    chunks_with_nodes = Chunk.objects.filter(node_id__isnull=False).select_related('unit', 'qaentry')[:100]
-    context['available_nodes'] = chunks_with_nodes
-    
-    node_data = None
-    node_json = None
-    error = None
-    node_id = request.GET.get('node_id')
-    
 # Register with admin site
 admin_site.register(Embedding, EmbeddingAdmin)
 
