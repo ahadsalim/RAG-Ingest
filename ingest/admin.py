@@ -7,6 +7,7 @@ class CustomAdminSite(AdminSite):
     site_header = "سیستم مدیریت اسناد"
     site_title = "مدیریت اسناد"
     index_title = "پنل مدیریت"
+    login_url = '/accounts/login/'  # OTP login page
 
     def get_app_list(self, request, app_label=None):
         """
