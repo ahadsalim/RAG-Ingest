@@ -362,56 +362,8 @@ class EmbeddingAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
 admin_site.register(Embedding, EmbeddingAdmin)
 
 
-# Custom view for Core Statistics
-def core_statistics_view(request):
-    """نمایش گزارشات سیستم مرکزی"""
-    context = admin_site.each_context(request)
-    context['title'] = 'گزارشات سیستم مرکزی'
-    
-    config = CoreConfig.get_config()
-    stats = None
-    error = None
-    
-    try:
-        url = f"{config.core_api_url}/api/v1/sync/statistics"
-        headers = {'X-API-Key': config.core_api_key}
-        
-        response = requests.get(url, headers=headers, timeout=30)
-        
-        if response.status_code == 200:
-            stats = response.json()
-        elif response.status_code == 401:
-            error = "خطای احراز هویت: API Key اشتباه است"
-        elif response.status_code == 404:
-            error = "API آمار در Core یافت نشد"
-        else:
-            error = f"خطای سرور: {response.status_code}"
-            
-    except requests.exceptions.ConnectionError:
-        error = f"خطای اتصال: سرور Core در دسترس نیست ({config.core_api_url})"
-    except requests.exceptions.Timeout:
-        error = "خطای Timeout: سرور Core پاسخ نمی‌دهد"
-    except Exception as e:
-        error = f"خطای غیرمنتظره: {str(e)}"
-    
-    context['stats'] = stats
-    context['error'] = error
-    context['core_url'] = config.core_api_url
-    
-    return render(request, 'admin/embeddings/core_statistics.html', context)
-
-
 # Fake models for menu display
 from django.db import models as fake_models
-
-class CoreStatistics(fake_models.Model):
-    """Fake model for admin menu"""
-    class Meta:
-        verbose_name = 'گزارشات سیستم مرکزی'
-        verbose_name_plural = 'گزارشات سیستم مرکزی'
-        app_label = 'embeddings'
-        managed = False
-
 
 class CoreNodeViewer(fake_models.Model):
     """Fake model for admin menu - Node Viewer"""
@@ -438,27 +390,6 @@ class EmbeddingReports(fake_models.Model):
         verbose_name_plural = 'گزارش بردارسازی'
         app_label = 'embeddings'
         managed = False
-
-
-@admin.register(CoreStatistics, site=admin_site)
-class CoreStatisticsAdmin(admin.ModelAdmin):
-    """Admin class for Core Statistics menu item"""
-    
-    def has_add_permission(self, request):
-        return False
-    
-    def has_change_permission(self, request, obj=None):
-        return True
-    
-    def has_delete_permission(self, request, obj=None):
-        return False
-    
-    def has_module_permission(self, request):
-        return True
-    
-    def changelist_view(self, request, extra_context=None):
-        """Redirect to statistics view"""
-        return core_statistics_view(request)
 
 
 @admin.register(CoreNodeViewer, site=admin_site)
