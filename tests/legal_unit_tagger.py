@@ -20,14 +20,14 @@ Usage:
 # ============================================
 # CONFIGURATION - SET THESE VALUES
 # ============================================
-OPENAI_API_KEY = "sk-your-api-key-here"
-OPENAI_BASE_URL = "https://api.openai.com/v1"  # Or your custom endpoint
+OPENAI_API_KEY = "sk-o92MoYgtEGcJrtvYEPS8t3BTWCwUfdg6o3HzdA67L3yWtddO"
+OPENAI_BASE_URL = "https://api.gapgpt.app/v1"  # Or your custom endpoint
 
 # Database connection (PostgreSQL on server)
 # Port 15432 is exposed externally by docker-compose
 DB_CONFIG = {
-    "host": "5.75.202.188",  # Server IP
-    "port": 15432,           # External port mapped to PostgreSQL
+    "host": "45.92.219.229",  # Server IP (correct)
+    "port": 15432,            # External port mapped to PostgreSQL
     "database": "ingest",
     "user": "ingest",
     "password": "rQXRweJEjVSD7tMKX4TrV3LQHDNhklt2"
@@ -230,13 +230,28 @@ def call_openai(system_prompt, user_prompt):
     
     return response.choices[0].message.content
 
-def save_tags_to_database(tagged_units, new_terms):
-    """Save tags and new terms to database."""
+def is_valid_uuid(val):
+    """Check if a string is a valid UUID."""
+    try:
+        uuid.UUID(str(val))
+        return True
+    except (ValueError, AttributeError):
+        return False
+
+def save_tags_to_database(tagged_units, new_terms, valid_term_ids):
+    """Save tags and new terms to database.
+    
+    Args:
+        tagged_units: List of units with their tags from GPT
+        new_terms: List of new term suggestions from GPT
+        valid_term_ids: Set of valid term UUIDs from database
+    """
     conn = get_db_connection()
     cur = conn.cursor()
     
     saved_tags = 0
     saved_terms = 0
+    skipped_invalid = 0
     
     # First, save any new suggested terms
     for term in new_terms:
@@ -254,9 +269,11 @@ def save_tags_to_database(tagged_units, new_terms):
                     VALUES (%s, %s, %s, %s, true, NOW(), NOW())
                     ON CONFLICT DO NOTHING
                 """, (term_id, vocab["id"], term.get("term"), term.get("code")))
+                conn.commit()  # Commit each term separately
                 saved_terms += 1
                 processing_state["new_terms_suggested"].append(term)
         except Exception as e:
+            conn.rollback()  # Rollback on error
             log_message(f"Error saving new term: {e}")
     
     # Save tags for each unit
@@ -264,9 +281,25 @@ def save_tags_to_database(tagged_units, new_terms):
         unit_id = unit.get("unit_id")
         tags = unit.get("tags", [])
         
+        # Validate unit_id
+        if not is_valid_uuid(unit_id):
+            skipped_invalid += 1
+            continue
+        
         for tag in tags:
+            term_id = tag.get("term_id")
+            
+            # Validate term_id format
+            if not is_valid_uuid(term_id):
+                skipped_invalid += 1
+                continue
+            
+            # Check if term_id exists in our valid set
+            if str(term_id) not in valid_term_ids:
+                skipped_invalid += 1
+                continue
+            
             try:
-                term_id = tag.get("term_id")
                 weight = min(max(int(tag.get("weight", 5)), 1), 10)  # Clamp 1-10
                 
                 tag_id = str(uuid.uuid4())
@@ -276,17 +309,27 @@ def save_tags_to_database(tagged_units, new_terms):
                     VALUES (%s, %s, %s, %s, NOW(), NOW())
                     ON CONFLICT (legal_unit_id, vocabulary_term_id) DO UPDATE SET weight = %s, updated_at = NOW()
                 """, (tag_id, unit_id, term_id, weight, weight))
+                conn.commit()  # Commit each tag separately to avoid transaction issues
                 saved_tags += 1
             except Exception as e:
+                conn.rollback()  # Rollback on error
                 log_message(f"Error saving tag for unit {unit_id}: {e}")
     
-    conn.commit()
     conn.close()
+    
+    if skipped_invalid > 0:
+        log_message(f"Skipped {skipped_invalid} invalid/non-existent term IDs")
     
     return saved_tags, saved_terms
 
-def process_batch(batch_num, terms, offset):
-    """Process a single batch of legal units."""
+def process_batch(batch_num, terms, valid_term_ids):
+    """Process a single batch of legal units.
+    
+    Args:
+        batch_num: Current batch number
+        terms: List of vocabulary terms for the prompt
+        valid_term_ids: Set of valid term UUIDs
+    """
     try:
         # Get legal units for this batch
         units = get_untagged_legal_units(limit=BATCH_SIZE, offset=0)  # Always offset 0 since we're processing untagged
@@ -312,8 +355,8 @@ def process_batch(batch_num, terms, offset):
             
             log_message(f"Batch {batch_num}: Got {len(tagged_units)} tagged units, {len(new_terms)} new term suggestions")
             
-            # Save to database
-            saved_tags, saved_terms = save_tags_to_database(tagged_units, new_terms)
+            # Save to database with validation
+            saved_tags, saved_terms = save_tags_to_database(tagged_units, new_terms, valid_term_ids)
             log_message(f"Batch {batch_num}: Saved {saved_tags} tags, {saved_terms} new terms")
             
             processing_state["processed_units"] += len(units)
@@ -342,6 +385,10 @@ def run_tagging_process():
         vocabularies, terms = get_vocabularies_and_terms()
         log_message(f"Loaded {len(vocabularies)} vocabularies, {len(terms)} terms")
         
+        # Build set of valid term IDs for validation
+        valid_term_ids = {str(t['id']) for t in terms}
+        log_message(f"Built validation set with {len(valid_term_ids)} valid term IDs")
+        
         # Count untagged units
         total_untagged = count_untagged_legal_units()
         processing_state["total_units"] = total_untagged
@@ -354,7 +401,7 @@ def run_tagging_process():
         while processing_state["is_running"]:
             processing_state["current_batch"] = batch_num
             
-            if not process_batch(batch_num, terms, 0):
+            if not process_batch(batch_num, terms, valid_term_ids):
                 break
             
             batch_num += 1

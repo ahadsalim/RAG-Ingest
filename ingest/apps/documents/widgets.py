@@ -55,22 +55,8 @@ class ParentAutocompleteWidget(forms.TextInput):
                    autocomplete="off"
                    style="{attrs.get('style', '')}"
                    data-manifestation-id="{self.manifestation_id or ''}"
+                   data-model-name="{self.model_name}"
             />
-            <button type="button" 
-                    id="id_{name}_clear" 
-                    class="parent-clear-btn"
-                    title="حذف والد (بدون والد)"
-                    style="
-                        padding: 6px 12px;
-                        background: #dc3545;
-                        color: white;
-                        border: none;
-                        border-radius: 4px;
-                        cursor: pointer;
-                        font-size: 12px;
-                        white-space: nowrap;
-                    "
-            >🗑️ بدون والد</button>
             <div id="id_{name}_results" class="autocomplete-results" style="
                 display: none;
                 position: absolute;
@@ -195,22 +181,12 @@ class ParentAutocompleteWidget(forms.TextInput):
                 }}
             }});
             
-            // دکمه پاک کردن والد
-            const clearBtn = document.getElementById('id_{name}_clear');
-            if (clearBtn) {{
-                clearBtn.addEventListener('click', function() {{
+            // پاک کردن والد با خالی کردن فیلد
+            searchInput.addEventListener('input', function() {{
+                if (this.value.trim() === '') {{
                     hiddenInput.value = '';
-                    searchInput.value = '';
-                    resultsDiv.style.display = 'none';
-                    // نشان دادن پیام تایید
-                    searchInput.placeholder = '✓ والد حذف شد - ذخیره کنید';
-                    searchInput.style.borderColor = '#28a745';
-                    setTimeout(function() {{
-                        searchInput.placeholder = '{attrs.get('placeholder', 'تایپ کنید...')}';
-                        searchInput.style.borderColor = '';
-                    }}, 2000);
-                }});
-            }}
+                }}
+            }});
         }})();
         </script>
         '''
