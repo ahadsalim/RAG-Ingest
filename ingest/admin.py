@@ -159,28 +159,12 @@ from django.contrib.auth.models import User, Group
 from django.contrib.auth.admin import UserAdmin, GroupAdmin
 
 
-class UserProfileInline(admin.StackedInline):
-    """Inline for UserProfile in User admin."""
-    from ingest.apps.accounts.models import UserProfile
-    model = UserProfile
-    can_delete = False
-    verbose_name = 'پروفایل'
-    verbose_name_plural = 'پروفایل'
-    fields = ('mobile', 'is_mobile_verified')
-    
-    def get_queryset(self, request):
-        from ingest.apps.accounts.models import UserProfile
-        return UserProfile.objects.all()
-
-
 class CustomUserAdmin(UserAdmin):
     """
     سفارشی‌سازی UserAdmin برای سیستم احراز هویت OTP
     - نام کاربری = شماره موبایل
     - حذف فیلد password (لاگین با OTP)
     """
-    inlines = [UserProfileInline]
-    
     # نام کاربری = شماره موبایل (ستون اول)
     list_display = ('username', 'first_name', 'last_name', 'email', 'is_staff', 'is_active')
     list_filter = ('is_staff', 'is_superuser', 'is_active', 'groups')
@@ -188,29 +172,41 @@ class CustomUserAdmin(UserAdmin):
     ordering = ('username',)
     
     def get_fieldsets(self, request, obj=None):
-        """Override fieldsets to remove password field for OTP-based auth."""
+        """Override fieldsets for OTP-based auth."""
         if not obj:
             # Creating new user - username is mobile number
             return (
                 (None, {
                     'classes': ('wide',),
-                    'description': 'نام کاربری باید شماره موبایل باشد (مثال: 09123456789)',
-                    'fields': ('username', 'first_name', 'last_name', 'email'),
+                    'description': 'شماره موبایل به عنوان نام کاربری استفاده می‌شود (مثال: 09123456789)',
+                    'fields': ('username',),
+                }),
+                ('اطلاعات شخصی', {
+                    'fields': ('first_name', 'last_name', 'email'),
                 }),
             )
         
-        # Editing existing user - no password field
+        # Editing existing user - prioritized field order
         return (
-            ('شماره موبایل', {'fields': ('username',)}),
-            ('اطلاعات شخصی', {'fields': ('first_name', 'last_name', 'email')}),
-            ('دسترسی‌ها', {
-                'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions'),
+            ('اطلاعات کاربر', {
+                'fields': ('username', 'first_name', 'last_name', 'email'),
+                'description': 'شماره موبایل به عنوان نام کاربری استفاده می‌شود',
             }),
-            ('تاریخ‌های مهم', {'fields': ('last_login', 'date_joined')}),
+            ('وضعیت', {
+                'fields': ('is_active', 'is_staff', 'is_superuser'),
+            }),
+            ('گروه‌ها و دسترسی‌ها', {
+                'classes': ('collapse',),
+                'fields': ('groups', 'user_permissions'),
+            }),
+            ('تاریخ‌ها', {
+                'classes': ('collapse',),
+                'fields': ('last_login', 'date_joined'),
+            }),
         )
     
     def get_readonly_fields(self, request, obj=None):
-        """Make some fields readonly when editing."""
+        """Make mobile (username) readonly when editing."""
         if obj:
             return ('username', 'last_login', 'date_joined')
         return ()
@@ -218,6 +214,7 @@ class CustomUserAdmin(UserAdmin):
     add_fieldsets = (
         (None, {
             'classes': ('wide',),
+            'description': 'شماره موبایل به عنوان نام کاربری استفاده می‌شود',
             'fields': ('username', 'first_name', 'last_name', 'email'),
         }),
     )
