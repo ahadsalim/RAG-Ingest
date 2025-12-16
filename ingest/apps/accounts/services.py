@@ -45,16 +45,22 @@ class BaleMessengerService:
             return None
         
         try:
-            # OAuth2 token endpoint
-            token_url = f"{self.api_url}/oauth/token"
+            # Auth token endpoint (per Bale Safir API docs)
+            token_url = f"{self.api_url}/auth/token"
             
+            # Must be sent as form-data with specific parameters
             payload = {
                 'grant_type': 'client_credentials',
                 'client_id': self.client_id,
-                'client_secret': self.client_secret
+                'client_secret': self.client_secret,
+                'scope': 'read'
             }
             
-            response = requests.post(token_url, data=payload, timeout=10)
+            headers = {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            }
+            
+            response = requests.post(token_url, data=payload, headers=headers, timeout=10)
             response.raise_for_status()
             
             result = response.json()
