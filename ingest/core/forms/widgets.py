@@ -34,6 +34,7 @@ class JalaliDateInput(forms.TextInput):
                 ]
             },
             js=[
+                'admin/js/vendor/jquery/jquery.min.js',
                 'https://cdn.jsdelivr.net/npm/persian-date@1.1.0/dist/persian-date.min.js',
                 'https://cdn.jsdelivr.net/npm/persian-datepicker@1.2.0/dist/js/persian-datepicker.min.js',
                 'js/jalali-init.js',
@@ -70,6 +71,7 @@ class JalaliDateTimeInput(forms.TextInput):
                 ]
             },
             js=[
+                'admin/js/vendor/jquery/jquery.min.js',
                 'https://cdn.jsdelivr.net/npm/persian-date@1.1.0/dist/persian-date.min.js',
                 'https://cdn.jsdelivr.net/npm/persian-datepicker@1.2.0/dist/js/persian-datepicker.min.js',
                 'js/jalali-init.js',

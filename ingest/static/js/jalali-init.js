@@ -15,9 +15,9 @@
     });
     
     function initializeJalaliDatepickers() {
-        // Check if Persian datepicker library is available
-        if (typeof persianDatepicker === 'undefined') {
-            console.warn('Persian datepicker library not loaded. Jalali datepickers will not work.');
+        // Check if jQuery and Persian datepicker library are available
+        if (typeof jQuery === 'undefined' || typeof jQuery.fn.persianDatepicker === 'undefined') {
+            console.warn('jQuery or Persian datepicker library not loaded. Jalali datepickers will not work.');
             return;
         }
         
@@ -83,9 +83,9 @@
             }
         };
         
-        // Initialize the datepicker
+        // Initialize the datepicker using jQuery
         try {
-            persianDatepicker(input, config);
+            jQuery(input).persianDatepicker(config);
             input.setAttribute('data-jalali-initialized', 'true');
             
             // Add CSS classes for styling

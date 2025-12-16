@@ -29,7 +29,7 @@ DB_CONFIG = {
 
 # Model settings
 MODEL_NAME = "gpt-4o-mini"
-BATCH_SIZE = 30  # Smaller batch for better review
+BATCH_SIZE = 10  # Smaller batch for better accuracy
 
 # ============================================
 # DO NOT MODIFY BELOW THIS LINE
@@ -100,11 +100,11 @@ def load_vocabularies_and_terms():
     conn.close()
     log(f"Loaded {len(state['vocabularies'])} vocabularies, {len(state['terms'])} terms")
 
-# فقط این نوع واحدها نیاز به برچسب دارند
-VALID_UNIT_TYPES = ['همه متن', 'ماده', 'بند', 'زیر بند', 'تبصره']
+# فقط این نوع واحدها نیاز به برچسب دارند (مقادیر انگلیسی در دیتابیس)
+VALID_UNIT_TYPES = ['full_text', 'article', 'clause', 'subclause', 'note']
 
-def get_untagged_units(limit=30):
-    """Get untagged legal units - only specific unit types."""
+def get_units(limit=30, offset=0):
+    """Get ALL legal units (not just untagged) - only specific unit types."""
     conn = get_db_connection()
     cur = conn.cursor()
     
@@ -112,17 +112,14 @@ def get_untagged_units(limit=30):
     type_placeholders = ','.join(['%s'] * len(VALID_UNIT_TYPES))
     
     cur.execute(f"""
-        SELECT lu.id, lu.path_label, lu.content, lu.unit_type
+        SELECT lu.id, lu.path_label, lu.content, lu.unit_type, d.title as document_title
         FROM documents_legalunit lu
+        LEFT JOIN documents_document d ON lu.document_id = d.id
         WHERE lu.content IS NOT NULL AND lu.content != ''
           AND lu.unit_type IN ({type_placeholders})
-          AND NOT EXISTS (
-              SELECT 1 FROM documents_legalunitvocabularyterm luvt 
-              WHERE luvt.legal_unit_id = lu.id
-          )
         ORDER BY lu.created_at
-        LIMIT %s
-    """, (*VALID_UNIT_TYPES, limit))
+        LIMIT %s OFFSET %s
+    """, (*VALID_UNIT_TYPES, limit, offset))
     
     units = list(cur.fetchall())
     conn.close()
@@ -161,7 +158,8 @@ def get_existing_tags(unit_ids):
     conn.close()
     return result
 
-def count_untagged():
+def count_total_units():
+    """Count ALL units (not just untagged)."""
     conn = get_db_connection()
     cur = conn.cursor()
     
@@ -171,10 +169,6 @@ def count_untagged():
         SELECT COUNT(*) as count FROM documents_legalunit lu
         WHERE lu.content IS NOT NULL AND lu.content != ''
           AND lu.unit_type IN ({type_placeholders})
-          AND NOT EXISTS (
-              SELECT 1 FROM documents_legalunitvocabularyterm luvt 
-              WHERE luvt.legal_unit_id = lu.id
-          )
     """, VALID_UNIT_TYPES)
     result = cur.fetchone()
     conn.close()
@@ -183,64 +177,58 @@ def count_untagged():
 def build_prompt(units):
     """Build prompt for GPT based on Legal Tagging Engine template."""
     
-    system = """تو یک Legal Tagging Engine هستی که باید برای هر «بند قانون» برچسب‌گذاری دقیق انجام دهی تا در Hybrid RAG Search (semantic + keyword) استفاده شود.
+    system = """تو یک Legal Tagging Engine هستی. برای هر بند قانون، برچسب‌های مرتبط را از لیست existing_tags انتخاب کن.
 
-## وظایف تو:
-1. از بین existing_tags فقط برچسب‌هایی را انتخاب کن که **مستقیماً و مفهومی** با بند مرتبط هستند.
-2. به هر برچسب انتخاب‌شده یک وزن عددی بین 1 تا 10 بده.
-3. اگر تعداد برچسب‌های انتخاب‌شده بیش از 10 بود:
-   - فقط 10 برچسب با بیشترین وزن را نگه دار
-   - بقیه را حذف کن
-4. در هیچ حالتی مجموع برچسب‌های نهایی نباید بیش از 20 باشد.
-5. اگر بند شامل مفاهیم مهمی است که در existing_tags نیست:
-   - برچسب جدید پیشنهاد بده
-   - این برچسب‌ها باید: کوتاه (۱ تا ۳ کلمه)، نرمال‌شده (بدون فعل، بدون جمع، بدون ابهام)، مناسب استفاده مکرر در کل دیتابیس
-   - برچسب‌های پیشنهادی جدید را در new_tags خروجی بده و در برچسب‌های همین بند هم لحاظ کن
+## دستورالعمل:
+1. برای هر unit_id، از لیست existing_tags برچسب‌های مرتبط را انتخاب کن
+2. به هر برچسب وزن 1-10 بده (10=خیلی مرتبط، 1=کم‌ربط)
+3. حداکثر 10 برچسب برای هر بند
+4. اگر مفهوم مهمی در existing_tags نیست، در new_tags پیشنهاد بده
 
-## قواعد مهم:
-- برچسب‌ها باید حقوقی، مفهومی و پایدار باشند (نه جمله، نه توصیفی)
-- وزن = میزان اهمیت آن برچسب برای بازیابی این بند در جستجو
-- وزن‌ها نسبی‌اند، نه مساوی
-- از برچسب خیلی خاصِ تک‌مصرف اجتناب کن
+## راهنمای وزن:
+- هسته اصلی بند: 9-10
+- موضوع فرعی مهم: 6-8
+- مرتبط ولی غیرمستقیم: 3-5
 
-## راهنمای وزن‌دهی:
-- هسته اصلی بند → 9 تا 10
-- موضوع مهم فرعی → 6 تا 8  
-- وابسته یا تلویحی → 3 تا 5
-
-## فرمت خروجی (فقط JSON خالص، بدون هیچ متن اضافه):
+## خروجی JSON (بدون هیچ متن اضافه):
 {
   "results": [
     {
-      "unit_id": "uuid-of-unit",
-      "final_tags": [
-        {"term_id": "uuid-of-existing-tag", "tag": "نام برچسب", "weight": 9}
-      ],
-      "new_tags": [
-        {"tag": "برچسب جدید پیشنهادی", "weight": 7, "vocabulary_code": "کد-موضوع-مرتبط"}
-      ]
+      "unit_id": "uuid",
+      "final_tags": [{"term_id": "uuid-from-existing", "tag": "نام", "weight": 8}],
+      "new_tags": [{"tag": "برچسب جدید", "weight": 7, "vocabulary_code": "code"}]
     }
   ]
 }
 
-نکته: term_id باید دقیقاً UUID برچسب از جدول existing_tags باشد."""
+مهم: term_id باید دقیقاً از ستون term_id جدول existing_tags کپی شود."""
 
-    # Build existing tags list
-    tags_list = "## existing_tags (برچسب‌های موجود در دیتابیس):\n\n"
-    tags_list += "| term_id (UUID) | موضوع (vocabulary) | برچسب (tag) |\n"
-    tags_list += "|----------------|-------------------|-------------|\n"
+    # Build existing tags as simple list grouped by vocabulary
+    tags_by_vocab = {}
     for t in state["terms"]:
-        tags_list += f"| {t['id']} | {t['vocabulary_name']} | {t['term']} |\n"
+        vname = t['vocabulary_name']
+        if vname not in tags_by_vocab:
+            tags_by_vocab[vname] = []
+        tags_by_vocab[vname].append({"id": str(t['id']), "term": t['term']})
     
-    # Build units/clauses
-    clauses = "\n\n## بندهای قانون برای برچسب‌گذاری:\n"
+    tags_list = "## existing_tags:\n\n"
+    for vname, terms in tags_by_vocab.items():
+        tags_list += f"### {vname}:\n"
+        for t in terms:
+            tags_list += f"- term_id: `{t['id']}` → {t['term']}\n"
+        tags_list += "\n"
+    
+    # Build units/clauses - more compact format
+    clauses = "\n## بندها برای برچسب‌گذاری:\n\n"
     for u in units:
         content = u['content']
-        clauses += f"\n### unit_id: {u['id']}\n"
-        clauses += f"**مسیر:** {u['path_label']}\n"
-        clauses += f"**نوع:** {u['unit_type']}\n"
-        clauses += f"**clause_text:**\n{content}\n"
-        clauses += "\n---\n"
+        if len(content) > 800:
+            content = content[:800] + "..."
+        doc_title = u.get('document_title', '-') or '-'
+        clauses += f"### unit_id: `{u['id']}`\n"
+        clauses += f"قانون: {doc_title}\n"
+        clauses += f"مسیر: {u['path_label']} | نوع: {u['unit_type']}\n"
+        clauses += f"متن:\n{content}\n\n---\n\n"
     
     user_prompt = tags_list + clauses
     
@@ -290,11 +278,14 @@ def process_next_batch():
     state["status"] = "processing"
     state["current_batch"] += 1
     
-    log(f"Batch {state['current_batch']}: Loading units...")
-    units = get_untagged_units(BATCH_SIZE)
+    # Calculate offset for pagination
+    offset = (state["current_batch"] - 1) * BATCH_SIZE
+    
+    log(f"Batch {state['current_batch']}: Loading units (offset={offset})...")
+    units = get_units(BATCH_SIZE, offset)
     
     if not units:
-        log("No more untagged units!")
+        log("No more units to process!")
         state["status"] = "idle"
         return False
     
@@ -387,6 +378,7 @@ def process_next_batch():
             
             display_data.append({
                 'unit_id': uid,
+                'document_title': unit.get('document_title', '-'),
                 'path_label': unit['path_label'],
                 'unit_type': unit['unit_type'],
                 'content': unit['content'],
@@ -495,46 +487,48 @@ HTML = """
             font-family: 'Vazirmatn', Tahoma, sans-serif;
             background: #1a1a2e;
             color: #eee;
-            padding: 20px;
+            padding: 15px;
             min-height: 100vh;
+            font-size: 12px;
         }
         .container { max-width: 1400px; margin: 0 auto; }
-        h1 { text-align: center; color: #00d4ff; margin-bottom: 20px; }
+        h1 { text-align: center; color: #00d4ff; margin-bottom: 15px; font-size: 1.4em; }
         
         .stats {
-            display: flex; gap: 20px; justify-content: center; margin-bottom: 20px;
+            display: flex; gap: 15px; justify-content: center; margin-bottom: 15px;
         }
         .stat {
             background: rgba(0,212,255,0.1);
             border: 1px solid rgba(0,212,255,0.3);
-            border-radius: 10px;
-            padding: 15px 25px;
+            border-radius: 8px;
+            padding: 10px 20px;
             text-align: center;
         }
-        .stat-value { font-size: 2em; font-weight: bold; color: #00d4ff; }
-        .stat-label { color: #aaa; font-size: 0.9em; }
+        .stat-value { font-size: 1.5em; font-weight: bold; color: #00d4ff; }
+        .stat-label { color: #aaa; font-size: 0.85em; }
         
-        .controls { text-align: center; margin: 20px 0; }
+        .controls { text-align: center; margin: 15px 0; }
         .btn {
-            padding: 12px 30px;
-            font-size: 1.1em;
+            padding: 8px 20px;
+            font-size: 0.95em;
             border: none;
-            border-radius: 8px;
+            border-radius: 6px;
             cursor: pointer;
-            margin: 5px;
+            margin: 3px;
             transition: all 0.3s;
         }
         .btn-primary { background: linear-gradient(90deg, #00d4ff, #00ff88); color: #000; }
         .btn-success { background: #00ff88; color: #000; }
         .btn-danger { background: #ff4444; color: #fff; }
-        .btn:hover { transform: scale(1.05); }
+        .btn:hover { transform: scale(1.03); }
         .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
         
         .status {
             text-align: center;
-            padding: 10px;
-            border-radius: 8px;
-            margin: 10px 0;
+            padding: 8px;
+            border-radius: 6px;
+            margin: 8px 0;
+            font-size: 0.9em;
         }
         .status-idle { background: rgba(100,100,100,0.3); }
         .status-processing { background: rgba(0,212,255,0.3); }
@@ -542,108 +536,115 @@ HTML = """
         
         .log-box {
             background: #0a0a15;
-            border-radius: 8px;
-            padding: 15px;
-            max-height: 150px;
+            border-radius: 6px;
+            padding: 10px;
+            max-height: 100px;
             overflow-y: auto;
             font-family: monospace;
-            font-size: 0.85em;
-            margin-bottom: 20px;
+            font-size: 0.75em;
+            margin-bottom: 15px;
         }
         
         .unit-card {
             background: rgba(255,255,255,0.05);
             border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 20px;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
         }
         .unit-header {
             display: flex;
+            flex-wrap: wrap;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 10px;
-            padding-bottom: 10px;
+            margin-bottom: 8px;
+            padding-bottom: 8px;
             border-bottom: 1px solid rgba(255,255,255,0.1);
+            gap: 8px;
         }
-        .unit-path { color: #00d4ff; font-weight: bold; }
+        .unit-doc { color: #ffcc00; font-size: 0.85em; width: 100%; }
+        .unit-path { color: #00d4ff; font-weight: bold; font-size: 0.9em; }
         .unit-type { 
             background: rgba(0,212,255,0.2);
-            padding: 3px 10px;
-            border-radius: 15px;
-            font-size: 0.85em;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.75em;
         }
         .unit-content {
             background: rgba(0,0,0,0.3);
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 15px;
-            line-height: 1.8;
-            max-height: 150px;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            line-height: 1.6;
+            max-height: 120px;
             overflow-y: auto;
+            font-size: 0.9em;
         }
         
-        .tags-section { margin-top: 15px; }
+        .tags-section { margin-top: 10px; }
         .tags-title { 
             font-weight: bold; 
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
+            font-size: 0.9em;
         }
-        .tags-title .icon { font-size: 1.2em; }
+        .tags-title .icon { font-size: 1em; }
         
         .tag-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 0.9em;
+            font-size: 0.8em;
         }
         .tag-table th, .tag-table td {
-            padding: 8px 12px;
+            padding: 5px 8px;
             text-align: right;
             border-bottom: 1px solid rgba(255,255,255,0.1);
         }
         .tag-table th {
             background: rgba(0,212,255,0.1);
             color: #00d4ff;
+            font-size: 0.85em;
         }
         .tag-table tr:hover { background: rgba(255,255,255,0.05); }
         
-        .tag-existing { color: #888; }
+        .tag-existing { color: #ffcc00; }
         .tag-new { color: #00ff88; }
         .tag-invalid { color: #ff4444; text-decoration: line-through; }
         
         .weight-badge {
             display: inline-block;
-            width: 30px;
-            height: 30px;
-            line-height: 30px;
+            width: 24px;
+            height: 24px;
+            line-height: 24px;
             text-align: center;
             border-radius: 50%;
             font-weight: bold;
+            font-size: 0.8em;
         }
         .weight-high { background: #00ff88; color: #000; }
         .weight-mid { background: #ffcc00; color: #000; }
         .weight-low { background: #ff8844; color: #000; }
         
-        .checkbox-cell { width: 40px; text-align: center; }
-        .checkbox-cell input { width: 18px; height: 18px; cursor: pointer; }
+        .checkbox-cell { width: 30px; text-align: center; }
+        .checkbox-cell input { width: 14px; height: 14px; cursor: pointer; }
         
         .new-terms-section {
             background: rgba(0,255,136,0.1);
             border: 1px solid rgba(0,255,136,0.3);
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 20px;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
         }
-        .new-terms-title { color: #00ff88; margin-bottom: 15px; }
+        .new-terms-title { color: #00ff88; margin-bottom: 10px; font-size: 0.95em; }
         
         .hidden { display: none; }
         
         .loading {
             text-align: center;
-            padding: 50px;
-            font-size: 1.5em;
+            padding: 40px;
+            font-size: 1.2em;
             color: #00d4ff;
         }
         .loading::after {
@@ -664,7 +665,7 @@ HTML = """
         <div class="stats">
             <div class="stat">
                 <div class="stat-value" id="total-units">-</div>
-                <div class="stat-label">کل بندهای بدون برچسب</div>
+                <div class="stat-label">کل بندها</div>
             </div>
             <div class="stat">
                 <div class="stat-value" id="processed">0</div>
@@ -820,17 +821,18 @@ HTML = """
             container.innerHTML = data.units.map((unit, ui) => `
                 <div class="unit-card">
                     <div class="unit-header">
+                        <div class="unit-doc">📄 ${unit.document_title || '-'}</div>
                         <span class="unit-path">${unit.path_label}</span>
                         <span class="unit-type">${unit.unit_type}</span>
                     </div>
                     <div class="unit-content">${unit.content}</div>
                     
-                    ${unit.existing_tags.length > 0 ? `
                     <div class="tags-section">
                         <div class="tags-title">
                             <span class="icon">📌</span>
-                            برچسب‌های موجود (${unit.existing_tags.length})
+                            برچسب‌های قبلی (${unit.existing_tags.length})
                         </div>
+                        ${unit.existing_tags.length > 0 ? `
                         <table class="tag-table">
                             <thead>
                                 <tr><th>موضوع</th><th>برچسب</th><th>وزن</th></tr>
@@ -845,15 +847,15 @@ HTML = """
                                 `).join('')}
                             </tbody>
                         </table>
+                        ` : '<em style="color:#888;font-size:0.85em">بدون برچسب قبلی</em>'}
                     </div>
-                    ` : ''}
                     
-                    ${unit.suggested_tags.length > 0 ? `
                     <div class="tags-section">
                         <div class="tags-title">
                             <span class="icon">🤖</span>
-                            برچسب‌های پیشنهادی (${unit.suggested_tags.length})
+                            برچسب‌های پیشنهادی جدید (${unit.suggested_tags.length})
                         </div>
+                        ${unit.suggested_tags.length > 0 ? `
                         <table class="tag-table">
                             <thead>
                                 <tr>
@@ -877,8 +879,8 @@ HTML = """
                                 `).join('')}
                             </tbody>
                         </table>
+                        ` : '<em style="color:#888;font-size:0.85em">بدون برچسب پیشنهادی</em>'}
                     </div>
-                    ` : '<div class="tags-section"><em style="color:#888">بدون برچسب پیشنهادی</em></div>'}
                 </div>
             `).join('');
         }
@@ -981,7 +983,7 @@ def index():
 @app.route('/api/init', methods=['POST'])
 def api_init():
     load_vocabularies_and_terms()
-    state["total_units"] = count_untagged()
+    state["total_units"] = count_total_units()
     state["total_batches"] = (state["total_units"] + BATCH_SIZE - 1) // BATCH_SIZE
     return jsonify({"success": True})
 
