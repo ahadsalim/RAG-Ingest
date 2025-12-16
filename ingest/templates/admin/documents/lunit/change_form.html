@@ -11,39 +11,12 @@
 {% block extrahead %}
 {{ block.super }}
 <script>
-// حذف برچسب‌های انتخاب شده
-function deleteSelectedTags() {
-    // پیدا کردن checkbox های تیک‌خورده در inline برچسب‌ها - جستجوی عمومی‌تر
-    const checkboxes = document.querySelectorAll('.inline-group input[type="checkbox"][name$="-DELETE"]:checked');
-    
-    if (checkboxes.length === 0) {
-        alert('لطفاً حداقل یک برچسب را برای حذف انتخاب کنید.');
+// حذف یک برچسب با کلیک روی دکمه ضربدر
+function deleteSingleTag(tagId, row) {
+    if (!confirm('آیا از حذف این برچسب مطمئن هستید؟')) {
         return;
     }
     
-    if (!confirm(`آیا از حذف ${checkboxes.length} برچسب مطمئن هستید؟`)) {
-        return;
-    }
-    
-    // جمع‌آوری ID های برچسب‌ها
-    const tagIds = [];
-    checkboxes.forEach(function(cb) {
-        // پیدا کردن hidden input با id در همان row
-        const row = cb.closest('tr');
-        if (row) {
-            const idInput = row.querySelector('input[name$="-id"]');
-            if (idInput && idInput.value) {
-                tagIds.push(idInput.value);
-            }
-        }
-    });
-    
-    if (tagIds.length === 0) {
-        alert('خطا: نمی‌توان ID برچسب‌ها را پیدا کرد.');
-        return;
-    }
-    
-    // ارسال درخواست حذف
     const objectId = window.location.pathname.split('/').filter(x => x).slice(-2, -1)[0];
     const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
     
@@ -53,14 +26,15 @@ function deleteSelectedTags() {
             'Content-Type': 'application/json',
             'X-CSRFToken': csrfToken
         },
-        body: JSON.stringify({tag_ids: tagIds})
+        body: JSON.stringify({tag_ids: [tagId]})
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            alert(data.message);
-            // رفرش صفحه
-            window.location.reload();
+            // حذف ردیف از جدول بدون رفرش
+            row.style.transition = 'opacity 0.3s';
+            row.style.opacity = '0';
+            setTimeout(() => row.remove(), 300);
         } else {
             alert('خطا: ' + (data.error || 'مشکلی پیش آمد'));
         }
@@ -70,54 +44,45 @@ function deleteSelectedTags() {
     });
 }
 
-// اضافه کردن دکمه حذف بعد از لود صفحه
+// اضافه کردن دکمه ضربدر به هر ردیف برچسب
 document.addEventListener('DOMContentLoaded', function() {
-    // پیدا کردن inline برچسب‌ها - امتحان چند ID مختلف
-    const possibleIds = [
-        'legalunitvocabularyterm_set-group',
-        'vocabulary_terms-group',
-        'legalunitvocabularytermInlineSimple-group'
-    ];
+    const inlineGroup = document.getElementById('legalunitvocabularyterm_set-group');
+    if (!inlineGroup) return;
     
-    let inlineGroup = null;
-    for (const id of possibleIds) {
-        inlineGroup = document.getElementById(id);
-        if (inlineGroup) break;
-    }
+    // پیدا کردن همه ردیف‌های برچسب (به جز ردیف‌های خالی)
+    const rows = inlineGroup.querySelectorAll('tr.form-row:not(.empty-form)');
     
-    // اگر با ID پیدا نشد، با class یا h2 پیدا کن
-    if (!inlineGroup) {
-        // پیدا کردن بر اساس عنوان "برچسب‌ها"
-        const allInlines = document.querySelectorAll('.inline-group');
-        for (const group of allInlines) {
-            const header = group.querySelector('h2');
-            if (header && header.textContent.includes('برچسب')) {
-                inlineGroup = group;
-                break;
-            }
-        }
-    }
-    
-    if (inlineGroup) {
-        // ساخت دکمه حذف
-        const deleteBtn = document.createElement('button');
-        deleteBtn.type = 'button';
-        deleteBtn.className = 'button';
-        deleteBtn.style.cssText = 'background: #ba2121; color: white; margin: 10px 0; padding: 8px 16px; border: none; cursor: pointer; border-radius: 4px;';
-        deleteBtn.innerHTML = '🗑️ حذف برچسب‌های انتخاب شده';
-        deleteBtn.onclick = deleteSelectedTags;
+    rows.forEach(function(row) {
+        // پیدا کردن ID برچسب
+        const idInput = row.querySelector('input[name$="-id"]');
+        if (!idInput || !idInput.value) return; // فقط برچسب‌های ذخیره شده
         
-        // اضافه کردن دکمه بعد از جدول
-        const table = inlineGroup.querySelector('table');
-        if (table) {
-            table.parentNode.insertBefore(deleteBtn, table.nextSibling);
+        const tagId = idInput.value;
+        
+        // پیدا کردن آخرین td (جایی که دکمه‌های چشم/مداد/+ هستند)
+        const lastTd = row.querySelector('td.original') || row.querySelector('td:last-child');
+        if (!lastTd) return;
+        
+        // ساخت دکمه ضربدر
+        const deleteBtn = document.createElement('a');
+        deleteBtn.href = '#';
+        deleteBtn.className = 'deletelink';
+        deleteBtn.title = 'حذف برچسب';
+        deleteBtn.style.cssText = 'display: inline-block; margin-right: 5px; color: #ba2121; font-size: 18px; font-weight: bold; text-decoration: none; cursor: pointer;';
+        deleteBtn.innerHTML = '✕';
+        deleteBtn.onclick = function(e) {
+            e.preventDefault();
+            deleteSingleTag(tagId, row);
+        };
+        
+        // اضافه کردن به ابتدای td (کنار دکمه‌های دیگر)
+        const relatedWrapper = lastTd.querySelector('.related-widget-wrapper');
+        if (relatedWrapper) {
+            relatedWrapper.appendChild(deleteBtn);
         } else {
-            // اگر جدول نبود، به انتهای گروه اضافه کن
-            inlineGroup.appendChild(deleteBtn);
+            lastTd.appendChild(deleteBtn);
         }
-    } else {
-        console.log('Inline group for tags not found');
-    }
+    });
 });
 </script>
 {% endblock %}
@@ -131,10 +96,7 @@ document.addEventListener('DOMContentLoaded', function() {
     .field-parent .related-lookup,
     .field-parent .changelink,
     .field-parent .addlink,
-    .field-parent .viewlink,
-    .field-parent .select2-selection__clear,
-    .field-parent .deletelink,
-    .field-parent a[data-popup="yes"] {
+    .field-parent .viewlink {
         display: none !important;
         visibility: hidden !important;
     }
