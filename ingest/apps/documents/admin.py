@@ -1,3 +1,11 @@
+""" 
+╔══════════════════════════════════════════════════════════════════════════════╗
+║  توجه: برای مدیریت بندهای حقوقی (LegalUnit) از LUnit استفاده کنید!          ║
+║  LUnit یک proxy model برای LegalUnit است با رابط کاربری بهتر.               ║
+║  فایل مربوطه: admin_lunit.py                                                 ║
+║  URL در admin: /admin/documents/lunit/                                       ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+"""
 from django.contrib import admin
 from django.utils.html import format_html
 from django.urls import reverse

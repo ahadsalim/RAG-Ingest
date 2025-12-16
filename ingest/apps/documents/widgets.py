@@ -1,5 +1,12 @@
 """
 Custom widgets for documents app.
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║  توجه: برای مدیریت بندهای حقوقی (LegalUnit) از LUnit استفاده کنید!          ║
+║  LUnit یک proxy model برای LegalUnit است با رابط کاربری بهتر.               ║
+║  فایل مربوطه: admin_lunit.py                                                 ║
+║  URL در admin: /admin/documents/lunit/                                       ║
+╚══════════════════════════════════════════════════════════════════════════════╝
 """
 from django import forms
 from django.urls import reverse
@@ -95,6 +102,16 @@ class ParentAutocompleteWidget(forms.TextInput):
             const resultsDiv = document.getElementById('id_{name}_results');
             const clearBtn = document.getElementById('id_{name}_clear');
             let searchTimeout;
+            
+            // Debug log
+            console.log('Parent autocomplete initialized for: {name}');
+            console.log('Manifestation ID:', searchInput ? searchInput.dataset.manifestationId : 'searchInput not found');
+            console.log('Model Name:', searchInput ? searchInput.dataset.modelName : 'searchInput not found');
+            
+            if (!searchInput) {{
+                console.error('Search input not found: id_{name}_search');
+                return;
+            }}
             
             // جستجو با تاخیر
             searchInput.addEventListener('input', function() {{

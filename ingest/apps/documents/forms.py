@@ -1,5 +1,12 @@
 """
 Django forms for documents app with Jalali date support.
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║  توجه: برای مدیریت بندهای حقوقی (LegalUnit) از LUnit استفاده کنید!          ║
+║  LUnit یک proxy model برای LegalUnit است با رابط کاربری بهتر.               ║
+║  فایل مربوطه: admin_lunit.py                                                 ║
+║  URL در admin: /admin/documents/lunit/                                       ║
+╚══════════════════════════════════════════════════════════════════════════════╝
 """
 
 from django import forms
