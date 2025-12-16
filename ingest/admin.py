@@ -157,6 +157,7 @@ admin_site = CustomAdminSite(name='custom_admin')
 # Register built-in Django models immediately
 from django.contrib.auth.models import User, Group
 from django.contrib.auth.admin import UserAdmin, GroupAdmin
+from ingest.core.jalali import to_jalali_datetime
 
 
 class CustomUserAdmin(UserAdmin):
@@ -164,12 +165,29 @@ class CustomUserAdmin(UserAdmin):
     سفارشی‌سازی UserAdmin برای سیستم احراز هویت OTP
     - نام کاربری = شماره موبایل
     - حذف فیلد password (لاگین با OTP)
+    - نمایش تاریخ‌ها به شمسی
     """
     # نام کاربری = شماره موبایل (ستون اول)
-    list_display = ('username', 'first_name', 'last_name', 'email', 'is_staff', 'is_active')
+    list_display = ('username', 'first_name', 'last_name', 'email', 'is_staff', 'is_active', 'jalali_last_login')
     list_filter = ('is_staff', 'is_superuser', 'is_active', 'groups')
     search_fields = ('username', 'first_name', 'last_name', 'email')
     ordering = ('username',)
+    
+    def jalali_last_login(self, obj):
+        """نمایش آخرین ورود به شمسی"""
+        if obj.last_login:
+            return to_jalali_datetime(obj.last_login)
+        return '-'
+    jalali_last_login.short_description = 'آخرین ورود'
+    jalali_last_login.admin_order_field = 'last_login'
+    
+    def jalali_date_joined(self, obj):
+        """نمایش تاریخ عضویت به شمسی"""
+        if obj.date_joined:
+            return to_jalali_datetime(obj.date_joined)
+        return '-'
+    jalali_date_joined.short_description = 'تاریخ عضویت'
+    jalali_date_joined.admin_order_field = 'date_joined'
     
     def get_fieldsets(self, request, obj=None):
         """Override fieldsets for OTP-based auth."""
@@ -178,7 +196,6 @@ class CustomUserAdmin(UserAdmin):
             return (
                 (None, {
                     'classes': ('wide',),
-                    'description': 'شماره موبایل به عنوان نام کاربری استفاده می‌شود (مثال: 09123456789)',
                     'fields': ('username',),
                 }),
                 ('اطلاعات شخصی', {
@@ -190,7 +207,6 @@ class CustomUserAdmin(UserAdmin):
         return (
             ('اطلاعات کاربر', {
                 'fields': ('username', 'first_name', 'last_name', 'email'),
-                'description': 'شماره موبایل به عنوان نام کاربری استفاده می‌شود',
             }),
             ('وضعیت', {
                 'fields': ('is_active', 'is_staff', 'is_superuser'),
@@ -201,23 +217,43 @@ class CustomUserAdmin(UserAdmin):
             }),
             ('تاریخ‌ها', {
                 'classes': ('collapse',),
-                'fields': ('last_login', 'date_joined'),
+                'fields': ('jalali_last_login_display', 'jalali_date_joined_display'),
             }),
         )
     
     def get_readonly_fields(self, request, obj=None):
         """Make mobile (username) readonly when editing."""
         if obj:
-            return ('username', 'last_login', 'date_joined')
+            return ('username', 'jalali_last_login_display', 'jalali_date_joined_display')
         return ()
+    
+    def jalali_last_login_display(self, obj):
+        """نمایش آخرین ورود به شمسی در فرم"""
+        if obj.last_login:
+            return to_jalali_datetime(obj.last_login)
+        return '-'
+    jalali_last_login_display.short_description = 'آخرین ورود'
+    
+    def jalali_date_joined_display(self, obj):
+        """نمایش تاریخ عضویت به شمسی در فرم"""
+        if obj.date_joined:
+            return to_jalali_datetime(obj.date_joined)
+        return '-'
+    jalali_date_joined_display.short_description = 'تاریخ عضویت'
     
     add_fieldsets = (
         (None, {
             'classes': ('wide',),
-            'description': 'شماره موبایل به عنوان نام کاربری استفاده می‌شود',
             'fields': ('username', 'first_name', 'last_name', 'email'),
         }),
     )
+    
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        """حذف help_text پیش‌فرض فیلد username"""
+        field = super().formfield_for_dbfield(db_field, request, **kwargs)
+        if db_field.name == 'username' and field:
+            field.help_text = ''
+        return field
     
     def save_model(self, request, obj, form, change):
         """
