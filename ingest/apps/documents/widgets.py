@@ -57,6 +57,21 @@ class ParentAutocompleteWidget(forms.TextInput):
                    data-manifestation-id="{self.manifestation_id or ''}"
                    data-model-name="{self.model_name}"
             />
+            <button type="button" 
+                    id="id_{name}_clear" 
+                    class="parent-clear-btn"
+                    title="حذف والد"
+                    style="
+                        padding: 4px 8px;
+                        background: #6c757d;
+                        color: white;
+                        border: none;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        font-size: 14px;
+                        display: {'inline-block' if value else 'none'};
+                    "
+            >✕</button>
             <div id="id_{name}_results" class="autocomplete-results" style="
                 display: none;
                 position: absolute;
@@ -78,6 +93,7 @@ class ParentAutocompleteWidget(forms.TextInput):
             const searchInput = document.getElementById('id_{name}_search');
             const hiddenInput = document.getElementById('id_{name}');
             const resultsDiv = document.getElementById('id_{name}_results');
+            const clearBtn = document.getElementById('id_{name}_clear');
             let searchTimeout;
             
             // جستجو با تاخیر
@@ -87,6 +103,9 @@ class ParentAutocompleteWidget(forms.TextInput):
                 
                 if (query.length < 1) {{
                     resultsDiv.style.display = 'none';
+                    // پاک کردن والد اگر فیلد خالی شد
+                    hiddenInput.value = '';
+                    if (clearBtn) clearBtn.style.display = 'none';
                     return;
                 }}
                 
@@ -165,6 +184,7 @@ class ParentAutocompleteWidget(forms.TextInput):
                 hiddenInput.value = id;
                 searchInput.value = display;
                 resultsDiv.style.display = 'none';
+                if (clearBtn) clearBtn.style.display = 'inline-block';
             }}
             
             // بستن نتایج با کلیک خارج
@@ -181,12 +201,15 @@ class ParentAutocompleteWidget(forms.TextInput):
                 }}
             }});
             
-            // پاک کردن والد با خالی کردن فیلد
-            searchInput.addEventListener('input', function() {{
-                if (this.value.trim() === '') {{
+            // دکمه پاک کردن والد
+            if (clearBtn) {{
+                clearBtn.addEventListener('click', function() {{
                     hiddenInput.value = '';
-                }}
-            }});
+                    searchInput.value = '';
+                    resultsDiv.style.display = 'none';
+                    clearBtn.style.display = 'none';
+                }});
+            }}
         }})();
         </script>
         '''

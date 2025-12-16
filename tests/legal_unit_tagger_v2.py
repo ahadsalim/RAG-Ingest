@@ -100,22 +100,29 @@ def load_vocabularies_and_terms():
     conn.close()
     log(f"Loaded {len(state['vocabularies'])} vocabularies, {len(state['terms'])} terms")
 
+# فقط این نوع واحدها نیاز به برچسب دارند
+VALID_UNIT_TYPES = ['همه متن', 'ماده', 'بند', 'زیر بند', 'تبصره']
+
 def get_untagged_units(limit=30):
-    """Get untagged legal units."""
+    """Get untagged legal units - only specific unit types."""
     conn = get_db_connection()
     cur = conn.cursor()
     
-    cur.execute("""
+    # فیلتر بر اساس نوع واحد
+    type_placeholders = ','.join(['%s'] * len(VALID_UNIT_TYPES))
+    
+    cur.execute(f"""
         SELECT lu.id, lu.path_label, lu.content, lu.unit_type
         FROM documents_legalunit lu
         WHERE lu.content IS NOT NULL AND lu.content != ''
+          AND lu.unit_type IN ({type_placeholders})
           AND NOT EXISTS (
               SELECT 1 FROM documents_legalunitvocabularyterm luvt 
               WHERE luvt.legal_unit_id = lu.id
           )
         ORDER BY lu.created_at
         LIMIT %s
-    """, (limit,))
+    """, (*VALID_UNIT_TYPES, limit))
     
     units = list(cur.fetchall())
     conn.close()
@@ -157,14 +164,18 @@ def get_existing_tags(unit_ids):
 def count_untagged():
     conn = get_db_connection()
     cur = conn.cursor()
-    cur.execute("""
+    
+    type_placeholders = ','.join(['%s'] * len(VALID_UNIT_TYPES))
+    
+    cur.execute(f"""
         SELECT COUNT(*) as count FROM documents_legalunit lu
         WHERE lu.content IS NOT NULL AND lu.content != ''
+          AND lu.unit_type IN ({type_placeholders})
           AND NOT EXISTS (
               SELECT 1 FROM documents_legalunitvocabularyterm luvt 
               WHERE luvt.legal_unit_id = lu.id
           )
-    """)
+    """, VALID_UNIT_TYPES)
     result = cur.fetchone()
     conn.close()
     return result["count"]
