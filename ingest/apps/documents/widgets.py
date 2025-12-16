@@ -81,16 +81,13 @@ class ParentAutocompleteWidget(forms.TextInput):
             >✕</button>
             <div id="id_{name}_results" class="autocomplete-results" style="
                 display: none;
-                position: absolute;
-                top: 100%;
-                left: 0;
+                position: fixed;
                 width: 600px;
                 background: white;
                 border: 1px solid #ccc;
-                border-top: none;
                 max-height: 400px;
                 overflow-y: auto;
-                z-index: 1000;
+                z-index: 99999;
                 box-shadow: 0 4px 8px rgba(0,0,0,0.15);
             "></div>
         </div>
@@ -99,7 +96,7 @@ class ParentAutocompleteWidget(forms.TextInput):
         (function() {{
             const searchInput = document.getElementById('id_{name}_search');
             const hiddenInput = document.getElementById('id_{name}');
-            const resultsDiv = document.getElementById('id_{name}_results');
+            let resultsDiv = document.getElementById('id_{name}_results');
             const clearBtn = document.getElementById('id_{name}_clear');
             let searchTimeout;
             
@@ -113,10 +110,17 @@ class ParentAutocompleteWidget(forms.TextInput):
                 return;
             }}
             
+            // انتقال resultsDiv به body برای جلوگیری از مشکلات overflow
+            if (resultsDiv) {{
+                document.body.appendChild(resultsDiv);
+                console.log('resultsDiv moved to body');
+            }}
+            
             // جستجو با تاخیر
             searchInput.addEventListener('input', function() {{
                 clearTimeout(searchTimeout);
                 const query = this.value.trim();
+                console.log('Input event, query:', query);
                 
                 if (query.length < 1) {{
                     resultsDiv.style.display = 'none';
@@ -127,6 +131,7 @@ class ParentAutocompleteWidget(forms.TextInput):
                 }}
                 
                 searchTimeout = setTimeout(function() {{
+                    console.log('Searching for:', query);
                     searchParents(query);
                 }}, 300);
             }});
@@ -142,18 +147,25 @@ class ParentAutocompleteWidget(forms.TextInput):
                 
                 const url = '/admin/documents/' + modelName + '/search-parents/?q=' + encodeURIComponent(query) + '&manifestation_id=' + manifestationId;
                 
+                console.log('Fetching URL:', url);
                 fetch(url)
                     .then(response => response.json())
                     .then(data => {{
+                        console.log('Got results:', data.results ? data.results.length : 0);
                         displayResults(data.results);
                     }})
                     .catch(error => {{
-                        console.error('Error:', error);
+                        console.error('Fetch Error:', error);
                     }});
             }}
             
             // نمایش نتایج
             function displayResults(results) {{
+                console.log('displayResults called, resultsDiv:', resultsDiv);
+                if (!resultsDiv) {{
+                    console.error('resultsDiv is null!');
+                    return;
+                }}
                 if (results.length === 0) {{
                     resultsDiv.innerHTML = '<div style="padding: 10px; color: #999;">نتیجه‌ای یافت نشد</div>';
                     resultsDiv.style.display = 'block';
@@ -178,7 +190,13 @@ class ParentAutocompleteWidget(forms.TextInput):
                 }});
                 
                 resultsDiv.innerHTML = html;
+                
+                // تنظیم موقعیت resultsDiv بر اساس searchInput
+                const rect = searchInput.getBoundingClientRect();
+                resultsDiv.style.top = (rect.bottom + window.scrollY) + 'px';
+                resultsDiv.style.left = rect.left + 'px';
                 resultsDiv.style.display = 'block';
+                console.log('Results displayed at:', rect.bottom, rect.left);
                 
                 // اضافه کردن event listener به هر آیتم
                 resultsDiv.querySelectorAll('.autocomplete-item').forEach(function(item) {{

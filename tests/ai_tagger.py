@@ -29,7 +29,7 @@ DB_CONFIG = {
 
 # Model settings
 MODEL_NAME = "gpt-4o-mini"
-BATCH_SIZE = 10  # Smaller batch for better accuracy
+BATCH_SIZE = 5  # Smaller batch for better accuracy and faster API response
 
 # ============================================
 # DO NOT MODIFY BELOW THIS LINE
@@ -112,12 +112,12 @@ def get_units(limit=30, offset=0):
     type_placeholders = ','.join(['%s'] * len(VALID_UNIT_TYPES))
     
     cur.execute(f"""
-        SELECT lu.id, lu.path_label, lu.content, lu.unit_type, d.title as document_title
+        SELECT lu.id, lu.path_label, lu.content, lu.unit_type, w.title_official as document_title, lu.work_id
         FROM documents_legalunit lu
-        LEFT JOIN documents_document d ON lu.document_id = d.id
+        LEFT JOIN documents_instrumentwork w ON lu.work_id = w.id
         WHERE lu.content IS NOT NULL AND lu.content != ''
           AND lu.unit_type IN ({type_placeholders})
-        ORDER BY lu.created_at
+        ORDER BY lu.work_id, lu.lft
         LIMIT %s OFFSET %s
     """, (*VALID_UNIT_TYPES, limit, offset))
     
@@ -254,17 +254,45 @@ def save_prompt_to_file(batch_num, system, user):
     return filename
 
 def call_gpt(system, user):
-    client = OpenAI(api_key=OPENAI_API_KEY, base_url=OPENAI_BASE_URL)
-    response = client.chat.completions.create(
-        model=MODEL_NAME,
-        messages=[
-            {"role": "system", "content": system},
-            {"role": "user", "content": user}
-        ],
-        temperature=0.3,
-        response_format={"type": "json_object"}
-    )
-    return response.choices[0].message.content
+    log(f"Calling GPT API ({MODEL_NAME})...")
+    log(f"Prompt size: system={len(system)} chars, user={len(user)} chars")
+    
+    try:
+        client = OpenAI(
+            api_key=OPENAI_API_KEY, 
+            base_url=OPENAI_BASE_URL,
+            timeout=180.0  # 3 minute timeout
+        )
+        
+        log("Sending request to API...")
+        response = client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": user}
+            ],
+            temperature=0.3
+        )
+        
+        result = response.choices[0].message.content
+        log(f"Got response: {len(result)} chars")
+        
+        # Extract JSON from response (may have extra text)
+        if result.strip().startswith('{'):
+            return result
+        
+        # Try to find JSON in response
+        import re
+        json_match = re.search(r'\{[\s\S]*\}', result)
+        if json_match:
+            return json_match.group()
+        
+        log(f"Warning: No JSON found in response")
+        return '{"results": []}'
+        
+    except Exception as e:
+        log(f"API Error: {type(e).__name__}: {e}")
+        raise
 
 def is_valid_uuid(val):
     try:
@@ -411,7 +439,7 @@ def save_approved_batch(approved_data):
     saved_tags = 0
     saved_terms = 0
     
-    # Save new terms first
+    # Save new terms from AI first
     for term in approved_data.get('new_terms', []):
         if not term.get('approved'):
             continue
@@ -440,7 +468,51 @@ def save_approved_batch(approved_data):
             conn.rollback()
             log(f"Error saving term: {e}")
     
-    # Save tags
+    # Save manual new terms and link to units
+    manual_term_map = {}  # tag_name -> term_id
+    for term in approved_data.get('manual_new_terms', []):
+        try:
+            vocab_id = term.get('vocabulary_id', '')
+            tag_name = term.get('tag', '')
+            unit_id = term.get('unit_id', '')
+            weight = term.get('weight', 7)
+            
+            if not vocab_id or not tag_name:
+                continue
+            
+            # Check if we already created this term
+            if tag_name in manual_term_map:
+                term_id = manual_term_map[tag_name]
+            else:
+                term_id = str(uuid.uuid4())
+                tag_code = ''.join(word.capitalize() for word in tag_name.split())
+                cur.execute("""
+                    INSERT INTO masterdata_vocabularyterm (id, vocabulary_id, term, code, is_active, created_at, updated_at)
+                    VALUES (%s, %s, %s, %s, true, NOW(), NOW())
+                    ON CONFLICT DO NOTHING
+                """, (term_id, vocab_id, tag_name, tag_code))
+                conn.commit()
+                saved_terms += 1
+                state["valid_term_ids"].add(term_id)
+                manual_term_map[tag_name] = term_id
+                log(f"Added manual term: {tag_name}")
+            
+            # Link to unit
+            if unit_id:
+                tag_id = str(uuid.uuid4())
+                cur.execute("""
+                    INSERT INTO documents_legalunitvocabularyterm 
+                    (id, legal_unit_id, vocabulary_term_id, weight, created_at, updated_at)
+                    VALUES (%s, %s, %s, %s, NOW(), NOW())
+                    ON CONFLICT (legal_unit_id, vocabulary_term_id) DO UPDATE SET weight = %s, updated_at = NOW()
+                """, (tag_id, unit_id, term_id, weight, weight))
+                conn.commit()
+                saved_tags += 1
+        except Exception as e:
+            conn.rollback()
+            log(f"Error saving manual term: {e}")
+    
+    # Save AI tags
     for unit in approved_data.get('units', []):
         unit_id = unit['unit_id']
         for tag in unit.get('tags', []):
@@ -465,6 +537,28 @@ def save_approved_batch(approved_data):
             except Exception as e:
                 conn.rollback()
                 log(f"Error saving tag: {e}")
+        
+        # Save manual existing tags
+        for tag in unit.get('manual_tags', []):
+            term_id = tag['term_id']
+            weight = tag.get('weight', 7)
+            
+            if not is_valid_uuid(term_id) or term_id not in state["valid_term_ids"]:
+                continue
+            
+            try:
+                tag_id = str(uuid.uuid4())
+                cur.execute("""
+                    INSERT INTO documents_legalunitvocabularyterm 
+                    (id, legal_unit_id, vocabulary_term_id, weight, created_at, updated_at)
+                    VALUES (%s, %s, %s, %s, NOW(), NOW())
+                    ON CONFLICT (legal_unit_id, vocabulary_term_id) DO UPDATE SET weight = %s, updated_at = NOW()
+                """, (tag_id, unit_id, term_id, weight, weight))
+                conn.commit()
+                saved_tags += 1
+            except Exception as e:
+                conn.rollback()
+                log(f"Error saving manual tag: {e}")
     
     conn.close()
     state["processed_units"] += len(approved_data.get('units', []))
@@ -638,6 +732,115 @@ HTML = """
             margin-bottom: 15px;
         }
         .new-terms-title { color: #00ff88; margin-bottom: 10px; font-size: 0.95em; }
+        
+        .manual-tag-section {
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 8px;
+        }
+        .manual-tag-title {
+            font-size: 0.85em;
+            color: #aaa;
+            margin-bottom: 8px;
+        }
+        .tag-search-container {
+            position: relative;
+        }
+        .tag-search-input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 6px;
+            background: rgba(0,0,0,0.3);
+            color: #fff;
+            font-size: 0.85em;
+        }
+        .tag-search-input:focus {
+            outline: none;
+            border-color: #00d4ff;
+        }
+        .tag-suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: #1a1a2e;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 6px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 100;
+            display: none;
+        }
+        .tag-suggestions.show { display: block; }
+        .tag-suggestion-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            font-size: 0.85em;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .tag-suggestion-item:hover { background: rgba(0,212,255,0.2); }
+        .tag-suggestion-item .vocab-name { color: #888; font-size: 0.8em; }
+        .tag-suggestion-new {
+            background: rgba(0,255,136,0.1);
+            color: #00ff88;
+        }
+        .manual-tags-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-top: 8px;
+        }
+        .manual-tag-chip {
+            background: rgba(138,43,226,0.3);
+            border: 1px solid rgba(138,43,226,0.5);
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .manual-tag-chip .remove-tag {
+            cursor: pointer;
+            color: #ff4444;
+        }
+        .vocab-select-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .vocab-select-content {
+            background: #1a1a2e;
+            padding: 20px;
+            border-radius: 12px;
+            min-width: 300px;
+            max-width: 400px;
+        }
+        .vocab-select-title { color: #00d4ff; margin-bottom: 15px; }
+        .vocab-select-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .vocab-select-item {
+            padding: 10px;
+            cursor: pointer;
+            border-radius: 6px;
+            margin-bottom: 5px;
+        }
+        .vocab-select-item:hover { background: rgba(0,212,255,0.2); }
+        .vocab-select-cancel {
+            margin-top: 15px;
+            text-align: center;
+        }
         
         .hidden { display: none; }
         
@@ -881,9 +1084,181 @@ HTML = """
                         </table>
                         ` : '<em style="color:#888;font-size:0.85em">بدون برچسب پیشنهادی</em>'}
                     </div>
+                    
+                    <!-- Manual Tag Input -->
+                    <div class="manual-tag-section">
+                        <div class="manual-tag-title">✏️ افزودن برچسب دستی:</div>
+                        <div class="tag-search-container">
+                            <input type="text" class="tag-search-input" 
+                                   placeholder="جستجو یا افزودن برچسب جدید..."
+                                   data-unit-idx="${ui}"
+                                   oninput="searchTags(this, ${ui})"
+                                   onkeydown="handleTagKeydown(event, ${ui})">
+                            <div class="tag-suggestions" id="suggestions-${ui}"></div>
+                        </div>
+                        <div class="manual-tags-list" id="manual-tags-${ui}"></div>
+                    </div>
                 </div>
             `).join('');
         }
+        
+        // Store manual tags per unit
+        let manualTags = {};
+        let allTerms = [];
+        let allVocabs = [];
+        
+        function loadTermsAndVocabs() {
+            fetch('/api/terms').then(r => r.json()).then(data => {
+                allTerms = data.terms || [];
+                allVocabs = data.vocabularies || [];
+            });
+        }
+        
+        function searchTags(input, unitIdx) {
+            const query = input.value.trim().toLowerCase();
+            const suggestionsDiv = document.getElementById('suggestions-' + unitIdx);
+            
+            if (query.length < 1) {
+                suggestionsDiv.classList.remove('show');
+                return;
+            }
+            
+            // Filter matching terms
+            const matches = allTerms.filter(t => 
+                t.term.toLowerCase().includes(query)
+            ).slice(0, 10);
+            
+            let html = matches.map(t => `
+                <div class="tag-suggestion-item" onclick="selectExistingTag(${unitIdx}, '${t.id}', '${t.term}', '${t.vocabulary_name}')">
+                    <div>${t.term}</div>
+                    <div class="vocab-name">${t.vocabulary_name}</div>
+                </div>
+            `).join('');
+            
+            // Add "create new" option if no exact match
+            const exactMatch = allTerms.find(t => t.term.toLowerCase() === query);
+            if (!exactMatch && query.length > 1) {
+                html += `
+                    <div class="tag-suggestion-item tag-suggestion-new" onclick="createNewTag(${unitIdx}, '${input.value.trim()}')">
+                        <div>🆕 ایجاد برچسب جدید: "${input.value.trim()}"</div>
+                    </div>
+                `;
+            }
+            
+            suggestionsDiv.innerHTML = html;
+            suggestionsDiv.classList.add('show');
+        }
+        
+        function handleTagKeydown(event, unitIdx) {
+            if (event.key === 'Escape') {
+                document.getElementById('suggestions-' + unitIdx).classList.remove('show');
+            }
+        }
+        
+        function selectExistingTag(unitIdx, termId, termName, vocabName) {
+            if (!manualTags[unitIdx]) manualTags[unitIdx] = [];
+            
+            // Check if already added
+            if (manualTags[unitIdx].find(t => t.term_id === termId)) {
+                alert('این برچسب قبلاً اضافه شده است');
+                return;
+            }
+            
+            manualTags[unitIdx].push({
+                term_id: termId,
+                term: termName,
+                vocabulary: vocabName,
+                weight: 7,
+                is_new: false
+            });
+            
+            renderManualTags(unitIdx);
+            
+            // Clear input
+            const input = document.querySelector(`[data-unit-idx="${unitIdx}"]`);
+            input.value = '';
+            document.getElementById('suggestions-' + unitIdx).classList.remove('show');
+        }
+        
+        function createNewTag(unitIdx, tagName) {
+            // Show vocabulary selection modal
+            showVocabModal(unitIdx, tagName);
+        }
+        
+        function showVocabModal(unitIdx, tagName) {
+            const modal = document.createElement('div');
+            modal.className = 'vocab-select-modal';
+            modal.id = 'vocab-modal';
+            modal.innerHTML = `
+                <div class="vocab-select-content">
+                    <div class="vocab-select-title">انتخاب موضوع برای برچسب: "${tagName}"</div>
+                    <div class="vocab-select-list">
+                        ${allVocabs.map(v => `
+                            <div class="vocab-select-item" onclick="confirmNewTag(${unitIdx}, '${tagName}', '${v.id}', '${v.name}')">
+                                ${v.name}
+                            </div>
+                        `).join('')}
+                    </div>
+                    <div class="vocab-select-cancel">
+                        <button class="btn btn-danger" onclick="closeVocabModal()">انصراف</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+        
+        function closeVocabModal() {
+            const modal = document.getElementById('vocab-modal');
+            if (modal) modal.remove();
+        }
+        
+        function confirmNewTag(unitIdx, tagName, vocabId, vocabName) {
+            if (!manualTags[unitIdx]) manualTags[unitIdx] = [];
+            
+            manualTags[unitIdx].push({
+                term_id: null,
+                term: tagName,
+                vocabulary: vocabName,
+                vocabulary_id: vocabId,
+                weight: 7,
+                is_new: true
+            });
+            
+            renderManualTags(unitIdx);
+            closeVocabModal();
+            
+            // Clear input
+            const input = document.querySelector(`[data-unit-idx="${unitIdx}"]`);
+            input.value = '';
+            document.getElementById('suggestions-' + unitIdx).classList.remove('show');
+        }
+        
+        function renderManualTags(unitIdx) {
+            const container = document.getElementById('manual-tags-' + unitIdx);
+            const tags = manualTags[unitIdx] || [];
+            
+            container.innerHTML = tags.map((t, i) => `
+                <div class="manual-tag-chip">
+                    <span>${t.is_new ? '🆕 ' : ''}${t.term}</span>
+                    <span style="color:#888">(${t.vocabulary})</span>
+                    <span class="remove-tag" onclick="removeManualTag(${unitIdx}, ${i})">×</span>
+                </div>
+            `).join('');
+        }
+        
+        function removeManualTag(unitIdx, tagIdx) {
+            if (manualTags[unitIdx]) {
+                manualTags[unitIdx].splice(tagIdx, 1);
+                renderManualTags(unitIdx);
+            }
+        }
+        
+        // Close suggestions when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!e.target.classList.contains('tag-search-input')) {
+                document.querySelectorAll('.tag-suggestions').forEach(el => el.classList.remove('show'));
+            }
+        });
         
         function getWeightClass(w) {
             if (w >= 7) return 'weight-high';
@@ -894,10 +1269,11 @@ HTML = """
         function collectApprovedData() {
             const result = {
                 units: [],
-                new_terms: []
+                new_terms: [],
+                manual_new_terms: []
             };
             
-            // Collect new terms
+            // Collect new terms from AI
             document.querySelectorAll('[data-new-term]').forEach(cb => {
                 const idx = parseInt(cb.dataset.newTerm);
                 if (cb.checked && currentData.new_terms[idx]) {
@@ -908,13 +1284,15 @@ HTML = """
                 }
             });
             
-            // Collect unit tags
+            // Collect unit tags (AI + manual)
             currentData.units.forEach((unit, ui) => {
                 const unitResult = {
                     unit_id: unit.unit_id,
-                    tags: []
+                    tags: [],
+                    manual_tags: []
                 };
                 
+                // AI suggested tags
                 document.querySelectorAll(`[data-unit="${ui}"]`).forEach(cb => {
                     const ti = parseInt(cb.dataset.tag);
                     if (cb.checked && unit.suggested_tags[ti] && unit.suggested_tags[ti].valid) {
@@ -926,7 +1304,29 @@ HTML = """
                     }
                 });
                 
-                if (unitResult.tags.length > 0) {
+                // Manual tags
+                if (manualTags[ui]) {
+                    manualTags[ui].forEach(mt => {
+                        if (mt.is_new) {
+                            // New term - add to manual_new_terms and manual_tags
+                            result.manual_new_terms.push({
+                                tag: mt.term,
+                                vocabulary_id: mt.vocabulary_id,
+                                vocabulary: mt.vocabulary,
+                                unit_id: unit.unit_id,
+                                weight: mt.weight
+                            });
+                        } else {
+                            // Existing term
+                            unitResult.manual_tags.push({
+                                term_id: mt.term_id,
+                                weight: mt.weight
+                            });
+                        }
+                    });
+                }
+                
+                if (unitResult.tags.length > 0 || unitResult.manual_tags.length > 0) {
                     result.units.push(unitResult);
                 }
             });
@@ -969,7 +1369,10 @@ HTML = """
         }
         
         // Initial load
-        fetch('/api/init', {method: 'POST'}).then(() => updateStatus());
+        fetch('/api/init', {method: 'POST'}).then(() => {
+            updateStatus();
+            loadTermsAndVocabs();
+        });
         setInterval(updateStatus, 5000);
     </script>
 </body>
@@ -1014,6 +1417,14 @@ def api_results():
     if state["current_results"]:
         return jsonify(state["current_results"])
     return jsonify({"units": [], "new_terms": []})
+
+@app.route('/api/terms')
+def api_terms():
+    """Return all terms and vocabularies for autocomplete."""
+    return jsonify({
+        "terms": state.get("terms", []),
+        "vocabularies": state.get("vocabularies", [])
+    })
 
 @app.route('/api/approve', methods=['POST'])
 def api_approve():
