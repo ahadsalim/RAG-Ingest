@@ -1,0 +1,6 @@
+# Requirements for legal_unit_tagger.py
+# Install with: pip install -r tagger_requirements.txt
+
+flask>=2.3.0
+psycopg2-binary>=2.9.0
+openai>=1.0.0
