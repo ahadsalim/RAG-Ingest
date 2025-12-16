@@ -158,86 +158,105 @@ admin_site = CustomAdminSite(name='custom_admin')
 from django.contrib.auth.models import User, Group
 from django.contrib.auth.admin import UserAdmin, GroupAdmin
 
+# Import UserProfileInline from accounts app
+from ingest.apps.accounts.admin import UserProfileInline
+
 
 class CustomUserAdmin(UserAdmin):
     """
-    سفارشی‌سازی UserAdmin برای نمایش فقط لینک تغییر رمز
+    سفارشی‌سازی UserAdmin برای سیستم احراز هویت OTP
+    - حذف فیلد password (لاگین با OTP)
+    - اضافه کردن UserProfile inline برای شماره موبایل
     """
+    inlines = [UserProfileInline]
     
-    def get_readonly_fields(self, request, obj=None):
-        """Add custom password display to readonly fields when editing."""
-        readonly = list(super().get_readonly_fields(request, obj))
-        if obj:  # در حال ویرایش
-            if 'password_display' not in readonly:
-                readonly.append('password_display')
-        return readonly
+    # حذف فیلد password از لیست نمایش
+    list_display = ('username', 'email', 'first_name', 'last_name', 'is_staff', 'is_active', 'get_mobile')
+    list_filter = ('is_staff', 'is_superuser', 'is_active', 'groups')
+    search_fields = ('username', 'first_name', 'last_name', 'email', 'profile__mobile')
+    
+    def get_mobile(self, obj):
+        """نمایش شماره موبایل از پروفایل"""
+        try:
+            return obj.profile.mobile
+        except:
+            return '-'
+    get_mobile.short_description = 'شماره موبایل'
+    get_mobile.admin_order_field = 'profile__mobile'
     
     def get_fieldsets(self, request, obj=None):
-        """Override fieldsets to replace password with password_display."""
-        fieldsets = super().get_fieldsets(request, obj)
+        """Override fieldsets to remove password field for OTP-based auth."""
+        if not obj:
+            # Creating new user - simplified form
+            return (
+                (None, {
+                    'classes': ('wide',),
+                    'fields': ('username', 'first_name', 'last_name', 'email'),
+                }),
+            )
         
-        if obj:  # در حال ویرایش
-            fieldsets = list(fieldsets)
-            for i, (name, data) in enumerate(fieldsets):
-                if 'password' in data.get('fields', []):
-                    # جایگزین کردن password با password_display
-                    fields = list(data['fields'])
-                    if 'password' in fields:
-                        idx = fields.index('password')
-                        fields[idx] = 'password_display'
-                    fieldsets[i] = (name, {**data, 'fields': tuple(fields)})
-        
-        return fieldsets
-    
-    def password_display(self, obj):
-        """Display only password change link."""
-        from django.urls import reverse
-        from django.utils.html import format_html
-        
-        change_password_url = reverse('admin:auth_user_password_change', args=[obj.pk])
-        return format_html(
-            '<a href="{}">تغییر رمز عبور</a>',
-            change_password_url
+        # Editing existing user - no password field
+        return (
+            (None, {'fields': ('username',)}),
+            ('اطلاعات شخصی', {'fields': ('first_name', 'last_name', 'email')}),
+            ('دسترسی‌ها', {
+                'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions'),
+            }),
+            ('تاریخ‌های مهم', {'fields': ('last_login', 'date_joined')}),
         )
-    password_display.short_description = 'گذرواژه'
+    
+    def get_readonly_fields(self, request, obj=None):
+        """Make some fields readonly when editing."""
+        if obj:
+            return ('username', 'last_login', 'date_joined')
+        return ()
+    
+    add_fieldsets = (
+        (None, {
+            'classes': ('wide',),
+            'fields': ('username', 'first_name', 'last_name', 'email'),
+        }),
+    )
     
     def save_model(self, request, obj, form, change):
         """
-        وقتی کاربر permission ویرایش LUnit/LegalUnit می‌گیرد،
-        permission حذف SyncLog هم بده.
+        Set unusable password for new users (OTP-based auth).
+        Also auto-add SyncLog delete permission for LUnit editors.
         """
+        if not change:
+            # New user - set unusable password
+            obj.set_unusable_password()
         super().save_model(request, obj, form, change)
         
-        # بررسی permissions
+        # بررسی permissions برای اضافه کردن خودکار permission حذف SyncLog
         from django.contrib.contenttypes.models import ContentType
         from django.contrib.auth.models import Permission
         
-        # اگر کاربر permission ویرایش LUnit یا LegalUnit دارد
-        lunit_ct = ContentType.objects.get(app_label='documents', model='lunit')
-        legalunit_ct = ContentType.objects.get(app_label='documents', model='legalunit')
-        
-        has_lunit_change = obj.user_permissions.filter(
-            content_type=lunit_ct, codename='change_lunit'
-        ).exists() or obj.groups.filter(
-            permissions__content_type=lunit_ct, permissions__codename='change_lunit'
-        ).exists()
-        
-        has_legalunit_change = obj.user_permissions.filter(
-            content_type=legalunit_ct, codename='change_legalunit'
-        ).exists() or obj.groups.filter(
-            permissions__content_type=legalunit_ct, permissions__codename='change_legalunit'
-        ).exists()
-        
-        # اگر یکی از این permissions را دارد، permission حذف SyncLog بده
-        if has_lunit_change or has_legalunit_change:
-            synclog_ct = ContentType.objects.get(app_label='embeddings', model='synclog')
-            delete_synclog_perm = Permission.objects.get(
-                content_type=synclog_ct, codename='delete_synclog'
-            )
+        try:
+            lunit_ct = ContentType.objects.get(app_label='documents', model='lunit')
+            legalunit_ct = ContentType.objects.get(app_label='documents', model='legalunit')
             
-            # اضافه کردن permission اگر نداشته باشد
-            if not obj.user_permissions.filter(pk=delete_synclog_perm.pk).exists():
-                obj.user_permissions.add(delete_synclog_perm)
+            has_lunit_change = obj.user_permissions.filter(
+                content_type=lunit_ct, codename='change_lunit'
+            ).exists() or obj.groups.filter(
+                permissions__content_type=lunit_ct, permissions__codename='change_lunit'
+            ).exists()
+            
+            has_legalunit_change = obj.user_permissions.filter(
+                content_type=legalunit_ct, codename='change_legalunit'
+            ).exists() or obj.groups.filter(
+                permissions__content_type=legalunit_ct, permissions__codename='change_legalunit'
+            ).exists()
+            
+            if has_lunit_change or has_legalunit_change:
+                synclog_ct = ContentType.objects.get(app_label='embeddings', model='synclog')
+                delete_synclog_perm = Permission.objects.get(
+                    content_type=synclog_ct, codename='delete_synclog'
+                )
+                if not obj.user_permissions.filter(pk=delete_synclog_perm.pk).exists():
+                    obj.user_permissions.add(delete_synclog_perm)
+        except ContentType.DoesNotExist:
+            pass
     
     def save_related(self, request, form, formsets, change):
         """
@@ -245,35 +264,37 @@ class CustomUserAdmin(UserAdmin):
         """
         super().save_related(request, form, formsets, change)
         
-        # دوباره save_model را صدا بزن تا permissions را چک کند
+        # بررسی permissions برای اضافه کردن خودکار permission حذف SyncLog
         obj = form.instance
         
         from django.contrib.contenttypes.models import ContentType
         from django.contrib.auth.models import Permission
         
-        lunit_ct = ContentType.objects.get(app_label='documents', model='lunit')
-        legalunit_ct = ContentType.objects.get(app_label='documents', model='legalunit')
-        
-        has_lunit_change = obj.user_permissions.filter(
-            content_type=lunit_ct, codename='change_lunit'
-        ).exists() or obj.groups.filter(
-            permissions__content_type=lunit_ct, permissions__codename='change_lunit'
-        ).exists()
-        
-        has_legalunit_change = obj.user_permissions.filter(
-            content_type=legalunit_ct, codename='change_legalunit'
-        ).exists() or obj.groups.filter(
-            permissions__content_type=legalunit_ct, permissions__codename='change_legalunit'
-        ).exists()
-        
-        if has_lunit_change or has_legalunit_change:
-            synclog_ct = ContentType.objects.get(app_label='embeddings', model='synclog')
-            delete_synclog_perm = Permission.objects.get(
-                content_type=synclog_ct, codename='delete_synclog'
-            )
+        try:
+            lunit_ct = ContentType.objects.get(app_label='documents', model='lunit')
+            legalunit_ct = ContentType.objects.get(app_label='documents', model='legalunit')
             
-            if not obj.user_permissions.filter(pk=delete_synclog_perm.pk).exists():
-                obj.user_permissions.add(delete_synclog_perm)
+            has_lunit_change = obj.user_permissions.filter(
+                content_type=lunit_ct, codename='change_lunit'
+            ).exists() or obj.groups.filter(
+                permissions__content_type=lunit_ct, permissions__codename='change_lunit'
+            ).exists()
+            
+            has_legalunit_change = obj.user_permissions.filter(
+                content_type=legalunit_ct, codename='change_legalunit'
+            ).exists() or obj.groups.filter(
+                permissions__content_type=legalunit_ct, permissions__codename='change_legalunit'
+            ).exists()
+            
+            if has_lunit_change or has_legalunit_change:
+                synclog_ct = ContentType.objects.get(app_label='embeddings', model='synclog')
+                delete_synclog_perm = Permission.objects.get(
+                    content_type=synclog_ct, codename='delete_synclog'
+                )
+                if not obj.user_permissions.filter(pk=delete_synclog_perm.pk).exists():
+                    obj.user_permissions.add(delete_synclog_perm)
+        except ContentType.DoesNotExist:
+            pass
 
 
 admin_site.register(User, CustomUserAdmin)
