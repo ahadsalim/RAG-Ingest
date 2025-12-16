@@ -31,10 +31,8 @@ function deleteSingleTag(tagId, row) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            // حذف ردیف از جدول بدون رفرش
-            row.style.transition = 'opacity 0.3s';
-            row.style.opacity = '0';
-            setTimeout(() => row.remove(), 300);
+            // رفرش صفحه برای بروزرسانی فرم
+            window.location.reload();
         } else {
             alert('خطا: ' + (data.error || 'مشکلی پیش آمد'));
         }
@@ -46,42 +44,88 @@ function deleteSingleTag(tagId, row) {
 
 // اضافه کردن دکمه ضربدر به هر ردیف برچسب
 document.addEventListener('DOMContentLoaded', function() {
-    const inlineGroup = document.getElementById('legalunitvocabularyterm_set-group');
-    if (!inlineGroup) return;
+    // پیدا کردن همه inline groups
+    const allInlineGroups = document.querySelectorAll('.inline-group');
+    let inlineGroup = null;
     
-    // پیدا کردن همه ردیف‌های برچسب (به جز ردیف‌های خالی)
-    const rows = inlineGroup.querySelectorAll('tr.form-row:not(.empty-form)');
+    allInlineGroups.forEach(function(g) {
+        // چک کردن عنوان
+        const header = g.querySelector('h2');
+        if (header && header.textContent.includes('برچسب')) {
+            inlineGroup = g;
+        }
+    });
     
-    rows.forEach(function(row) {
+    if (!inlineGroup) {
+        console.log('Tag inline group not found. Available groups:', 
+            Array.from(allInlineGroups).map(g => g.id).join(', '));
+        return;
+    }
+    
+    console.log('Found inline group:', inlineGroup.id);
+    
+    // پیدا کردن همه ردیف‌های برچسب در tbody
+    const tbody = inlineGroup.querySelector('tbody');
+    if (!tbody) {
+        console.log('No tbody found');
+        return;
+    }
+    
+    const rows = tbody.querySelectorAll('tr');
+    console.log('Found rows:', rows.length);
+    
+    rows.forEach(function(row, index) {
+        // رد کردن ردیف‌های خالی یا template
+        if (row.classList.contains('empty-form') || row.id.includes('__prefix__') || row.classList.contains('add-row')) return;
+        
         // پیدا کردن ID برچسب
         const idInput = row.querySelector('input[name$="-id"]');
-        if (!idInput || !idInput.value) return; // فقط برچسب‌های ذخیره شده
+        if (!idInput || !idInput.value) {
+            return;
+        }
         
         const tagId = idInput.value;
         
-        // پیدا کردن آخرین td (جایی که دکمه‌های چشم/مداد/+ هستند)
-        const lastTd = row.querySelector('td.original') || row.querySelector('td:last-child');
-        if (!lastTd) return;
+        // پیدا کردن همه td ها
+        const allTds = row.querySelectorAll('td');
+        
+        // پیدا کردن td که checkbox DELETE دارد (معمولاً td.delete)
+        let deleteTd = null;
+        allTds.forEach(function(td) {
+            if (td.classList.contains('delete') || td.querySelector('input[name$="-DELETE"]')) {
+                deleteTd = td;
+            }
+        });
+        
+        if (!deleteTd) {
+            return;
+        }
+        
+        // مخفی کردن متن توضیحی در td.original (نگه داشتن hidden inputs)
+        const originalTd = row.querySelector('td.original');
+        if (originalTd) {
+            // فقط <p> را مخفی کن، hidden input ها را نگه دار
+            const pTag = originalTd.querySelector('p');
+            if (pTag) {
+                pTag.style.display = 'none';
+            }
+        }
         
         // ساخت دکمه ضربدر
         const deleteBtn = document.createElement('a');
         deleteBtn.href = '#';
-        deleteBtn.className = 'deletelink';
+        deleteBtn.className = 'delete-tag-btn';
         deleteBtn.title = 'حذف برچسب';
-        deleteBtn.style.cssText = 'display: inline-block; margin-right: 5px; color: #ba2121; font-size: 18px; font-weight: bold; text-decoration: none; cursor: pointer;';
+        deleteBtn.style.cssText = 'display: block; text-align: center; color: #ba2121; font-size: 24px; font-weight: bold; text-decoration: none; cursor: pointer;';
         deleteBtn.innerHTML = '✕';
         deleteBtn.onclick = function(e) {
             e.preventDefault();
             deleteSingleTag(tagId, row);
         };
         
-        // اضافه کردن به ابتدای td (کنار دکمه‌های دیگر)
-        const relatedWrapper = lastTd.querySelector('.related-widget-wrapper');
-        if (relatedWrapper) {
-            relatedWrapper.appendChild(deleteBtn);
-        } else {
-            lastTd.appendChild(deleteBtn);
-        }
+        // خالی کردن td و اضافه کردن دکمه
+        deleteTd.innerHTML = '';
+        deleteTd.appendChild(deleteBtn);
     });
 });
 </script>

@@ -424,9 +424,14 @@ def process_next_batch():
         state["status"] = "waiting_approval"
         
         # Start prefetching next batch in background
-        prefetch_thread = threading.Thread(target=prefetch_next_batch)
-        prefetch_thread.daemon = True
-        prefetch_thread.start()
+        log("Starting prefetch thread...")
+        try:
+            prefetch_thread = threading.Thread(target=prefetch_next_batch)
+            prefetch_thread.daemon = True
+            prefetch_thread.start()
+            log("Prefetch thread started successfully")
+        except Exception as e:
+            log(f"Failed to start prefetch thread: {e}")
         
         return True
         
@@ -439,15 +444,21 @@ def process_next_batch():
 
 def prefetch_next_batch():
     """Pre-fetch the next batch while user reviews current batch."""
+    log(f"prefetch_next_batch called, current status: {state['prefetch_status']}")
+    
     if state["prefetch_status"] == "fetching":
+        log("Prefetch already in progress, skipping")
         return
     
     next_batch = state["current_batch"] + 1
+    log(f"Next batch would be: {next_batch}, total batches: {state['total_batches']}")
+    
     if next_batch > state["total_batches"]:
+        log("No more batches to prefetch")
         return
     
     state["prefetch_status"] = "fetching"
-    log(f"Pre-fetching batch {next_batch}...")
+    log(f"🔄 Pre-fetching batch {next_batch}...")
     
     try:
         offset = (next_batch - 1) * BATCH_SIZE
@@ -536,7 +547,9 @@ def prefetch_next_batch():
         log(f"Pre-fetch batch {next_batch} ready!")
         
     except Exception as e:
-        log(f"Pre-fetch error: {e}")
+        import traceback
+        log(f"❌ Pre-fetch error: {e}")
+        log(f"Traceback: {traceback.format_exc()}")
         state["prefetch_status"] = "idle"
         state["prefetch_results"] = None
 
@@ -901,22 +914,65 @@ HTML = """
         .manual-tags-list {
             display: flex;
             flex-wrap: wrap;
-            gap: 5px;
-            margin-top: 8px;
+            gap: 8px;
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(138,43,226,0.1);
+            border-radius: 8px;
+            min-height: 40px;
+        }
+        .manual-tags-list:empty::before {
+            content: '🏷️ برچسب‌های دستی شما اینجا نمایش داده می‌شود...';
+            color: #888;
+            font-size: 11px;
+            font-style: italic;
         }
         .manual-tag-chip {
-            background: rgba(138,43,226,0.3);
-            border: 1px solid rgba(138,43,226,0.5);
-            padding: 3px 8px;
-            border-radius: 12px;
-            font-size: 11px;
+            background: linear-gradient(135deg, rgba(138,43,226,0.5), rgba(0,212,255,0.3));
+            border: 2px solid rgba(138,43,226,0.8);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
             display: flex;
             align-items: center;
-            gap: 5px;
+            gap: 8px;
+            animation: tagAdded 0.5s ease-out;
+            box-shadow: 0 2px 8px rgba(138,43,226,0.3);
+        }
+        .manual-tag-chip:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(138,43,226,0.5);
+        }
+        @keyframes tagAdded {
+            0% { transform: scale(0); opacity: 0; }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .manual-tag-chip .tag-name {
+            font-weight: bold;
+            color: #fff;
+        }
+        .manual-tag-chip .tag-vocab {
+            color: #aaa;
+            font-size: 11px;
+        }
+        .manual-tag-chip .tag-weight {
+            background: #00ff88;
+            color: #000;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-weight: bold;
+            font-size: 10px;
         }
         .manual-tag-chip .remove-tag {
             cursor: pointer;
             color: #ff4444;
+            font-size: 14px;
+            margin-right: 4px;
+        }
+        .manual-tag-chip .remove-tag:hover {
+            color: #ff0000;
+            transform: scale(1.2);
         }
         .vocab-select-modal {
             position: fixed;
@@ -1389,13 +1445,15 @@ HTML = """
             ).slice(0, 10);
             
             let html = matches.map((t, idx) => {
-                const safeId = escapeHtml(t.id);
-                const safeTerm = escapeHtml(t.term);
-                const safeVocab = escapeHtml(t.vocabulary_name);
+                // Store all term info in data attributes
                 return `
-                    <div class="tag-suggestion-item" data-term-idx="${idx}" data-unit-idx="${unitIdx}">
-                        <div>${safeTerm}</div>
-                        <div class="vocab-name">${safeVocab}</div>
+                    <div class="tag-suggestion-item" 
+                         data-term-id="${t.id}" 
+                         data-term-name="${escapeHtml(t.term)}" 
+                         data-vocab-name="${escapeHtml(t.vocabulary_name || '')}"
+                         data-unit-idx="${unitIdx}">
+                        <div>${escapeHtml(t.term)}</div>
+                        <div class="vocab-name">${escapeHtml(t.vocabulary_name || '')}</div>
                     </div>
                 `;
             }).join('');
@@ -1414,19 +1472,23 @@ HTML = """
             suggestionsDiv.innerHTML = html;
             suggestionsDiv.classList.add('show');
             
-            // Add click handlers
+            // Add click handlers - use data attributes directly
             suggestionsDiv.querySelectorAll('.tag-suggestion-item').forEach(item => {
-                item.onclick = function() {
+                item.onclick = function(e) {
+                    e.stopPropagation();
                     const newTag = this.dataset.newTag;
                     const unitIdx = parseInt(this.dataset.unitIdx);
+                    
+                    console.log('Item clicked:', this.dataset);
+                    
                     if (newTag) {
                         createNewTag(unitIdx, newTag);
                     } else {
-                        const termIdx = parseInt(this.dataset.termIdx);
-                        const term = matches[termIdx];
-                        if (term) {
-                            selectExistingTag(unitIdx, term.id, term.term, term.vocabulary_name);
-                        }
+                        const termId = this.dataset.termId;
+                        const termName = this.dataset.termName;
+                        const vocabName = this.dataset.vocabName;
+                        console.log('Selecting existing tag:', termId, termName, vocabName);
+                        selectExistingTag(unitIdx, termId, termName, vocabName);
                     }
                 };
             });
@@ -1439,6 +1501,8 @@ HTML = """
         }
         
         function selectExistingTag(unitIdx, termId, termName, vocabName) {
+            console.log('selectExistingTag called:', unitIdx, termId, termName, vocabName);
+            
             if (!manualTags[unitIdx]) manualTags[unitIdx] = [];
             
             // Check if already added
@@ -1447,20 +1511,28 @@ HTML = """
                 return;
             }
             
+            // Ask for weight
+            const weight = prompt('وزن برچسب را وارد کنید (1-10):', '7');
+            if (weight === null) return; // User cancelled
+            const weightNum = parseInt(weight) || 7;
+            
             manualTags[unitIdx].push({
                 term_id: termId,
                 term: termName,
                 vocabulary: vocabName,
-                weight: 7,
+                weight: Math.min(10, Math.max(1, weightNum)),
                 is_new: false
             });
+            
+            console.log('manualTags after push:', JSON.stringify(manualTags));
             
             renderManualTags(unitIdx);
             
             // Clear input
             const input = document.querySelector(`[data-unit-idx="${unitIdx}"]`);
-            input.value = '';
-            document.getElementById('suggestions-' + unitIdx).classList.remove('show');
+            if (input) input.value = '';
+            const suggestions = document.getElementById('suggestions-' + unitIdx);
+            if (suggestions) suggestions.classList.remove('show');
         }
         
         function createNewTag(unitIdx, tagName) {
@@ -1534,14 +1606,28 @@ HTML = """
         }
         
         function renderManualTags(unitIdx) {
+            console.log('renderManualTags called for unit:', unitIdx);
             const container = document.getElementById('manual-tags-' + unitIdx);
+            
+            if (!container) {
+                console.error('Container not found for unit:', unitIdx);
+                return;
+            }
+            
             const tags = manualTags[unitIdx] || [];
+            console.log('tags to render:', tags.length);
+            
+            if (tags.length === 0) {
+                container.innerHTML = '';
+                return;
+            }
             
             container.innerHTML = tags.map((t, i) => `
                 <div class="manual-tag-chip">
-                    <span>${t.is_new ? '🆕 ' : ''}${escapeHtml(t.term)}</span>
-                    <span style="color:#888">(${escapeHtml(t.vocabulary)})</span>
-                    <span class="remove-tag" data-unit="${unitIdx}" data-tag-idx="${i}">×</span>
+                    <span class="tag-name">${t.is_new ? '🆕 ' : ''}${escapeHtml(t.term)}</span>
+                    <span class="tag-vocab">${escapeHtml(t.vocabulary)}</span>
+                    <span class="tag-weight">${t.weight}</span>
+                    <span class="remove-tag" data-unit="${unitIdx}" data-tag-idx="${i}">✕</span>
                 </div>
             `).join('');
             
@@ -1899,24 +1985,26 @@ HTML = """
             fetch('/api/prefetch_status')
                 .then(r => r.json())
                 .then(data => {
+                    console.log('Prefetch status:', data);
                     let indicator = document.getElementById('prefetch-indicator');
                     if (!indicator) {
                         indicator = document.createElement('div');
                         indicator.id = 'prefetch-indicator';
-                        indicator.className = 'prefetch-indicator hidden';
+                        indicator.className = 'prefetch-indicator';
                         document.body.appendChild(indicator);
                     }
                     
                     if (data.status === 'fetching') {
                         indicator.textContent = '⏳ در حال آماده‌سازی دسته بعدی...';
-                        indicator.classList.remove('hidden');
+                        indicator.style.display = 'block';
                     } else if (data.status === 'ready') {
                         indicator.textContent = '✅ دسته بعدی آماده است';
-                        indicator.classList.remove('hidden');
+                        indicator.style.display = 'block';
                     } else {
-                        indicator.classList.add('hidden');
+                        indicator.style.display = 'none';
                     }
-                });
+                })
+                .catch(err => console.error('Prefetch status error:', err));
         }
         
         // Initial load

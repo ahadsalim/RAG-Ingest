@@ -60,6 +60,79 @@ Persian Numbers: تبدیل به انگلیسی
 
 ---
 
+## 📝 تغییرات Session 1404/09/26 (2025-12-16)
+
+### 1. دکمه حذف برچسب در LUnit Admin
+**هدف**: اضافه کردن دکمه ضربدر (✕) برای حذف سریع برچسب‌ها
+
+**فایل‌های تغییر یافته**:
+- `/srv/ingest/apps/documents/admin_lunit.py` - اضافه کردن view `delete_tags_view`
+- `/srv/ingest/templates/admin/documents/lunit/change_form.html` - JavaScript برای دکمه حذف
+
+**تغییرات در admin_lunit.py**:
+```python
+# در get_urls اضافه شد:
+path('<path:object_id>/delete-tags/', self.admin_site.admin_view(self.delete_tags_view), name='lunit_delete_tags'),
+
+# متد جدید delete_tags_view:
+def delete_tags_view(self, request, object_id):
+    # POST request با JSON body: {tag_ids: [...]}
+    # حذف LegalUnitVocabularyTerm با id های داده شده
+    # برگرداندن JSON response
+```
+
+**تغییرات در change_form.html**:
+- تابع `deleteSingleTag(tagId, row)` برای حذف AJAX
+- در DOMContentLoaded: پیدا کردن inline برچسب‌ها و اضافه کردن دکمه ✕
+- دکمه در ستون "حذف؟" قرار می‌گیرد (جایگزین checkbox)
+- متن توضیحی در `td.original > p` مخفی می‌شود (hidden inputs حفظ می‌شوند)
+
+### 2. نکات مهم
+
+**⚠️ مشکل شناخته شده**:
+- وقتی برچسب با AJAX حذف می‌شود، صفحه reload می‌شود
+- اگر بدون reload دکمه ذخیره زده شود، خطای validation می‌دهد
+- **راه‌حل فعلی**: reload صفحه بعد از هر حذف
+
+**⚠️ td.original**:
+- این td حاوی hidden input های `id` و `legal_unit` است
+- **هرگز innerHTML را خالی نکنید** - فقط `<p>` را مخفی کنید
+- اگر hidden inputs حذف شوند، فرم Django خطا می‌دهد
+
+### 3. دستورات کپی به container
+```bash
+# کپی template
+docker cp /srv/ingest/templates/admin/documents/lunit/change_form.html deployment-web-1:/app/ingest/templates/admin/documents/lunit/change_form.html
+
+# کپی admin_lunit.py
+docker cp /srv/ingest/apps/documents/admin_lunit.py deployment-web-1:/app/ingest/apps/documents/admin_lunit.py
+
+# restart برای اعمال تغییرات template
+docker restart deployment-web-1
+```
+
+### 4. ساختار HTML inline برچسب‌ها
+```html
+<div id="unit_vocabulary_terms-group">
+  <table>
+    <tbody>
+      <tr class="form-row has_original" id="unit_vocabulary_terms-0">
+        <td class="original">
+          <p>فصل 9 > ماده 114 - نماینده (وزن: 6)</p>
+          <input type="hidden" name="unit_vocabulary_terms-0-id" value="...">
+          <input type="hidden" name="unit_vocabulary_terms-0-legal_unit" value="...">
+        </td>
+        <td class="field-vocabulary_term">...</td>
+        <td class="field-weight">...</td>
+        <td class="delete"><input type="checkbox" name="...-DELETE"></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+```
+
+---
+
 ## ⚠️ نکات مهم
 
 ### 1. LUnit vs LegalUnit

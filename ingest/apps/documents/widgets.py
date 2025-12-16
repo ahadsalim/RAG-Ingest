@@ -193,10 +193,17 @@ class ParentAutocompleteWidget(forms.TextInput):
                 
                 // تنظیم موقعیت resultsDiv بر اساس searchInput
                 const rect = searchInput.getBoundingClientRect();
+                let leftPos = rect.left;
+                // اگر از سمت راست خارج می‌شود، تنظیم کن
+                if (leftPos + 600 > window.innerWidth) {{
+                    leftPos = window.innerWidth - 620;
+                }}
+                if (leftPos < 10) leftPos = 10;
+                
                 resultsDiv.style.top = (rect.bottom + window.scrollY) + 'px';
-                resultsDiv.style.left = rect.left + 'px';
+                resultsDiv.style.left = leftPos + 'px';
                 resultsDiv.style.display = 'block';
-                console.log('Results displayed at:', rect.bottom, rect.left);
+                console.log('Results displayed at:', rect.bottom, leftPos, 'viewport width:', window.innerWidth);
                 
                 // اضافه کردن event listener به هر آیتم
                 resultsDiv.querySelectorAll('.autocomplete-item').forEach(function(item) {{
