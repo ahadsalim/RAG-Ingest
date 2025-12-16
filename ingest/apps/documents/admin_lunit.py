@@ -146,13 +146,50 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
         return qs.select_related('manifestation', 'manifestation__expr', 'manifestation__expr__work')
     
     def get_urls(self):
-        """اضافه کردن URL برای AJAX search."""
+        """اضافه کردن URL برای AJAX search و حذف برچسب‌ها."""
         from django.urls import path
         urls = super().get_urls()
         custom_urls = [
             path('search-parents/', self.admin_site.admin_view(self.search_parents_view), name='lunit_search_parents'),
+            path('<path:object_id>/delete-tags/', self.admin_site.admin_view(self.delete_tags_view), name='lunit_delete_tags'),
         ]
         return custom_urls + urls
+    
+    def delete_tags_view(self, request, object_id):
+        """
+        View برای حذف برچسب‌های انتخاب شده.
+        POST request با لیست tag_ids
+        """
+        from django.http import JsonResponse
+        from django.contrib import messages
+        import json
+        
+        if request.method != 'POST':
+            return JsonResponse({'error': 'Only POST allowed'}, status=405)
+        
+        try:
+            data = json.loads(request.body)
+            tag_ids = data.get('tag_ids', [])
+            
+            if not tag_ids:
+                return JsonResponse({'error': 'No tags selected'}, status=400)
+            
+            # حذف برچسب‌ها
+            deleted_count, _ = LegalUnitVocabularyTerm.objects.filter(
+                id__in=tag_ids,
+                legal_unit_id=object_id
+            ).delete()
+            
+            return JsonResponse({
+                'success': True,
+                'deleted_count': deleted_count,
+                'message': f'{deleted_count} برچسب حذف شد'
+            })
+            
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON'}, status=400)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
     
     def search_parents_view(self, request):
         """

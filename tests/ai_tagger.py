@@ -60,6 +60,8 @@ state = {
     "term_lookup": {},  # id -> term info
     "current_results": None,  # Current batch results waiting for approval
     "current_units": None,  # Current batch units
+    "prefetch_results": None,  # Pre-fetched next batch results
+    "prefetch_status": "idle",  # idle, fetching, ready
 }
 
 def get_db_connection():
@@ -421,6 +423,11 @@ def process_next_batch():
         }
         state["status"] = "waiting_approval"
         
+        # Start prefetching next batch in background
+        prefetch_thread = threading.Thread(target=prefetch_next_batch)
+        prefetch_thread.daemon = True
+        prefetch_thread.start()
+        
         return True
         
     except Exception as e:
@@ -429,6 +436,109 @@ def process_next_batch():
         log(f"Traceback: {traceback.format_exc()}")
         state["status"] = "idle"
         return False
+
+def prefetch_next_batch():
+    """Pre-fetch the next batch while user reviews current batch."""
+    if state["prefetch_status"] == "fetching":
+        return
+    
+    next_batch = state["current_batch"] + 1
+    if next_batch > state["total_batches"]:
+        return
+    
+    state["prefetch_status"] = "fetching"
+    log(f"Pre-fetching batch {next_batch}...")
+    
+    try:
+        offset = (next_batch - 1) * BATCH_SIZE
+        units = get_units(BATCH_SIZE, offset)
+        
+        if not units:
+            state["prefetch_status"] = "idle"
+            return
+        
+        unit_map = {str(u['id']): u for u in units}
+        unit_ids = list(unit_map.keys())
+        existing_tags = get_existing_tags(unit_ids)
+        
+        system_prompt, user_prompt = build_prompt(units)
+        
+        # Save prompts
+        save_prompt_to_file(system_prompt, user_prompt, f"prefetch_{next_batch}")
+        
+        response = call_gpt(system_prompt, user_prompt)
+        
+        # Save response
+        with open(f"response_prefetch_{next_batch}.json", "w", encoding="utf-8") as f:
+            f.write(response)
+        
+        results = json.loads(response)
+        
+        # Process results same as process_next_batch
+        display_data = []
+        all_new_terms = []
+        
+        for unit_result in results.get('results', []):
+            uid = unit_result.get('unit_id', '')
+            if uid not in unit_map:
+                continue
+            
+            unit = unit_map[uid]
+            suggested_tags = []
+            
+            for tag in unit_result.get('tags', []):
+                term_id = tag.get('term_id', '')
+                is_valid = term_id in state["valid_term_ids"]
+                term_info = state["term_lookup"].get(term_id, {})
+                
+                suggested_tags.append({
+                    'term_id': term_id,
+                    'term': term_info.get('term', tag.get('term', '?')),
+                    'vocabulary': term_info.get('vocabulary_name', '?'),
+                    'weight': tag.get('weight', 5),
+                    'valid': is_valid
+                })
+            
+            for new_tag in unit_result.get('new_tags', []):
+                all_new_terms.append({
+                    'unit_id': uid,
+                    'vocabulary_code': new_tag.get('vocabulary_code'),
+                    'tag': new_tag.get('tag'),
+                    'weight': new_tag.get('weight', 5)
+                })
+                suggested_tags.append({
+                    'term_id': None,
+                    'term': f"🆕 {new_tag.get('tag')}",
+                    'vocabulary': new_tag.get('vocabulary_code', 'جدید'),
+                    'weight': new_tag.get('weight', 5),
+                    'valid': True,
+                    'is_new': True,
+                    'new_tag_data': new_tag
+                })
+            
+            display_data.append({
+                'unit_id': uid,
+                'document_title': unit.get('document_title', '-'),
+                'path_label': unit['path_label'],
+                'unit_type': unit['unit_type'],
+                'content': unit['content'],
+                'existing_tags': existing_tags.get(uid, []),
+                'suggested_tags': suggested_tags
+            })
+        
+        state["prefetch_results"] = {
+            'units': display_data,
+            'new_terms': all_new_terms,
+            'raw_results': results,
+            'batch_number': next_batch
+        }
+        state["prefetch_status"] = "ready"
+        log(f"Pre-fetch batch {next_batch} ready!")
+        
+    except Exception as e:
+        log(f"Pre-fetch error: {e}")
+        state["prefetch_status"] = "idle"
+        state["prefetch_results"] = None
 
 def save_approved_batch(approved_data):
     """Save approved tags to database."""
@@ -576,6 +686,7 @@ HTML = """
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>برچسب‌گذار هوشمند v2</title>
     <style>
+        /* Base: 12px, Range: 11px-13px */
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
             font-family: 'Vazirmatn', Tahoma, sans-serif;
@@ -586,7 +697,7 @@ HTML = """
             font-size: 12px;
         }
         .container { max-width: 1400px; margin: 0 auto; }
-        h1 { text-align: center; color: #00d4ff; margin-bottom: 15px; font-size: 1.4em; }
+        h1 { text-align: center; color: #00d4ff; margin-bottom: 15px; font-size: 13px; font-weight: bold; }
         
         .stats {
             display: flex; gap: 15px; justify-content: center; margin-bottom: 15px;
@@ -598,13 +709,13 @@ HTML = """
             padding: 10px 20px;
             text-align: center;
         }
-        .stat-value { font-size: 1.5em; font-weight: bold; color: #00d4ff; }
-        .stat-label { color: #aaa; font-size: 0.85em; }
+        .stat-value { font-size: 13px; font-weight: bold; color: #00d4ff; }
+        .stat-label { color: #aaa; font-size: 11px; }
         
         .controls { text-align: center; margin: 15px 0; }
         .btn {
             padding: 8px 20px;
-            font-size: 0.95em;
+            font-size: 12px;
             border: none;
             border-radius: 6px;
             cursor: pointer;
@@ -622,11 +733,12 @@ HTML = """
             padding: 8px;
             border-radius: 6px;
             margin: 8px 0;
-            font-size: 0.9em;
+            font-size: 12px;
         }
         .status-idle { background: rgba(100,100,100,0.3); }
         .status-processing { background: rgba(0,212,255,0.3); }
         .status-waiting { background: rgba(255,200,0,0.3); }
+        .status-prefetching { background: rgba(138,43,226,0.3); }
         
         .log-box {
             background: #0a0a15;
@@ -635,7 +747,7 @@ HTML = """
             max-height: 100px;
             overflow-y: auto;
             font-family: monospace;
-            font-size: 0.75em;
+            font-size: 11px;
             margin-bottom: 15px;
         }
         
@@ -656,13 +768,13 @@ HTML = """
             border-bottom: 1px solid rgba(255,255,255,0.1);
             gap: 8px;
         }
-        .unit-doc { color: #ffcc00; font-size: 0.85em; width: 100%; }
-        .unit-path { color: #00d4ff; font-weight: bold; font-size: 0.9em; }
+        .unit-doc { color: #ffcc00; font-size: 12px; width: 100%; }
+        .unit-path { color: #00d4ff; font-weight: bold; font-size: 12px; }
         .unit-type { 
             background: rgba(0,212,255,0.2);
             padding: 2px 8px;
             border-radius: 12px;
-            font-size: 0.75em;
+            font-size: 11px;
         }
         .unit-content {
             background: rgba(0,0,0,0.3);
@@ -672,7 +784,7 @@ HTML = """
             line-height: 1.6;
             max-height: 120px;
             overflow-y: auto;
-            font-size: 0.9em;
+            font-size: 12px;
         }
         
         .tags-section { margin-top: 10px; }
@@ -682,14 +794,14 @@ HTML = """
             display: flex;
             align-items: center;
             gap: 8px;
-            font-size: 0.9em;
+            font-size: 12px;
         }
-        .tags-title .icon { font-size: 1em; }
+        .tags-title .icon { font-size: 12px; }
         
         .tag-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 0.8em;
+            font-size: 11px;
         }
         .tag-table th, .tag-table td {
             padding: 5px 8px;
@@ -699,7 +811,7 @@ HTML = """
         .tag-table th {
             background: rgba(0,212,255,0.1);
             color: #00d4ff;
-            font-size: 0.85em;
+            font-size: 11px;
         }
         .tag-table tr:hover { background: rgba(255,255,255,0.05); }
         
@@ -709,13 +821,13 @@ HTML = """
         
         .weight-badge {
             display: inline-block;
-            width: 24px;
-            height: 24px;
-            line-height: 24px;
+            width: 22px;
+            height: 22px;
+            line-height: 22px;
             text-align: center;
             border-radius: 50%;
             font-weight: bold;
-            font-size: 0.8em;
+            font-size: 11px;
         }
         .weight-high { background: #00ff88; color: #000; }
         .weight-mid { background: #ffcc00; color: #000; }
@@ -731,7 +843,7 @@ HTML = """
             padding: 15px;
             margin-bottom: 15px;
         }
-        .new-terms-title { color: #00ff88; margin-bottom: 10px; font-size: 0.95em; }
+        .new-terms-title { color: #00ff88; margin-bottom: 10px; font-size: 12px; }
         
         .manual-tag-section {
             margin-top: 10px;
@@ -740,7 +852,7 @@ HTML = """
             border-radius: 8px;
         }
         .manual-tag-title {
-            font-size: 0.85em;
+            font-size: 12px;
             color: #aaa;
             margin-bottom: 8px;
         }
@@ -754,7 +866,7 @@ HTML = """
             border-radius: 6px;
             background: rgba(0,0,0,0.3);
             color: #fff;
-            font-size: 0.85em;
+            font-size: 12px;
         }
         .tag-search-input:focus {
             outline: none;
@@ -777,11 +889,11 @@ HTML = """
         .tag-suggestion-item {
             padding: 8px 12px;
             cursor: pointer;
-            font-size: 0.85em;
+            font-size: 12px;
             border-bottom: 1px solid rgba(255,255,255,0.1);
         }
         .tag-suggestion-item:hover { background: rgba(0,212,255,0.2); }
-        .tag-suggestion-item .vocab-name { color: #888; font-size: 0.8em; }
+        .tag-suggestion-item .vocab-name { color: #888; font-size: 11px; }
         .tag-suggestion-new {
             background: rgba(0,255,136,0.1);
             color: #00ff88;
@@ -797,7 +909,7 @@ HTML = """
             border: 1px solid rgba(138,43,226,0.5);
             padding: 3px 8px;
             border-radius: 12px;
-            font-size: 0.8em;
+            font-size: 11px;
             display: flex;
             align-items: center;
             gap: 5px;
@@ -825,7 +937,7 @@ HTML = """
             min-width: 300px;
             max-width: 400px;
         }
-        .vocab-select-title { color: #00d4ff; margin-bottom: 15px; }
+        .vocab-select-title { color: #00d4ff; margin-bottom: 15px; font-size: 13px; }
         .vocab-select-list {
             max-height: 300px;
             overflow-y: auto;
@@ -835,6 +947,7 @@ HTML = """
             cursor: pointer;
             border-radius: 6px;
             margin-bottom: 5px;
+            font-size: 12px;
         }
         .vocab-select-item:hover { background: rgba(0,212,255,0.2); }
         .vocab-select-cancel {
@@ -842,12 +955,147 @@ HTML = """
             text-align: center;
         }
         
+        /* Add Tag Modal Styles */
+        .add-tag-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .add-tag-content {
+            background: #1a1a2e;
+            padding: 25px;
+            border-radius: 12px;
+            min-width: 450px;
+            max-width: 550px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .add-tag-title {
+            color: #00d4ff;
+            font-size: 13px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .add-tag-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+        }
+        .add-tag-section-title {
+            color: #ffcc00;
+            font-size: 12px;
+            margin-bottom: 10px;
+        }
+        .add-tag-input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 6px;
+            background: rgba(0,0,0,0.3);
+            color: #fff;
+            font-size: 12px;
+            margin-bottom: 10px;
+        }
+        .add-tag-input:focus {
+            outline: none;
+            border-color: #00d4ff;
+        }
+        .add-tag-select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 6px;
+            background: rgba(0,0,0,0.3);
+            color: #fff;
+            font-size: 12px;
+        }
+        .add-tag-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            margin: 5px;
+        }
+        .add-tag-btn-save {
+            background: #00ff88;
+            color: #000;
+        }
+        .add-tag-btn-cancel {
+            background: #ff4444;
+            color: #fff;
+        }
+        .add-tag-btn-create {
+            background: #00d4ff;
+            color: #000;
+        }
+        .add-tag-actions {
+            text-align: center;
+            margin-top: 20px;
+        }
+        .vocab-list-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            border-radius: 6px;
+            margin-bottom: 5px;
+            background: rgba(255,255,255,0.05);
+            font-size: 12px;
+        }
+        .vocab-list-item:hover {
+            background: rgba(0,212,255,0.2);
+        }
+        .vocab-list-item.selected {
+            background: rgba(0,212,255,0.3);
+            border: 1px solid #00d4ff;
+        }
+        .new-vocab-form {
+            display: none;
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(0,255,136,0.1);
+            border-radius: 6px;
+        }
+        .new-vocab-form.show {
+            display: block;
+        }
+        .weight-input {
+            width: 60px;
+            padding: 5px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 4px;
+            background: rgba(0,0,0,0.3);
+            color: #fff;
+            font-size: 12px;
+        }
+        
+        .prefetch-indicator {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(138,43,226,0.8);
+            color: #fff;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 11px;
+            z-index: 999;
+        }
+        
         .hidden { display: none; }
         
         .loading {
             text-align: center;
             padding: 40px;
-            font-size: 1.2em;
+            font-size: 13px;
             color: #00d4ff;
         }
         .loading::after {
@@ -1087,10 +1335,16 @@ HTML = """
                     
                     <!-- Manual Tag Input -->
                     <div class="manual-tag-section">
-                        <div class="manual-tag-title">✏️ افزودن برچسب دستی:</div>
+                        <div class="manual-tag-title">
+                            ✏️ افزودن برچسب دستی:
+                            <button class="add-tag-btn add-tag-btn-create" style="margin-right:10px;padding:4px 10px;font-size:0.8em;" 
+                                    data-unit-idx="${ui}" onclick="openAddTagModal(${ui})">
+                                ➕ افزودن برچسب جدید
+                            </button>
+                        </div>
                         <div class="tag-search-container">
                             <input type="text" class="tag-search-input" 
-                                   placeholder="جستجو یا افزودن برچسب جدید..."
+                                   placeholder="جستجوی برچسب موجود..."
                                    data-unit-idx="${ui}"
                                    oninput="searchTags(this, ${ui})"
                                    onkeydown="handleTagKeydown(event, ${ui})">
@@ -1114,6 +1368,12 @@ HTML = """
             });
         }
         
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+        
         function searchTags(input, unitIdx) {
             const query = input.value.trim().toLowerCase();
             const suggestionsDiv = document.getElementById('suggestions-' + unitIdx);
@@ -1125,28 +1385,51 @@ HTML = """
             
             // Filter matching terms
             const matches = allTerms.filter(t => 
-                t.term.toLowerCase().includes(query)
+                t.term && t.term.toLowerCase().includes(query)
             ).slice(0, 10);
             
-            let html = matches.map(t => `
-                <div class="tag-suggestion-item" onclick="selectExistingTag(${unitIdx}, '${t.id}', '${t.term}', '${t.vocabulary_name}')">
-                    <div>${t.term}</div>
-                    <div class="vocab-name">${t.vocabulary_name}</div>
-                </div>
-            `).join('');
+            let html = matches.map((t, idx) => {
+                const safeId = escapeHtml(t.id);
+                const safeTerm = escapeHtml(t.term);
+                const safeVocab = escapeHtml(t.vocabulary_name);
+                return `
+                    <div class="tag-suggestion-item" data-term-idx="${idx}" data-unit-idx="${unitIdx}">
+                        <div>${safeTerm}</div>
+                        <div class="vocab-name">${safeVocab}</div>
+                    </div>
+                `;
+            }).join('');
             
             // Add "create new" option if no exact match
-            const exactMatch = allTerms.find(t => t.term.toLowerCase() === query);
+            const exactMatch = allTerms.find(t => t.term && t.term.toLowerCase() === query);
             if (!exactMatch && query.length > 1) {
+                const safeInput = escapeHtml(input.value.trim());
                 html += `
-                    <div class="tag-suggestion-item tag-suggestion-new" onclick="createNewTag(${unitIdx}, '${input.value.trim()}')">
-                        <div>🆕 ایجاد برچسب جدید: "${input.value.trim()}"</div>
+                    <div class="tag-suggestion-item tag-suggestion-new" data-new-tag="${safeInput}" data-unit-idx="${unitIdx}">
+                        <div>🆕 ایجاد برچسب جدید: "${safeInput}"</div>
                     </div>
                 `;
             }
             
             suggestionsDiv.innerHTML = html;
             suggestionsDiv.classList.add('show');
+            
+            // Add click handlers
+            suggestionsDiv.querySelectorAll('.tag-suggestion-item').forEach(item => {
+                item.onclick = function() {
+                    const newTag = this.dataset.newTag;
+                    const unitIdx = parseInt(this.dataset.unitIdx);
+                    if (newTag) {
+                        createNewTag(unitIdx, newTag);
+                    } else {
+                        const termIdx = parseInt(this.dataset.termIdx);
+                        const term = matches[termIdx];
+                        if (term) {
+                            selectExistingTag(unitIdx, term.id, term.term, term.vocabulary_name);
+                        }
+                    }
+                };
+            });
         }
         
         function handleTagKeydown(event, unitIdx) {
@@ -1189,22 +1472,39 @@ HTML = """
             const modal = document.createElement('div');
             modal.className = 'vocab-select-modal';
             modal.id = 'vocab-modal';
+            
+            const safeTagName = escapeHtml(tagName);
+            let vocabListHtml = allVocabs.map((v, idx) => `
+                <div class="vocab-select-item" data-vocab-idx="${idx}">
+                    ${escapeHtml(v.name)}
+                </div>
+            `).join('');
+            
             modal.innerHTML = `
                 <div class="vocab-select-content">
-                    <div class="vocab-select-title">انتخاب موضوع برای برچسب: "${tagName}"</div>
+                    <div class="vocab-select-title">انتخاب موضوع برای برچسب: "${safeTagName}"</div>
                     <div class="vocab-select-list">
-                        ${allVocabs.map(v => `
-                            <div class="vocab-select-item" onclick="confirmNewTag(${unitIdx}, '${tagName}', '${v.id}', '${v.name}')">
-                                ${v.name}
-                            </div>
-                        `).join('')}
+                        ${vocabListHtml}
                     </div>
                     <div class="vocab-select-cancel">
-                        <button class="btn btn-danger" onclick="closeVocabModal()">انصراف</button>
+                        <button class="btn btn-danger" id="cancel-vocab-btn">انصراف</button>
                     </div>
                 </div>
             `;
             document.body.appendChild(modal);
+            
+            // Add click handlers
+            modal.querySelectorAll('.vocab-select-item').forEach(item => {
+                item.onclick = function() {
+                    const vocabIdx = parseInt(this.dataset.vocabIdx);
+                    const vocab = allVocabs[vocabIdx];
+                    if (vocab) {
+                        confirmNewTag(unitIdx, tagName, vocab.id, vocab.name);
+                    }
+                };
+            });
+            
+            document.getElementById('cancel-vocab-btn').onclick = closeVocabModal;
         }
         
         function closeVocabModal() {
@@ -1239,11 +1539,20 @@ HTML = """
             
             container.innerHTML = tags.map((t, i) => `
                 <div class="manual-tag-chip">
-                    <span>${t.is_new ? '🆕 ' : ''}${t.term}</span>
-                    <span style="color:#888">(${t.vocabulary})</span>
-                    <span class="remove-tag" onclick="removeManualTag(${unitIdx}, ${i})">×</span>
+                    <span>${t.is_new ? '🆕 ' : ''}${escapeHtml(t.term)}</span>
+                    <span style="color:#888">(${escapeHtml(t.vocabulary)})</span>
+                    <span class="remove-tag" data-unit="${unitIdx}" data-tag-idx="${i}">×</span>
                 </div>
             `).join('');
+            
+            // Add click handlers for remove buttons
+            container.querySelectorAll('.remove-tag').forEach(btn => {
+                btn.onclick = function() {
+                    const unitIdx = parseInt(this.dataset.unit);
+                    const tagIdx = parseInt(this.dataset.tagIdx);
+                    removeManualTag(unitIdx, tagIdx);
+                };
+            });
         }
         
         function removeManualTag(unitIdx, tagIdx) {
@@ -1251,6 +1560,203 @@ HTML = """
                 manualTags[unitIdx].splice(tagIdx, 1);
                 renderManualTags(unitIdx);
             }
+        }
+        
+        // ============================================
+        // Add Tag Modal Functions
+        // ============================================
+        let currentAddTagUnitIdx = null;
+        let selectedVocabId = null;
+        let selectedVocabName = null;
+        
+        function openAddTagModal(unitIdx) {
+            currentAddTagUnitIdx = unitIdx;
+            selectedVocabId = null;
+            selectedVocabName = null;
+            
+            const modal = document.createElement('div');
+            modal.className = 'add-tag-modal';
+            modal.id = 'add-tag-modal';
+            
+            let vocabListHtml = allVocabs.map((v, idx) => `
+                <div class="vocab-list-item" data-vocab-idx="${idx}" data-vocab-id="${v.id}">
+                    ${escapeHtml(v.name)}
+                </div>
+            `).join('');
+            
+            modal.innerHTML = `
+                <div class="add-tag-content">
+                    <div class="add-tag-title">➕ افزودن برچسب جدید</div>
+                    
+                    <!-- Vocabulary Section -->
+                    <div class="add-tag-section">
+                        <div class="add-tag-section-title">📁 انتخاب یا ایجاد موضوع (Vocabulary):</div>
+                        <div style="max-height:150px;overflow-y:auto;margin-bottom:10px;" id="vocab-list">
+                            ${vocabListHtml}
+                        </div>
+                        <button class="add-tag-btn add-tag-btn-create" id="show-new-vocab-btn">
+                            🆕 ایجاد موضوع جدید
+                        </button>
+                        <div class="new-vocab-form" id="new-vocab-form">
+                            <input type="text" class="add-tag-input" id="new-vocab-name" placeholder="نام موضوع جدید...">
+                            <input type="text" class="add-tag-input" id="new-vocab-code" placeholder="کد موضوع (انگلیسی)...">
+                            <button class="add-tag-btn add-tag-btn-save" id="save-new-vocab-btn">💾 ذخیره موضوع</button>
+                        </div>
+                        <div id="selected-vocab-display" style="margin-top:10px;color:#00ff88;display:none;">
+                            ✅ موضوع انتخاب شده: <span id="selected-vocab-name"></span>
+                        </div>
+                    </div>
+                    
+                    <!-- Term Section -->
+                    <div class="add-tag-section">
+                        <div class="add-tag-section-title">🏷️ برچسب جدید (Vocabulary Term):</div>
+                        <input type="text" class="add-tag-input" id="new-term-name" placeholder="نام برچسب...">
+                        <input type="text" class="add-tag-input" id="new-term-code" placeholder="کد برچسب (انگلیسی، اختیاری)...">
+                        <div style="display:flex;align-items:center;gap:10px;margin-top:10px;">
+                            <label>وزن:</label>
+                            <input type="number" class="weight-input" id="new-term-weight" value="7" min="1" max="10">
+                        </div>
+                    </div>
+                    
+                    <div class="add-tag-actions">
+                        <button class="add-tag-btn add-tag-btn-save" id="save-term-btn">💾 ذخیره برچسب و افزودن به بند</button>
+                        <button class="add-tag-btn add-tag-btn-cancel" id="cancel-add-tag-btn">❌ انصراف</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            // Add event listeners
+            setupAddTagModalEvents();
+        }
+        
+        function setupAddTagModalEvents() {
+            // Vocab list item click
+            document.querySelectorAll('#vocab-list .vocab-list-item').forEach(item => {
+                item.onclick = function() {
+                    document.querySelectorAll('#vocab-list .vocab-list-item').forEach(i => i.classList.remove('selected'));
+                    this.classList.add('selected');
+                    const vocabIdx = parseInt(this.dataset.vocabIdx);
+                    const vocab = allVocabs[vocabIdx];
+                    selectedVocabId = vocab.id;
+                    selectedVocabName = vocab.name;
+                    document.getElementById('selected-vocab-display').style.display = 'block';
+                    document.getElementById('selected-vocab-name').textContent = vocab.name;
+                    document.getElementById('new-vocab-form').classList.remove('show');
+                };
+            });
+            
+            // Show new vocab form
+            document.getElementById('show-new-vocab-btn').onclick = function() {
+                document.getElementById('new-vocab-form').classList.toggle('show');
+            };
+            
+            // Save new vocab
+            document.getElementById('save-new-vocab-btn').onclick = async function() {
+                const name = document.getElementById('new-vocab-name').value.trim();
+                const code = document.getElementById('new-vocab-code').value.trim();
+                
+                if (!name || !code) {
+                    alert('لطفاً نام و کد موضوع را وارد کنید');
+                    return;
+                }
+                
+                try {
+                    const response = await fetch('/api/create_vocabulary', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({name, code})
+                    });
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        // Add to local list
+                        allVocabs.push({id: data.id, name: name, code: code});
+                        selectedVocabId = data.id;
+                        selectedVocabName = name;
+                        document.getElementById('selected-vocab-display').style.display = 'block';
+                        document.getElementById('selected-vocab-name').textContent = name;
+                        document.getElementById('new-vocab-form').classList.remove('show');
+                        document.getElementById('new-vocab-name').value = '';
+                        document.getElementById('new-vocab-code').value = '';
+                        alert('موضوع با موفقیت ذخیره شد');
+                    } else {
+                        alert('خطا: ' + (data.error || 'نامشخص'));
+                    }
+                } catch (e) {
+                    alert('خطا در ذخیره موضوع: ' + e.message);
+                }
+            };
+            
+            // Save term and add to unit
+            document.getElementById('save-term-btn').onclick = async function() {
+                const termName = document.getElementById('new-term-name').value.trim();
+                const termCode = document.getElementById('new-term-code').value.trim();
+                const weight = parseInt(document.getElementById('new-term-weight').value) || 7;
+                
+                if (!selectedVocabId) {
+                    alert('لطفاً ابتدا یک موضوع انتخاب کنید');
+                    return;
+                }
+                
+                if (!termName) {
+                    alert('لطفاً نام برچسب را وارد کنید');
+                    return;
+                }
+                
+                try {
+                    const response = await fetch('/api/create_term', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            vocabulary_id: selectedVocabId,
+                            term: termName,
+                            code: termCode || termName.replace(/\s+/g, '')
+                        })
+                    });
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        // Add to local terms list
+                        allTerms.push({
+                            id: data.id,
+                            term: termName,
+                            vocabulary_id: selectedVocabId,
+                            vocabulary_name: selectedVocabName
+                        });
+                        
+                        // Add to manual tags for this unit
+                        if (!manualTags[currentAddTagUnitIdx]) manualTags[currentAddTagUnitIdx] = [];
+                        manualTags[currentAddTagUnitIdx].push({
+                            term_id: data.id,
+                            term: termName,
+                            vocabulary: selectedVocabName,
+                            weight: weight,
+                            is_new: false  // Already saved to DB
+                        });
+                        
+                        renderManualTags(currentAddTagUnitIdx);
+                        closeAddTagModal();
+                        alert('برچسب با موفقیت ذخیره و به بند اضافه شد');
+                    } else {
+                        alert('خطا: ' + (data.error || 'نامشخص'));
+                    }
+                } catch (e) {
+                    alert('خطا در ذخیره برچسب: ' + e.message);
+                }
+            };
+            
+            // Cancel
+            document.getElementById('cancel-add-tag-btn').onclick = closeAddTagModal;
+        }
+        
+        function closeAddTagModal() {
+            const modal = document.getElementById('add-tag-modal');
+            if (modal) modal.remove();
+            currentAddTagUnitIdx = null;
+            selectedVocabId = null;
+            selectedVocabName = null;
         }
         
         // Close suggestions when clicking outside
@@ -1347,24 +1853,69 @@ HTML = """
             document.getElementById('results-section').classList.add('hidden');
             document.getElementById('loading-section').classList.remove('hidden');
             
+            // Reset manual tags for next batch
+            manualTags = {};
+            
             fetch('/api/approve', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(data)
             })
             .then(r => r.json())
-            .then(() => {
+            .then(response => {
                 updateStatus();
-                // Start next batch
-                startProcess();
+                
+                // Check if prefetch is ready
+                if (response.has_prefetch) {
+                    // Use prefetched results immediately
+                    fetch('/api/use_prefetch', {method: 'POST'})
+                        .then(r => r.json())
+                        .then(data => {
+                            if (data.success) {
+                                document.getElementById('loading-section').classList.add('hidden');
+                                loadResults();
+                            } else {
+                                startProcess();
+                            }
+                        });
+                } else {
+                    // Start next batch normally
+                    startProcess();
+                }
             });
         }
         
         function skipBatch() {
             document.getElementById('results-section').classList.add('hidden');
+            manualTags = {};
             fetch('/api/skip', {method: 'POST'})
                 .then(() => {
                     updateStatus();
+                });
+        }
+        
+        // Show prefetch indicator
+        function updatePrefetchIndicator() {
+            fetch('/api/prefetch_status')
+                .then(r => r.json())
+                .then(data => {
+                    let indicator = document.getElementById('prefetch-indicator');
+                    if (!indicator) {
+                        indicator = document.createElement('div');
+                        indicator.id = 'prefetch-indicator';
+                        indicator.className = 'prefetch-indicator hidden';
+                        document.body.appendChild(indicator);
+                    }
+                    
+                    if (data.status === 'fetching') {
+                        indicator.textContent = '⏳ در حال آماده‌سازی دسته بعدی...';
+                        indicator.classList.remove('hidden');
+                    } else if (data.status === 'ready') {
+                        indicator.textContent = '✅ دسته بعدی آماده است';
+                        indicator.classList.remove('hidden');
+                    } else {
+                        indicator.classList.add('hidden');
+                    }
                 });
         }
         
@@ -1374,6 +1925,7 @@ HTML = """
             loadTermsAndVocabs();
         });
         setInterval(updateStatus, 5000);
+        setInterval(updatePrefetchIndicator, 3000);
     </script>
 </body>
 </html>
@@ -1426,6 +1978,90 @@ def api_terms():
         "vocabularies": state.get("vocabularies", [])
     })
 
+@app.route('/api/create_vocabulary', methods=['POST'])
+def api_create_vocabulary():
+    """Create a new vocabulary."""
+    data = request.json
+    name = data.get('name', '').strip()
+    code = data.get('code', '').strip()
+    
+    if not name or not code:
+        return jsonify({"success": False, "error": "نام و کد الزامی است"})
+    
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # Check if code already exists
+        cur.execute("SELECT id FROM masterdata_vocabulary WHERE code = %s", (code,))
+        if cur.fetchone():
+            conn.close()
+            return jsonify({"success": False, "error": "این کد قبلاً وجود دارد"})
+        
+        vocab_id = str(uuid.uuid4())
+        cur.execute("""
+            INSERT INTO masterdata_vocabulary (id, name, code, created_at, updated_at)
+            VALUES (%s, %s, %s, NOW(), NOW())
+        """, (vocab_id, name, code))
+        conn.commit()
+        conn.close()
+        
+        # Add to state
+        state["vocabularies"].append({"id": vocab_id, "name": name, "code": code})
+        log(f"Created vocabulary: {name} ({code})")
+        
+        return jsonify({"success": True, "id": vocab_id})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
+@app.route('/api/create_term', methods=['POST'])
+def api_create_term():
+    """Create a new vocabulary term."""
+    data = request.json
+    vocabulary_id = data.get('vocabulary_id', '').strip()
+    term = data.get('term', '').strip()
+    code = data.get('code', '').strip()
+    
+    if not vocabulary_id or not term:
+        return jsonify({"success": False, "error": "موضوع و نام برچسب الزامی است"})
+    
+    if not code:
+        code = ''.join(word.capitalize() for word in term.split())
+    
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # Check vocabulary exists
+        cur.execute("SELECT id, name FROM masterdata_vocabulary WHERE id = %s", (vocabulary_id,))
+        vocab = cur.fetchone()
+        if not vocab:
+            conn.close()
+            return jsonify({"success": False, "error": "موضوع یافت نشد"})
+        
+        term_id = str(uuid.uuid4())
+        cur.execute("""
+            INSERT INTO masterdata_vocabularyterm (id, vocabulary_id, term, code, is_active, created_at, updated_at)
+            VALUES (%s, %s, %s, %s, true, NOW(), NOW())
+        """, (term_id, vocabulary_id, term, code))
+        conn.commit()
+        conn.close()
+        
+        # Add to state
+        state["terms"].append({
+            "id": term_id, 
+            "term": term, 
+            "code": code,
+            "vocabulary_id": vocabulary_id,
+            "vocabulary_name": vocab["name"]
+        })
+        state["valid_term_ids"].add(term_id)
+        log(f"Created term: {term} in {vocab['name']}")
+        
+        return jsonify({"success": True, "id": term_id})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
 @app.route('/api/approve', methods=['POST'])
 def api_approve():
     data = request.json
@@ -1434,12 +2070,57 @@ def api_approve():
     # Refresh term list if new terms were added
     if saved_terms > 0:
         load_vocabularies_and_terms()
-    return jsonify({"success": True, "saved_tags": saved_tags, "saved_terms": saved_terms})
+    
+    # Check if prefetch is ready
+    has_prefetch = state["prefetch_status"] == "ready" and state["prefetch_results"] is not None
+    return jsonify({
+        "success": True, 
+        "saved_tags": saved_tags, 
+        "saved_terms": saved_terms,
+        "has_prefetch": has_prefetch
+    })
+
+@app.route('/api/use_prefetch', methods=['POST'])
+def api_use_prefetch():
+    """Use pre-fetched results for next batch."""
+    if state["prefetch_status"] != "ready" or state["prefetch_results"] is None:
+        return jsonify({"success": False, "error": "No prefetch available"})
+    
+    # Move prefetch to current
+    state["current_batch"] = state["prefetch_results"]["batch_number"]
+    state["current_results"] = {
+        'units': state["prefetch_results"]["units"],
+        'new_terms': state["prefetch_results"]["new_terms"],
+        'raw_results': state["prefetch_results"]["raw_results"]
+    }
+    state["status"] = "waiting_approval"
+    
+    # Clear prefetch and start new prefetch
+    state["prefetch_results"] = None
+    state["prefetch_status"] = "idle"
+    
+    # Start prefetching next batch
+    prefetch_thread = threading.Thread(target=prefetch_next_batch)
+    prefetch_thread.daemon = True
+    prefetch_thread.start()
+    
+    log(f"Using pre-fetched batch {state['current_batch']}")
+    return jsonify({"success": True})
+
+@app.route('/api/prefetch_status')
+def api_prefetch_status():
+    """Get prefetch status."""
+    return jsonify({
+        "status": state["prefetch_status"],
+        "ready": state["prefetch_status"] == "ready"
+    })
 
 @app.route('/api/skip', methods=['POST'])
 def api_skip():
     state["status"] = "idle"
     state["current_results"] = None
+    state["prefetch_results"] = None
+    state["prefetch_status"] = "idle"
     log("Batch skipped by user")
     return jsonify({"success": True})
 

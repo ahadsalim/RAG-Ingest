@@ -8,6 +8,91 @@
 {# حذف content title اضافی #}
 {% endblock %}
 
+{% block extrahead %}
+{{ block.super }}
+<script>
+// حذف برچسب‌های انتخاب شده
+function deleteSelectedTags() {
+    // پیدا کردن checkbox های تیک‌خورده در inline برچسب‌ها
+    const checkboxes = document.querySelectorAll('#legalunitvocabularyterm_set-group input[type="checkbox"][name$="-DELETE"]:checked');
+    
+    if (checkboxes.length === 0) {
+        alert('لطفاً حداقل یک برچسب را برای حذف انتخاب کنید.');
+        return;
+    }
+    
+    if (!confirm(`آیا از حذف ${checkboxes.length} برچسب مطمئن هستید؟`)) {
+        return;
+    }
+    
+    // جمع‌آوری ID های برچسب‌ها
+    const tagIds = [];
+    checkboxes.forEach(function(cb) {
+        // پیدا کردن hidden input با id در همان row
+        const row = cb.closest('tr');
+        if (row) {
+            const idInput = row.querySelector('input[name$="-id"]');
+            if (idInput && idInput.value) {
+                tagIds.push(idInput.value);
+            }
+        }
+    });
+    
+    if (tagIds.length === 0) {
+        alert('خطا: نمی‌توان ID برچسب‌ها را پیدا کرد.');
+        return;
+    }
+    
+    // ارسال درخواست حذف
+    const objectId = window.location.pathname.split('/').filter(x => x).slice(-2, -1)[0];
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+    fetch(`/admin/documents/lunit/${objectId}/delete-tags/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify({tag_ids: tagIds})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            // رفرش صفحه
+            window.location.reload();
+        } else {
+            alert('خطا: ' + (data.error || 'مشکلی پیش آمد'));
+        }
+    })
+    .catch(error => {
+        alert('خطا در ارتباط با سرور: ' + error);
+    });
+}
+
+// اضافه کردن دکمه حذف بعد از لود صفحه
+document.addEventListener('DOMContentLoaded', function() {
+    // پیدا کردن inline برچسب‌ها
+    const inlineGroup = document.getElementById('legalunitvocabularyterm_set-group');
+    if (inlineGroup) {
+        // ساخت دکمه حذف
+        const deleteBtn = document.createElement('button');
+        deleteBtn.type = 'button';
+        deleteBtn.className = 'button';
+        deleteBtn.style.cssText = 'background: #ba2121; color: white; margin: 10px 0; padding: 8px 16px; border: none; cursor: pointer; border-radius: 4px;';
+        deleteBtn.innerHTML = '🗑️ حذف برچسب‌های انتخاب شده';
+        deleteBtn.onclick = deleteSelectedTags;
+        
+        // اضافه کردن دکمه بعد از جدول
+        const table = inlineGroup.querySelector('table');
+        if (table) {
+            table.parentNode.insertBefore(deleteBtn, table.nextSibling);
+        }
+    }
+});
+</script>
+{% endblock %}
+
 {% block extrastyle %}
 {{ block.super }}
 <style>
