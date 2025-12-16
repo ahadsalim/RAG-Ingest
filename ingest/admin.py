@@ -158,8 +158,19 @@ admin_site = CustomAdminSite(name='custom_admin')
 from django.contrib.auth.models import User, Group
 from django.contrib.auth.admin import UserAdmin, GroupAdmin
 
-# Import UserProfileInline from accounts app
-from ingest.apps.accounts.admin import UserProfileInline
+
+class UserProfileInline(admin.StackedInline):
+    """Inline for UserProfile in User admin."""
+    from ingest.apps.accounts.models import UserProfile
+    model = UserProfile
+    can_delete = False
+    verbose_name = 'پروفایل'
+    verbose_name_plural = 'پروفایل'
+    fields = ('mobile', 'is_mobile_verified')
+    
+    def get_queryset(self, request):
+        from ingest.apps.accounts.models import UserProfile
+        return UserProfile.objects.all()
 
 
 class CustomUserAdmin(UserAdmin):

@@ -184,15 +184,7 @@ class ReportsModel:
         app_label = 'accounts'
 
 # Celery Beat models removed - not needed in admin interface
-
-
-class UserProfileInline(admin.StackedInline):
-    """Inline for UserProfile in User admin."""
-    model = UserProfile
-    can_delete = False
-    verbose_name = 'پروفایل'
-    verbose_name_plural = 'پروفایل'
-    fields = ('mobile', 'is_mobile_verified')
+# UserProfileInline is defined in /srv/ingest/admin.py to avoid circular imports
 
 
 class UserProfileAdmin(SimpleJalaliAdminMixin, admin.ModelAdmin):
