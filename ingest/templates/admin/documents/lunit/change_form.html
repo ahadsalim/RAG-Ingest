@@ -13,8 +13,8 @@
 <script>
 // حذف برچسب‌های انتخاب شده
 function deleteSelectedTags() {
-    // پیدا کردن checkbox های تیک‌خورده در inline برچسب‌ها
-    const checkboxes = document.querySelectorAll('#legalunitvocabularyterm_set-group input[type="checkbox"][name$="-DELETE"]:checked');
+    // پیدا کردن checkbox های تیک‌خورده در inline برچسب‌ها - جستجوی عمومی‌تر
+    const checkboxes = document.querySelectorAll('.inline-group input[type="checkbox"][name$="-DELETE"]:checked');
     
     if (checkboxes.length === 0) {
         alert('لطفاً حداقل یک برچسب را برای حذف انتخاب کنید.');
@@ -72,8 +72,32 @@ function deleteSelectedTags() {
 
 // اضافه کردن دکمه حذف بعد از لود صفحه
 document.addEventListener('DOMContentLoaded', function() {
-    // پیدا کردن inline برچسب‌ها
-    const inlineGroup = document.getElementById('legalunitvocabularyterm_set-group');
+    // پیدا کردن inline برچسب‌ها - امتحان چند ID مختلف
+    const possibleIds = [
+        'legalunitvocabularyterm_set-group',
+        'vocabulary_terms-group',
+        'legalunitvocabularytermInlineSimple-group'
+    ];
+    
+    let inlineGroup = null;
+    for (const id of possibleIds) {
+        inlineGroup = document.getElementById(id);
+        if (inlineGroup) break;
+    }
+    
+    // اگر با ID پیدا نشد، با class یا h2 پیدا کن
+    if (!inlineGroup) {
+        // پیدا کردن بر اساس عنوان "برچسب‌ها"
+        const allInlines = document.querySelectorAll('.inline-group');
+        for (const group of allInlines) {
+            const header = group.querySelector('h2');
+            if (header && header.textContent.includes('برچسب')) {
+                inlineGroup = group;
+                break;
+            }
+        }
+    }
+    
     if (inlineGroup) {
         // ساخت دکمه حذف
         const deleteBtn = document.createElement('button');
@@ -87,7 +111,12 @@ document.addEventListener('DOMContentLoaded', function() {
         const table = inlineGroup.querySelector('table');
         if (table) {
             table.parentNode.insertBefore(deleteBtn, table.nextSibling);
+        } else {
+            // اگر جدول نبود، به انتهای گروه اضافه کن
+            inlineGroup.appendChild(deleteBtn);
         }
+    } else {
+        console.log('Inline group for tags not found');
     }
 });
 </script>
@@ -102,7 +131,10 @@ document.addEventListener('DOMContentLoaded', function() {
     .field-parent .related-lookup,
     .field-parent .changelink,
     .field-parent .addlink,
-    .field-parent .viewlink {
+    .field-parent .viewlink,
+    .field-parent .select2-selection__clear,
+    .field-parent .deletelink,
+    .field-parent a[data-popup="yes"] {
         display: none !important;
         visibility: hidden !important;
     }
