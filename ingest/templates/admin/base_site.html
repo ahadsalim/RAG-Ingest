@@ -205,4 +205,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
 {% block nav-global %}{% endblock %}
 
+{% block userlinks %}
+{% if site_url %}
+    <a href="{{ site_url }}">نمایش سایت</a> /
+{% endif %}
+{% if user.is_active and user.is_staff %}
+    {% url 'admin:index' as admin_index %}
+    {% if admin_index %}
+        <a href="{% url 'accounts:otp_logout' %}">خروج</a>
+    {% endif %}
+{% endif %}
+{% endblock %}
+
 {% block bodyclass %}{{ block.super }} rtl-admin{% endblock %}

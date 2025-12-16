@@ -8,6 +8,8 @@ class CustomAdminSite(AdminSite):
     site_title = "مدیریت اسناد"
     index_title = "پنل مدیریت"
     login_url = '/accounts/login/'  # OTP login page
+    password_change_url = None  # Disable password change (OTP-based auth)
+    password_change_done_url = None  # Disable password change done
 
     def get_app_list(self, request, app_label=None):
         """
@@ -132,11 +134,18 @@ class CustomAdminSite(AdminSite):
         return app_list
 
     def get_urls(self):
-        """Override to add custom admin URLs."""
+        """Override to add custom admin URLs and disable password change."""
+        from django.http import HttpResponseRedirect
+        from django.urls import reverse
+        
         urls = super().get_urls()
         
         # Import here to avoid circular imports
         from ingest.apps.accounts import admin_views
+        
+        def redirect_to_index(request):
+            """Redirect password change to admin index (OTP-based auth)."""
+            return HttpResponseRedirect(reverse('admin:index'))
         
         custom_urls = [
             path(
@@ -144,9 +153,10 @@ class CustomAdminSite(AdminSite):
                 self.admin_view(admin_views.user_activity_report),
                 name='user_activity_report',
             ),
+            # Disable password change URLs (redirect to admin index)
+            path('password_change/', redirect_to_index, name='password_change'),
+            path('password_change/done/', redirect_to_index, name='password_change_done'),
         ]
-        
-        # Embedding management now handled directly in EmbeddingAdmin.get_urls()
         
         # Prepend custom URLs so they take precedence
         return custom_urls + urls
