@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('documents', '0012_change_order_index_to_charfield'),
+        ('documents', '0011_alter_order_index_remove_default'),
     ]
 
     operations = [

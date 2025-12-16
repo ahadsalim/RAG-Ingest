@@ -8,7 +8,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('embeddings', '0010_change_vector_dimension_to_1024'),
+        ('embeddings', '0009_simplify_synclog'),
     ]
 
     operations = [

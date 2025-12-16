@@ -11,7 +11,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('documents', '0014_add_textentry'),
+        ('documents', '0013_change_order_index_to_charfield'),
         ('masterdata', '0002_initial'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]

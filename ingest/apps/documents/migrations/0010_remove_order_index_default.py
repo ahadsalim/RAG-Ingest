@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('documents', '0009_alter_chunk_options_alter_historicalchunk_options_and_more'),
+        ('documents', '0008_add_node_id'),
     ]
 
     operations = [
