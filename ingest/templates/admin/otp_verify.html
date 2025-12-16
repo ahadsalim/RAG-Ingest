@@ -35,25 +35,28 @@
         .logo {
             width: 80px;
             height: 80px;
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             border-radius: 20px;
             margin: 0 auto 20px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 40px;
+            font-size: 32px;
+            color: white;
         }
         
         h1 {
             color: #1a1a2e;
             font-size: 24px;
             margin-bottom: 10px;
+            font-family: 'Vazirmatn', 'Tahoma', sans-serif;
         }
         
         .subtitle {
             color: #666;
             font-size: 14px;
             margin-bottom: 10px;
+            font-family: 'Vazirmatn', 'Tahoma', sans-serif;
         }
         
         .mobile-display {
@@ -62,10 +65,12 @@
             border-radius: 8px;
             display: inline-block;
             margin-bottom: 25px;
-            font-size: 16px;
+            font-size: 18px;
             color: #374151;
             direction: ltr;
             letter-spacing: 2px;
+            font-family: 'Vazirmatn', 'Tahoma', sans-serif;
+            font-weight: 600;
         }
         
         .form-group {
@@ -79,6 +84,7 @@
             font-size: 14px;
             margin-bottom: 8px;
             font-weight: 500;
+            font-family: 'Vazirmatn', 'Tahoma', sans-serif;
         }
         
         input[type="text"] {
@@ -92,6 +98,7 @@
             text-align: center;
             letter-spacing: 15px;
             font-weight: bold;
+            font-family: 'Vazirmatn', 'Tahoma', sans-serif;
         }
         
         input[type="text"]:focus {
@@ -112,6 +119,7 @@
             cursor: pointer;
             transition: all 0.3s ease;
             margin-top: 10px;
+            font-family: 'Vazirmatn', 'Tahoma', sans-serif;
         }
         
         .btn-submit:hover {
@@ -131,6 +139,7 @@
             cursor: pointer;
             transition: all 0.3s ease;
             margin-top: 15px;
+            font-family: 'Vazirmatn', 'Tahoma', sans-serif;
         }
         
         .btn-secondary:hover {
@@ -152,6 +161,7 @@
             border-radius: 8px;
             margin-bottom: 10px;
             font-size: 14px;
+            font-family: 'Vazirmatn', 'Tahoma', sans-serif;
         }
         
         .message.error {
@@ -170,6 +180,7 @@
             margin-top: 20px;
             color: #666;
             font-size: 14px;
+            font-family: 'Vazirmatn', 'Tahoma', sans-serif;
         }
         
         .timer span {
@@ -183,6 +194,7 @@
             color: #667eea;
             text-decoration: none;
             font-size: 14px;
+            font-family: 'Vazirmatn', 'Tahoma', sans-serif;
         }
         
         .back-link:hover {
@@ -193,12 +205,13 @@
             margin-top: 30px;
             color: #999;
             font-size: 12px;
+            font-family: 'Vazirmatn', 'Tahoma', sans-serif;
         }
     </style>
 </head>
 <body>
     <div class="login-container">
-        <div class="logo">✓</div>
+        <div class="logo">🔐</div>
         <h1>تایید کد ورود</h1>
         <p class="subtitle">کد ارسال شده به پیام‌رسان بله را وارد کنید</p>
         <div class="mobile-display">{{ masked_mobile }}</div>
