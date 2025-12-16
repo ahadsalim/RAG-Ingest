@@ -176,39 +176,32 @@ class UserProfileInline(admin.StackedInline):
 class CustomUserAdmin(UserAdmin):
     """
     سفارشی‌سازی UserAdmin برای سیستم احراز هویت OTP
+    - نام کاربری = شماره موبایل
     - حذف فیلد password (لاگین با OTP)
-    - اضافه کردن UserProfile inline برای شماره موبایل
     """
     inlines = [UserProfileInline]
     
-    # حذف فیلد password از لیست نمایش
-    list_display = ('username', 'email', 'first_name', 'last_name', 'is_staff', 'is_active', 'get_mobile')
+    # نام کاربری = شماره موبایل (ستون اول)
+    list_display = ('username', 'first_name', 'last_name', 'email', 'is_staff', 'is_active')
     list_filter = ('is_staff', 'is_superuser', 'is_active', 'groups')
-    search_fields = ('username', 'first_name', 'last_name', 'email', 'profile__mobile')
-    
-    def get_mobile(self, obj):
-        """نمایش شماره موبایل از پروفایل"""
-        try:
-            return obj.profile.mobile
-        except:
-            return '-'
-    get_mobile.short_description = 'شماره موبایل'
-    get_mobile.admin_order_field = 'profile__mobile'
+    search_fields = ('username', 'first_name', 'last_name', 'email')
+    ordering = ('username',)
     
     def get_fieldsets(self, request, obj=None):
         """Override fieldsets to remove password field for OTP-based auth."""
         if not obj:
-            # Creating new user - simplified form
+            # Creating new user - username is mobile number
             return (
                 (None, {
                     'classes': ('wide',),
+                    'description': 'نام کاربری باید شماره موبایل باشد (مثال: 09123456789)',
                     'fields': ('username', 'first_name', 'last_name', 'email'),
                 }),
             )
         
         # Editing existing user - no password field
         return (
-            (None, {'fields': ('username',)}),
+            ('شماره موبایل', {'fields': ('username',)}),
             ('اطلاعات شخصی', {'fields': ('first_name', 'last_name', 'email')}),
             ('دسترسی‌ها', {
                 'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions'),
@@ -232,12 +225,20 @@ class CustomUserAdmin(UserAdmin):
     def save_model(self, request, obj, form, change):
         """
         Set unusable password for new users (OTP-based auth).
+        Create UserProfile with mobile = username.
         Also auto-add SyncLog delete permission for LUnit editors.
         """
         if not change:
             # New user - set unusable password
             obj.set_unusable_password()
         super().save_model(request, obj, form, change)
+        
+        # Create/update UserProfile with mobile = username
+        from ingest.apps.accounts.models import UserProfile
+        UserProfile.objects.update_or_create(
+            user=obj,
+            defaults={'mobile': obj.username, 'is_mobile_verified': True}
+        )
         
         # بررسی permissions برای اضافه کردن خودکار permission حذف SyncLog
         from django.contrib.contenttypes.models import ContentType

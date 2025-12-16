@@ -35,8 +35,8 @@ class MobileLoginForm(forms.Form):
         # Normalize mobile number
         mobile = mobile.replace(' ', '').replace('-', '')
         
-        # Check if user exists
-        if not UserProfile.objects.filter(mobile=mobile).exists():
+        # Check if user exists (username = mobile number)
+        if not User.objects.filter(username=mobile).exists():
             raise forms.ValidationError('این شماره موبایل در سیستم ثبت نشده است.')
         
         return mobile

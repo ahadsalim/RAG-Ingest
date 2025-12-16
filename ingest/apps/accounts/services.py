@@ -195,19 +195,21 @@ class BaleMessengerService:
 
 
 class OTPService:
-    """Service for managing OTP authentication."""
+    """Service for managing OTP authentication.
+    
+    Note: In this system, username = mobile number.
+    """
     
     def __init__(self):
         self.bale_service = BaleMessengerService()
     
     def send_otp(self, mobile: str) -> dict:
         """Generate and send OTP to user via Bale Safir API."""
-        from .models import OTPCode, UserProfile
+        from .models import OTPCode
+        from django.contrib.auth.models import User
         
-        # Check if user exists with this mobile
-        try:
-            profile = UserProfile.objects.get(mobile=mobile)
-        except UserProfile.DoesNotExist:
+        # Check if user exists (username = mobile number)
+        if not User.objects.filter(username=mobile).exists():
             return {
                 'success': False,
                 'error': 'شماره موبایل در سیستم ثبت نشده است.'
@@ -216,7 +218,7 @@ class OTPService:
         # Generate OTP
         otp = OTPCode.generate_code(mobile)
         
-        # Send via Bale Safir API (uses phone number directly, no chat_id needed)
+        # Send via Bale Safir API (uses phone number directly)
         result = self.bale_service.send_otp(mobile, otp.code)
         
         if result['success']:
@@ -230,7 +232,7 @@ class OTPService:
     
     def verify_otp(self, mobile: str, code: str) -> dict:
         """Verify OTP code and return user if valid."""
-        from .models import OTPCode, UserProfile
+        from .models import OTPCode
         from django.contrib.auth.models import User
         
         # Get latest unused OTP for this mobile
@@ -246,17 +248,14 @@ class OTPService:
             }
         
         if otp.verify(code):
-            # Get user
+            # Get user (username = mobile number)
             try:
-                profile = UserProfile.objects.get(mobile=mobile)
-                profile.is_mobile_verified = True
-                profile.save()
-                
+                user = User.objects.get(username=mobile)
                 return {
                     'success': True,
-                    'user': profile.user
+                    'user': user
                 }
-            except UserProfile.DoesNotExist:
+            except User.DoesNotExist:
                 return {
                     'success': False,
                     'error': 'کاربر یافت نشد.'
