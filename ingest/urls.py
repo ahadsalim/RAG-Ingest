@@ -27,7 +27,6 @@ urlpatterns = [
     path('admin/', admin_site.urls),
     path('admin/embeddings/', include('ingest.apps.embeddings.urls')),
     path('admin/documents/', include('ingest.apps.documents.urls')),
-    path('admin/accounts/', include('ingest.apps.accounts.urls')),
     path('api/', include('ingest.api.urls')),
 ]
 
