@@ -1,6 +1,6 @@
 # 🧠 AI Memory - RAG-Ingest Project
 
-**آخرین به‌روزرسانی**: 1404/09/25 (2025-12-15)
+**آخرین به‌روزرسانی**: 1404/09/27 (2025-12-17)
 
 ---
 
@@ -57,6 +57,65 @@ Persian Numbers: تبدیل به انگلیسی
 - ✅ Label تاریخ: "تاریخ نسخه/تصویب"
 - ✅ Parent queryset: فیلتر به manifestation
 - ✅ حذف cache مشکل‌ساز
+
+---
+
+## 📝 تغییرات Session 1404/09/27 (2025-12-17) - Parent Autocomplete Widget
+
+### 🐛 مشکلات و راه‌حل‌ها
+
+#### 1. فاصله زیاد بین فیلدها (margin-bottom: 180px)
+**مشکل**: فضای خالی زیاد بین فیلد content و unit_type در فرم LegalUnit
+**علت**: CSS قدیمی در `change_form.html` که برای dropdown قبلی بود:
+```css
+.form-row:has(.field-parent) {
+    margin-bottom: 180px !important;  /* این خط مشکل‌ساز بود */
+}
+```
+**راه‌حل**: حذف `margin-bottom: 180px` چون `resultsDiv` حالا در `body` است و نیازی به فاصله نیست
+
+#### 2. بسته شدن زودهنگام لیست autocomplete
+**مشکل**: لیست والد قبل از انتخاب آیتم بسته می‌شد
+**علت اصلی**: `mouseenter` و `mouseleave` روی آیتم‌ها باعث می‌شد آیتم‌ها یکی یکی حذف شوند!
+```javascript
+// این کد مشکل‌ساز بود:
+item.addEventListener('mouseenter', function() {
+    this.style.backgroundColor = '#f0f0f0';
+});
+item.addEventListener('mouseleave', function() {
+    this.style.backgroundColor = 'white';
+});
+```
+**راه‌حل**: حذف کامل `mouseenter`/`mouseleave` و فقط استفاده از `mousedown` برای انتخاب
+
+#### 3. دکمه حذف والد (✕) نبود
+**راه‌حل**: اضافه کردن دکمه قرمز که فقط وقتی والد انتخاب شده نمایش داده می‌شود
+
+### 📁 فایل‌های تغییر یافته
+- `/srv/ingest/apps/documents/widgets.py` - اصلاح JavaScript و اضافه کردن دکمه حذف
+- `/srv/ingest/templates/admin/documents/lunit/change_form.html` - حذف margin-bottom
+
+### ⚠️ نکات مهم برای آینده
+
+1. **هرگز از `mouseenter`/`mouseleave` برای hover effect روی آیتم‌های dropdown استفاده نکنید** - این باعث رفتار عجیب می‌شود
+2. **برای بستن dropdown با کلیک خارج**: از `blur` با تأخیر (300ms) استفاده کنید، نه `click` روی document
+3. **resultsDiv در body**: چون `resultsDiv` به `body` منتقل شده، نیازی به `margin-bottom` روی parent نیست
+4. **class name تداخل**: از class name یکتا مثل `parent-search-dropdown` استفاده کنید تا با CSS خارجی تداخل نداشته باشد
+
+### 🔧 کد نهایی widget (خلاصه)
+```javascript
+// فقط mousedown برای انتخاب - بدون mouseenter/mouseleave
+item.addEventListener('mousedown', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    selectParent(this.dataset.id, this.dataset.display);
+});
+
+// بستن با blur و تأخیر
+searchInput.addEventListener('blur', function() {
+    setTimeout(hideResults, 300);
+});
+```
 
 ---
 
