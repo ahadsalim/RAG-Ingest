@@ -41,9 +41,12 @@ class ParentAutocompleteWidget(forms.TextInput):
             except:
                 pass
         
+        # نمایش دکمه حذف والد فقط اگر والد انتخاب شده باشد
+        clear_btn_style = "display:inline-block;" if value else "display:none;"
+        
         # HTML output
         html = f'''
-        <div class="parent-autocomplete-wrapper" style="position: relative;">
+        <div class="parent-autocomplete-wrapper" style="position: relative; display: inline-block;">
             <input type="hidden" name="{name}" id="id_{name}" value="{value or ''}" />
             <input type="text" 
                    id="id_{name}_search" 
@@ -53,49 +56,38 @@ class ParentAutocompleteWidget(forms.TextInput):
                    autocomplete="off"
                    style="{attrs.get('style', '')}"
                    data-manifestation-id="{self.manifestation_id or ''}"
-            />
-            <div id="id_{name}_results" class="autocomplete-results" style="
-                display: none;
-                position: absolute;
-                top: 100%;
-                left: 0;
-                width: 600px;
-                background: red;
-                border: 2px solid blue;
-                max-height: 400px;
-                overflow-y: auto;
-                z-index: 1000;
-                box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-            ">TEST CONTENT</div>
+            /><button type="button" id="id_{name}_clear" style="{clear_btn_style}margin-right:8px;padding:4px 10px;background:#dc3545;color:#fff;border:none;border-radius:4px;cursor:pointer;vertical-align:middle;">✕</button>
+            <div id="id_{name}_results" class="parent-search-dropdown" style="display:none;"></div>
         </div>
         
         <script>
         (function() {{
-            console.log('=== Parent Autocomplete Script Loaded ===');
             const searchInput = document.getElementById('id_{name}_search');
             const hiddenInput = document.getElementById('id_{name}');
+            const clearBtn = document.getElementById('id_{name}_clear');
             let resultsDiv = document.getElementById('id_{name}_results');
             let searchTimeout;
             
-            console.log('searchInput:', searchInput);
-            console.log('manifestationId:', searchInput ? searchInput.dataset.manifestationId : 'N/A');
-            
-            if (!searchInput) {{
-                console.error('searchInput not found!');
-                return;
-            }}
+            if (!searchInput) return;
             
             // انتقال resultsDiv به body برای جلوگیری از مشکل overflow:hidden
             if (resultsDiv) {{
                 document.body.appendChild(resultsDiv);
                 resultsDiv.style.position = 'fixed';
                 resultsDiv.style.zIndex = '99999';
-                console.log('resultsDiv moved to body');
+            }}
+            
+            // دکمه حذف والد
+            if (clearBtn) {{
+                clearBtn.addEventListener('click', function() {{
+                    hiddenInput.value = '';
+                    searchInput.value = '';
+                    clearBtn.style.display = 'none';
+                }});
             }}
             
             // جستجو با تاخیر
             searchInput.addEventListener('input', function() {{
-                console.log('Input event fired, value:', this.value);
                 clearTimeout(searchTimeout);
                 const query = this.value.trim();
                 
@@ -119,11 +111,9 @@ class ParentAutocompleteWidget(forms.TextInput):
                 
                 const url = '/admin/documents/lunit/search-parents/?q=' + encodeURIComponent(query) + '&manifestation_id=' + manifestationId;
                 
-                console.log('Fetching URL:', url);
                 fetch(url)
                     .then(response => response.json())
                     .then(data => {{
-                        console.log('Got results:', data.results ? data.results.length : 0);
                         displayResults(data.results);
                     }})
                     .catch(error => {{
@@ -133,8 +123,6 @@ class ParentAutocompleteWidget(forms.TextInput):
             
             // نمایش نتایج
             function displayResults(results) {{
-                console.log('displayResults called, resultsDiv:', resultsDiv);
-                console.log('resultsDiv parent:', resultsDiv ? resultsDiv.parentElement : 'N/A');
                 
                 if (results.length === 0) {{
                     resultsDiv.innerHTML = '<div style="padding: 10px; color: #999;">نتیجه‌ای یافت نشد</div>';
@@ -184,20 +172,12 @@ class ParentAutocompleteWidget(forms.TextInput):
                 resultsDiv.style.setProperty('border', '1px solid #ccc', 'important');
                 resultsDiv.style.setProperty('box-shadow', '0 4px 8px rgba(0,0,0,0.15)', 'important');
                 
-                console.log('Results displayed at top:', rect.bottom, 'left:', leftPos, 'viewport:', window.innerWidth);
-                
-                // اضافه کردن event listener به هر آیتم
+                // اضافه کردن event listener به هر آیتم - فقط mousedown برای انتخاب
                 resultsDiv.querySelectorAll('.autocomplete-item').forEach(function(item) {{
-                    item.addEventListener('click', function() {{
+                    item.addEventListener('mousedown', function(e) {{
+                        e.preventDefault();
+                        e.stopPropagation();
                         selectParent(this.dataset.id, this.dataset.display);
-                    }});
-                    
-                    item.addEventListener('mouseenter', function() {{
-                        this.style.backgroundColor = '#f0f0f0';
-                    }});
-                    
-                    item.addEventListener('mouseleave', function() {{
-                        this.style.backgroundColor = 'white';
                     }});
                 }});
             }}
@@ -206,21 +186,24 @@ class ParentAutocompleteWidget(forms.TextInput):
             function selectParent(id, display) {{
                 hiddenInput.value = id;
                 searchInput.value = display;
-                resultsDiv.style.display = 'none';
+                hideResults();
+                if (clearBtn) clearBtn.style.display = 'inline-block';
             }}
             
-            // بستن نتایج با کلیک خارج
-            document.addEventListener('click', function(e) {{
-                if (!searchInput.contains(e.target) && !resultsDiv.contains(e.target)) {{
-                    resultsDiv.style.display = 'none';
+            function hideResults() {{
+                resultsDiv.style.setProperty('display', 'none', 'important');
+            }}
+            
+            // بستن نتایج فقط با Escape
+            searchInput.addEventListener('keydown', function(e) {{
+                if (e.key === 'Escape') {{
+                    hideResults();
                 }}
             }});
             
-            // پاک کردن با فشار Escape
-            searchInput.addEventListener('keydown', function(e) {{
-                if (e.key === 'Escape') {{
-                    resultsDiv.style.display = 'none';
-                }}
+            // بستن با کلیک خارج - با تأخیر برای اجازه دادن به انتخاب آیتم
+            searchInput.addEventListener('blur', function() {{
+                setTimeout(hideResults, 300);
             }});
         }})();
         </script>
