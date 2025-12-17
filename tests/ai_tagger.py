@@ -1259,7 +1259,10 @@ HTML = """
                     } else if (data.status === 'waiting_approval') {
                         statusBox.classList.add('status-waiting');
                         statusText.textContent = 'منتظر تأیید شما';
-                        loadResults();
+                        // Only load results if not already showing
+                        if (!currentData || document.getElementById('results-section').classList.contains('hidden')) {
+                            loadResults();
+                        }
                     }
                 });
         }
@@ -1283,7 +1286,10 @@ HTML = """
                     updateStatus();
                     if (data.status === 'waiting_approval') {
                         document.getElementById('loading-section').classList.add('hidden');
-                        loadResults();
+                        // Only load if not already loaded
+                        if (!currentData || document.getElementById('results-section').classList.contains('hidden')) {
+                            loadResults();
+                        }
                     } else if (data.status === 'processing') {
                         setTimeout(pollForResults, 2000);
                     } else {
@@ -1293,12 +1299,21 @@ HTML = """
         }
         
         function loadResults() {
+            // Save existing manual tags before re-render
+            const savedManualTags = JSON.parse(JSON.stringify(manualTags));
+            
             fetch('/api/results')
                 .then(r => r.json())
                 .then(data => {
                     currentData = data;
                     renderResults(data);
                     document.getElementById('results-section').classList.remove('hidden');
+                    
+                    // Restore manual tags after render
+                    manualTags = savedManualTags;
+                    Object.keys(manualTags).forEach(unitIdx => {
+                        renderManualTags(parseInt(unitIdx));
+                    });
                 });
         }
         

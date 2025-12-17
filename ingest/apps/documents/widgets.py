@@ -1,12 +1,5 @@
 """
 Custom widgets for documents app.
-
-╔══════════════════════════════════════════════════════════════════════════════╗
-║  توجه: برای مدیریت بندهای حقوقی (LegalUnit) از LUnit استفاده کنید!          ║
-║  LUnit یک proxy model برای LegalUnit است با رابط کاربری بهتر.               ║
-║  فایل مربوطه: admin_lunit.py                                                 ║
-║  URL در admin: /admin/documents/lunit/                                       ║
-╚══════════════════════════════════════════════════════════════════════════════╝
 """
 from django import forms
 from django.urls import reverse
@@ -19,16 +12,14 @@ class ParentAutocompleteWidget(forms.TextInput):
     """
     template_name = 'admin/documents/widgets/parent_autocomplete.html'
     
-    def __init__(self, manifestation_id=None, model_name='lunit', *args, **kwargs):
+    def __init__(self, manifestation_id=None, *args, **kwargs):
         self.manifestation_id = manifestation_id
-        self.model_name = model_name  # 'lunit' or 'legalunit'
         super().__init__(*args, **kwargs)
         self.attrs.update({
             'class': 'parent-autocomplete vTextField',
             'placeholder': 'نوع واحد (باب/بخش، فصل، ماده، ...) یا شماره',
             'autocomplete': 'off',
-            'style': 'width: 500px; display: inline-block;',
-            'data-model-name': model_name
+            'style': 'width: 500px; display: inline-block;'
         })
     
     def render(self, name, value, attrs=None, renderer=None):
@@ -52,7 +43,7 @@ class ParentAutocompleteWidget(forms.TextInput):
         
         # HTML output
         html = f'''
-        <div class="parent-autocomplete-wrapper" style="position: relative; display: inline-flex; align-items: center; gap: 8px;">
+        <div class="parent-autocomplete-wrapper" style="position: relative;">
             <input type="hidden" name="{name}" id="id_{name}" value="{value or ''}" />
             <input type="text" 
                    id="id_{name}_search" 
@@ -62,76 +53,58 @@ class ParentAutocompleteWidget(forms.TextInput):
                    autocomplete="off"
                    style="{attrs.get('style', '')}"
                    data-manifestation-id="{self.manifestation_id or ''}"
-                   data-model-name="{self.model_name}"
             />
-            <button type="button" 
-                    id="id_{name}_clear" 
-                    class="parent-clear-btn"
-                    title="حذف والد"
-                    style="
-                        padding: 4px 8px;
-                        background: #6c757d;
-                        color: white;
-                        border: none;
-                        border-radius: 4px;
-                        cursor: pointer;
-                        font-size: 14px;
-                        display: {'inline-block' if value else 'none'};
-                    "
-            >✕</button>
             <div id="id_{name}_results" class="autocomplete-results" style="
                 display: none;
-                position: fixed;
+                position: absolute;
+                top: 100%;
+                left: 0;
                 width: 600px;
-                background: white;
-                border: 1px solid #ccc;
+                background: red;
+                border: 2px solid blue;
                 max-height: 400px;
                 overflow-y: auto;
-                z-index: 99999;
+                z-index: 1000;
                 box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-            "></div>
+            ">TEST CONTENT</div>
         </div>
         
         <script>
         (function() {{
+            console.log('=== Parent Autocomplete Script Loaded ===');
             const searchInput = document.getElementById('id_{name}_search');
             const hiddenInput = document.getElementById('id_{name}');
             let resultsDiv = document.getElementById('id_{name}_results');
-            const clearBtn = document.getElementById('id_{name}_clear');
             let searchTimeout;
             
-            // Debug log
-            console.log('Parent autocomplete initialized for: {name}');
-            console.log('Manifestation ID:', searchInput ? searchInput.dataset.manifestationId : 'searchInput not found');
-            console.log('Model Name:', searchInput ? searchInput.dataset.modelName : 'searchInput not found');
+            console.log('searchInput:', searchInput);
+            console.log('manifestationId:', searchInput ? searchInput.dataset.manifestationId : 'N/A');
             
             if (!searchInput) {{
-                console.error('Search input not found: id_{name}_search');
+                console.error('searchInput not found!');
                 return;
             }}
             
-            // انتقال resultsDiv به body برای جلوگیری از مشکلات overflow
+            // انتقال resultsDiv به body برای جلوگیری از مشکل overflow:hidden
             if (resultsDiv) {{
                 document.body.appendChild(resultsDiv);
+                resultsDiv.style.position = 'fixed';
+                resultsDiv.style.zIndex = '99999';
                 console.log('resultsDiv moved to body');
             }}
             
             // جستجو با تاخیر
             searchInput.addEventListener('input', function() {{
+                console.log('Input event fired, value:', this.value);
                 clearTimeout(searchTimeout);
                 const query = this.value.trim();
-                console.log('Input event, query:', query);
                 
                 if (query.length < 1) {{
                     resultsDiv.style.display = 'none';
-                    // پاک کردن والد اگر فیلد خالی شد
-                    hiddenInput.value = '';
-                    if (clearBtn) clearBtn.style.display = 'none';
                     return;
                 }}
                 
                 searchTimeout = setTimeout(function() {{
-                    console.log('Searching for:', query);
                     searchParents(query);
                 }}, 300);
             }});
@@ -139,13 +112,12 @@ class ParentAutocompleteWidget(forms.TextInput):
             // جستجو در والدها
             function searchParents(query) {{
                 const manifestationId = searchInput.dataset.manifestationId;
-                const modelName = searchInput.dataset.modelName || 'lunit';
                 if (!manifestationId) {{
                     console.error('Manifestation ID not found');
                     return;
                 }}
                 
-                const url = '/admin/documents/' + modelName + '/search-parents/?q=' + encodeURIComponent(query) + '&manifestation_id=' + manifestationId;
+                const url = '/admin/documents/lunit/search-parents/?q=' + encodeURIComponent(query) + '&manifestation_id=' + manifestationId;
                 
                 console.log('Fetching URL:', url);
                 fetch(url)
@@ -162,10 +134,8 @@ class ParentAutocompleteWidget(forms.TextInput):
             // نمایش نتایج
             function displayResults(results) {{
                 console.log('displayResults called, resultsDiv:', resultsDiv);
-                if (!resultsDiv) {{
-                    console.error('resultsDiv is null!');
-                    return;
-                }}
+                console.log('resultsDiv parent:', resultsDiv ? resultsDiv.parentElement : 'N/A');
+                
                 if (results.length === 0) {{
                     resultsDiv.innerHTML = '<div style="padding: 10px; color: #999;">نتیجه‌ای یافت نشد</div>';
                     resultsDiv.style.display = 'block';
@@ -191,19 +161,30 @@ class ParentAutocompleteWidget(forms.TextInput):
                 
                 resultsDiv.innerHTML = html;
                 
-                // تنظیم موقعیت resultsDiv بر اساس searchInput
+                // تنظیم موقعیت بر اساس searchInput
                 const rect = searchInput.getBoundingClientRect();
                 let leftPos = rect.left;
+                
                 // اگر از سمت راست خارج می‌شود، تنظیم کن
                 if (leftPos + 600 > window.innerWidth) {{
                     leftPos = window.innerWidth - 620;
                 }}
                 if (leftPos < 10) leftPos = 10;
                 
-                resultsDiv.style.top = (rect.bottom + window.scrollY) + 'px';
-                resultsDiv.style.left = leftPos + 'px';
-                resultsDiv.style.display = 'block';
-                console.log('Results displayed at:', rect.bottom, leftPos, 'viewport width:', window.innerWidth);
+                // استفاده از setProperty با important برای override کردن CSS خارجی
+                resultsDiv.style.setProperty('display', 'block', 'important');
+                resultsDiv.style.setProperty('position', 'fixed', 'important');
+                resultsDiv.style.setProperty('top', rect.bottom + 'px', 'important');
+                resultsDiv.style.setProperty('left', leftPos + 'px', 'important');
+                resultsDiv.style.setProperty('width', Math.min(600, window.innerWidth - 40) + 'px', 'important');
+                resultsDiv.style.setProperty('background', 'white', 'important');
+                resultsDiv.style.setProperty('z-index', '999999', 'important');
+                resultsDiv.style.setProperty('max-height', '400px', 'important');
+                resultsDiv.style.setProperty('overflow-y', 'auto', 'important');
+                resultsDiv.style.setProperty('border', '1px solid #ccc', 'important');
+                resultsDiv.style.setProperty('box-shadow', '0 4px 8px rgba(0,0,0,0.15)', 'important');
+                
+                console.log('Results displayed at top:', rect.bottom, 'left:', leftPos, 'viewport:', window.innerWidth);
                 
                 // اضافه کردن event listener به هر آیتم
                 resultsDiv.querySelectorAll('.autocomplete-item').forEach(function(item) {{
@@ -226,7 +207,6 @@ class ParentAutocompleteWidget(forms.TextInput):
                 hiddenInput.value = id;
                 searchInput.value = display;
                 resultsDiv.style.display = 'none';
-                if (clearBtn) clearBtn.style.display = 'inline-block';
             }}
             
             // بستن نتایج با کلیک خارج
@@ -242,16 +222,6 @@ class ParentAutocompleteWidget(forms.TextInput):
                     resultsDiv.style.display = 'none';
                 }}
             }});
-            
-            // دکمه پاک کردن والد
-            if (clearBtn) {{
-                clearBtn.addEventListener('click', function() {{
-                    hiddenInput.value = '';
-                    searchInput.value = '';
-                    resultsDiv.style.display = 'none';
-                    clearBtn.style.display = 'none';
-                }});
-            }}
         }})();
         </script>
         '''
