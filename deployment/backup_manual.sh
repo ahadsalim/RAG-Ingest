@@ -2,7 +2,8 @@
 
 # =============================================================================
 # Manual Backup & Restore Script
-# Supports: Full backup (files + config + db) and Database-only backup
+# Supports: Full backup (DB + Config + NPM) and Database-only backup
+# Note: MinIO has its own separate backup script (backup_minio.sh)
 # =============================================================================
 
 set -e
@@ -88,7 +89,7 @@ backup_full() {
     mkdir -p "$backup_dir_temp"
     
     # 1. Database
-    print_info "  [1/5] Backing up database..."
+    print_info "  [1/4] Backing up database..."
     if docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T db \
         pg_dump -U "${POSTGRES_USER:-ingest}" "${POSTGRES_DB:-ingest}" | gzip > "$backup_dir_temp/database.sql.gz"; then
         print_success "  Database backup done"
@@ -98,30 +99,16 @@ backup_full() {
         return 1
     fi
     
-    # 2. MinIO data
-    print_info "  [2/5] Backing up MinIO files..."
-    local minio_volume=$(docker volume ls --format "{{.Name}}" | grep -E "minio_data$" | head -1)
-    if [ -n "$minio_volume" ]; then
-        if docker run --rm -v "$minio_volume:/data:ro" alpine tar -czf - /data > "$backup_dir_temp/minio_data.tar.gz" 2>/dev/null; then
-            local minio_size=$(du -sh "$backup_dir_temp/minio_data.tar.gz" | cut -f1)
-            print_success "  MinIO backup done ($minio_size)"
-        else
-            print_warning "  MinIO backup failed (continuing...)"
-        fi
-    else
-        print_warning "  MinIO volume not found"
-    fi
-    
-    # 3. Environment file
-    print_info "  [3/5] Backing up configuration..."
+    # 2. Environment file
+    print_info "  [2/4] Backing up configuration..."
     mkdir -p "$backup_dir_temp/config"
     if [ -f "$ENV_FILE" ]; then
         cp "$ENV_FILE" "$backup_dir_temp/config/.env"
         print_success "  .env file backed up"
     fi
     
-    # 4. Nginx Proxy Manager data
-    print_info "  [4/5] Backing up Nginx Proxy Manager..."
+    # 3. Nginx Proxy Manager data
+    print_info "  [3/4] Backing up Nginx Proxy Manager..."
     local npm_volume=$(docker volume ls --format "{{.Name}}" | grep -E "npm_data$" | head -1)
     if [ -n "$npm_volume" ]; then
         if docker run --rm -v "$npm_volume:/data:ro" alpine tar -czf - /data > "$backup_dir_temp/npm_data.tar.gz" 2>/dev/null; then
@@ -140,8 +127,8 @@ backup_full() {
         fi
     fi
     
-    # 5. Metadata
-    print_info "  [5/5] Creating metadata..."
+    # 4. Metadata
+    print_info "  [4/4] Creating metadata..."
     cat > "$backup_dir_temp/backup_info.json" << EOF
 {
     "backup_date": "$(date -Iseconds)",
@@ -245,7 +232,8 @@ restore_full() {
         return 1
     fi
     
-    print_warning "This will REPLACE all data (database + MinIO files)!"
+    print_warning "This will REPLACE all data (database + NPM config)!"
+    print_info "Note: MinIO data is NOT included. Use backup_minio.sh for MinIO."
     read -p "Continue? (y/N): " confirm
     if [[ ! $confirm =~ ^[Yy]$ ]]; then
         print_info "Operation cancelled"
@@ -298,19 +286,6 @@ restore_full() {
             psql -U "${POSTGRES_USER:-ingest}" -d "${POSTGRES_DB:-ingest}" >/dev/null 2>&1
         
         print_success "Database restored"
-    fi
-    
-    # Restore MinIO
-    if [ -f "$backup_dir/minio_data.tar.gz" ]; then
-        print_info "Restoring MinIO files..."
-        local minio_volume=$(docker volume ls --format "{{.Name}}" | grep -E "minio_data$" | head -1)
-        if [ -n "$minio_volume" ]; then
-            docker run --rm -v "$minio_volume:/data" alpine sh -c "rm -rf /data/* /data/.* 2>/dev/null || true"
-            docker run --rm -v "$minio_volume:/data" -v "$backup_dir:/backup:ro" alpine \
-                sh -c "cd /data && tar -xzf /backup/minio_data.tar.gz --strip-components=1 2>/dev/null || tar -xzf /backup/minio_data.tar.gz"
-            docker run --rm -v "$minio_volume:/data" alpine sh -c "chown -R 1000:1000 /data 2>/dev/null || true"
-            print_success "MinIO files restored"
-        fi
     fi
     
     # Restore NPM data
@@ -382,7 +357,7 @@ show_menu() {
     print_header "🗄️ Manual Backup & Restore"
     echo ""
     echo "BACKUP:"
-    echo "  1) Full Backup (Database + MinIO + Config)"
+    echo "  1) Full Backup (Database + Config + NPM)"
     echo "  2) Database Only Backup"
     echo ""
     echo "RESTORE:"
@@ -443,7 +418,7 @@ show_help() {
     echo "Usage: $0 [COMMAND] [OPTIONS]"
     echo ""
     echo "Commands:"
-    echo "  backup full          Create full system backup"
+    echo "  backup full          Create full system backup (DB + Config + NPM)"
     echo "  backup db            Create database-only backup"
     echo "  restore full <file>  Restore from full backup"
     echo "  restore db <file>    Restore database from backup"

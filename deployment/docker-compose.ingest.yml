@@ -60,7 +60,6 @@ services:
     command: gunicorn ingest.wsgi:application --bind 0.0.0.0:8000 --workers 4 --threads 4 --worker-class gthread --timeout 120 --max-requests 1000 --max-requests-jitter 50
     volumes:
       - static_volume:/app/staticfiles
-      - media_volume:/app/media
       - model_volume:/app/models
     ports:
       - "127.0.0.1:8001:8000"
@@ -91,7 +90,6 @@ services:
     command: celery -A ingest worker --loglevel=info
     volumes:
       - static_volume:/app/staticfiles
-      - media_volume:/app/media
       - model_volume:/app/models
     environment:
       - POSTGRES_HOST=db
@@ -121,7 +119,6 @@ services:
     command: celery -A ingest beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
     volumes:
       - static_volume:/app/staticfiles
-      - media_volume:/app/media
       - model_volume:/app/models
     environment:
       - POSTGRES_HOST=db
@@ -172,7 +169,6 @@ services:
 volumes:
   postgres_data:
   static_volume:
-  media_volume:
   model_volume:
   minio_data:
   npm_data:
