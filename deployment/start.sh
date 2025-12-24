@@ -273,7 +273,7 @@ CELERY_RESULT_BACKEND=redis://redis:6379/0
 # =============================================================================
 AWS_ACCESS_KEY_ID=${MINIO_ACCESS_KEY}
 AWS_SECRET_ACCESS_KEY=${MINIO_SECRET_KEY}
-AWS_STORAGE_BUCKET_NAME=advisor-docs
+AWS_STORAGE_BUCKET_NAME=ingest-system
 AWS_S3_ENDPOINT_URL=http://minio:9000
 AWS_S3_REGION_NAME=us-east-1
 AWS_S3_USE_SSL=false
