@@ -3,6 +3,7 @@
 # =============================================================================
 # MinIO Backup & Restore Script
 # Independent backup system for MinIO object storage
+# Note: Excludes temp-userfile bucket (temporary user files)
 # =============================================================================
 
 set -e
@@ -42,6 +43,9 @@ BACKUP_RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-30}"
 # MinIO remote path (separate from database backups)
 MINIO_REMOTE_PATH="${BACKUP_SERVER_PATH}/minio"
 
+# Buckets to exclude from backup (temporary files)
+EXCLUDED_BUCKETS="temp-userfile"
+
 # Ensure directories exist
 mkdir -p "$LOCAL_BACKUP_DIR"
 
@@ -77,13 +81,14 @@ get_minio_volume() {
 # BACKUP FUNCTIONS
 # =============================================================================
 
-# Create MinIO backup
+# Create MinIO backup (excluding temp buckets)
 create_backup() {
     local date=$(date +%Y%m%d_%H%M%S)
     local backup_name="minio_backup_${date}.tar.gz"
     local backup_path="$LOCAL_BACKUP_DIR/$backup_name"
     
     print_info "Creating MinIO backup..."
+    print_info "Excluding buckets: $EXCLUDED_BUCKETS"
     
     local volume=$(get_minio_volume)
     print_info "Using volume: $volume"
@@ -94,12 +99,35 @@ create_backup() {
         return 1
     fi
     
-    # Get volume size estimate
-    local size_estimate=$(docker run --rm -v "$volume:/data:ro" alpine du -sh /data 2>/dev/null | cut -f1)
-    print_info "Estimated data size: $size_estimate"
+    # Build exclude arguments for tar
+    local exclude_args=""
+    for bucket in $EXCLUDED_BUCKETS; do
+        exclude_args="$exclude_args --exclude=data/$bucket --exclude=data/.minio.sys/buckets/$bucket"
+    done
     
-    # Create backup
-    if docker run --rm -v "$volume:/data:ro" alpine tar -czf - /data > "$backup_path" 2>/dev/null; then
+    # Get volume size estimate (excluding temp buckets)
+    local size_estimate=$(docker run --rm -v "$volume:/data:ro" alpine sh -c "
+        total=0
+        for dir in /data/*; do
+            name=\$(basename \"\$dir\")
+            skip=false
+            for excl in $EXCLUDED_BUCKETS; do
+                if [ \"\$name\" = \"\$excl\" ]; then
+                    skip=true
+                    break
+                fi
+            done
+            if [ \"\$skip\" = false ] && [ -d \"\$dir\" ]; then
+                size=\$(du -s \"\$dir\" 2>/dev/null | cut -f1)
+                total=\$((total + size))
+            fi
+        done
+        echo \$((total / 1024))M
+    " 2>/dev/null)
+    print_info "Estimated data size (excluding temp): $size_estimate"
+    
+    # Create backup with exclusions
+    if docker run --rm -v "$volume:/data:ro" alpine sh -c "cd / && tar -czf - $exclude_args data" > "$backup_path" 2>/dev/null; then
         # Verify backup is not empty
         local backup_size=$(stat -c%s "$backup_path" 2>/dev/null || echo 0)
         if [ "$backup_size" -lt 100 ]; then
@@ -114,6 +142,7 @@ create_backup() {
         echo ""
         echo -e "${GREEN}📁 Backup file: $backup_path${NC}"
         echo -e "${GREEN}📦 Size: $size${NC}"
+        echo -e "${YELLOW}⚠️  Excluded: $EXCLUDED_BUCKETS${NC}"
         
         echo "$backup_path"
         return 0
@@ -372,6 +401,7 @@ show_status() {
     # Volume size
     local vol_size=$(docker run --rm -v "$volume:/data:ro" alpine du -sh /data 2>/dev/null | cut -f1)
     echo "  Current Data Size: $vol_size"
+    echo "  Excluded Buckets: $EXCLUDED_BUCKETS"
     
     # Local backups
     local local_count=$(ls -1 "$LOCAL_BACKUP_DIR"/minio_backup_*.tar.gz 2>/dev/null | wc -l)

@@ -30,7 +30,7 @@
 | **PostgreSQL Database** | داده‌های اصلی سیستم | auto, manual |
 | **فایل .env** | تنظیمات و رمزها | auto, manual |
 | **Nginx Proxy Manager** | تنظیمات SSL و proxy | auto, manual |
-| **MinIO Data** | فایل‌های آپلود شده | minio |
+| **MinIO Data** | فایل‌های آپلود شده (بجز temp-userfile) | minio |
 
 ---
 
@@ -197,6 +197,8 @@ cd /srv/deployment
 ---
 
 ## Backup مجزای MinIO
+
+> **توجه:** باکت `temp-userfile` (فایل‌های موقت کاربران) از backup استثنا شده است.
 
 ### دستورات
 
