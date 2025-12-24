@@ -36,12 +36,12 @@ LOG_FILE="/var/log/minio_backup.log"
 # Remote backup settings (from .env)
 BACKUP_SERVER_HOST="${BACKUP_SERVER_HOST:-}"
 BACKUP_SERVER_USER="${BACKUP_SERVER_USER:-root}"
-BACKUP_SERVER_PATH="${BACKUP_SERVER_PATH:-/srv/backup/ingest}"
+BACKUP_SERVER_PATH_MINIO="${BACKUP_SERVER_PATH_MINIO:-/srv/backup/minio}"
 BACKUP_SSH_KEY="${BACKUP_SSH_KEY:-/root/.ssh/backup_key}"
 BACKUP_RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-30}"
 
-# MinIO remote path (separate from database backups)
-MINIO_REMOTE_PATH="${BACKUP_SERVER_PATH}/minio"
+# MinIO remote path (dedicated path for MinIO backups)
+MINIO_REMOTE_PATH="${BACKUP_SERVER_PATH_MINIO}"
 
 # Buckets to exclude from backup (temporary files)
 EXCLUDED_BUCKETS="temp-userfile"
@@ -87,15 +87,15 @@ create_backup() {
     local backup_name="minio_backup_${date}.tar.gz"
     local backup_path="$LOCAL_BACKUP_DIR/$backup_name"
     
-    print_info "Creating MinIO backup..."
-    print_info "Excluding buckets: $EXCLUDED_BUCKETS"
+    print_info "Creating MinIO backup..." >&2
+    print_info "Excluding buckets: $EXCLUDED_BUCKETS" >&2
     
     local volume=$(get_minio_volume)
-    print_info "Using volume: $volume"
+    print_info "Using volume: $volume" >&2
     
     # Check if volume exists
     if ! docker volume inspect "$volume" >/dev/null 2>&1; then
-        print_error "MinIO volume not found: $volume"
+        print_error "MinIO volume not found: $volume" >&2
         return 1
     fi
     
@@ -124,30 +124,30 @@ create_backup() {
         done
         echo \$((total / 1024))M
     " 2>/dev/null)
-    print_info "Estimated data size (excluding temp): $size_estimate"
+    print_info "Estimated data size (excluding temp): $size_estimate" >&2
     
     # Create backup with exclusions
     if docker run --rm -v "$volume:/data:ro" alpine sh -c "cd / && tar -czf - $exclude_args data" > "$backup_path" 2>/dev/null; then
         # Verify backup is not empty
         local backup_size=$(stat -c%s "$backup_path" 2>/dev/null || echo 0)
         if [ "$backup_size" -lt 100 ]; then
-            print_warning "Backup file is very small - MinIO might be empty"
+            print_warning "Backup file is very small - MinIO might be empty" >&2
         fi
         
         # Create checksum
         sha256sum "$backup_path" > "${backup_path}.sha256"
         
         local size=$(du -sh "$backup_path" | cut -f1)
-        print_success "MinIO backup created successfully"
-        echo ""
-        echo -e "${GREEN}📁 Backup file: $backup_path${NC}"
-        echo -e "${GREEN}📦 Size: $size${NC}"
-        echo -e "${YELLOW}⚠️  Excluded: $EXCLUDED_BUCKETS${NC}"
+        print_success "MinIO backup created successfully" >&2
+        echo "" >&2
+        echo -e "${GREEN}📁 Backup file: $backup_path${NC}" >&2
+        echo -e "${GREEN}📦 Size: $size${NC}" >&2
+        echo -e "${YELLOW}⚠️  Excluded: $EXCLUDED_BUCKETS${NC}" >&2
         
         echo "$backup_path"
         return 0
     else
-        print_error "MinIO backup failed"
+        print_error "MinIO backup failed" >&2
         rm -f "$backup_path"
         return 1
     fi
@@ -355,16 +355,17 @@ auto_backup() {
 setup_cron() {
     print_info "Setting up cron job for automatic MinIO backup..."
     
-    # Run daily at 3:00 AM (offset from database backup)
-    local cron_job="0 3 * * * $SCRIPT_DIR/backup_minio.sh --auto >> $LOG_FILE 2>&1"
+    # Run twice daily at 4:00 AM and 4:00 PM UTC
+    local cron_job_am="0 4 * * * $SCRIPT_DIR/backup_minio.sh --auto >> $LOG_FILE 2>&1"
+    local cron_job_pm="0 16 * * * $SCRIPT_DIR/backup_minio.sh --auto >> $LOG_FILE 2>&1"
     
-    # Remove existing job
+    # Remove existing jobs
     crontab -l 2>/dev/null | grep -v "backup_minio.sh" | crontab - 2>/dev/null || true
     
-    # Add new job
-    (crontab -l 2>/dev/null; echo "$cron_job") | crontab -
+    # Add new jobs
+    (crontab -l 2>/dev/null; echo "$cron_job_am"; echo "$cron_job_pm") | crontab -
     
-    print_success "Cron job installed: daily at 3:00 AM"
+    print_success "Cron jobs installed: daily at 4:00 AM and 4:00 PM UTC"
     print_info "View logs: tail -f $LOG_FILE"
 }
 
@@ -469,7 +470,8 @@ main() {
     case "${1:-}" in
         backup)
             backup_file=$(create_backup)
-            if [ "${2:-}" == "--remote" ] && [ $? -eq 0 ]; then
+            backup_result=$?
+            if [ $backup_result -eq 0 ] && [ "${2:-}" == "--remote" ]; then
                 send_to_remote "$backup_file"
             fi
             ;;
