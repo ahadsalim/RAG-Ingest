@@ -1,8 +1,9 @@
 #!/bin/bash
 
 # =============================================================================
-# Automatic Database Backup Script
+# Automatic Full Backup Script
 # Runs every 6 hours via cron, sends backup to remote server
+# Includes: Database + .env config + Nginx Proxy Manager
 # =============================================================================
 
 set -e
@@ -87,32 +88,78 @@ test_ssh_connection() {
     fi
 }
 
-# Create database backup
-create_db_backup() {
+# Create full backup (DB + config + NPM)
+create_full_backup() {
     local date=$(date +%Y%m%d_%H%M%S)
-    local backup_name="ingest_db_${date}.sql.gz"
-    local backup_path="$LOCAL_BACKUP_DIR/$backup_name"
+    local backup_name="ingest_auto_${date}"
+    local backup_dir="$LOCAL_BACKUP_DIR/$backup_name"
+    local backup_path="$LOCAL_BACKUP_DIR/${backup_name}.tar.gz"
     
-    mkdir -p "$LOCAL_BACKUP_DIR"
+    mkdir -p "$backup_dir"
     
-    print_info "Creating database backup..."
-    
+    # 1. Database
+    print_info "[1/3] Creating database backup..."
     if docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" exec -T db \
-        pg_dump -U "${POSTGRES_USER:-ingest}" "${POSTGRES_DB:-ingest}" | gzip > "$backup_path"; then
-        
-        local size=$(du -sh "$backup_path" | cut -f1)
-        print_success "Database backup created: $backup_name ($size)"
-        
-        # Create checksum
-        sha256sum "$backup_path" > "${backup_path}.sha256"
-        
-        echo "$backup_path"
-        return 0
+        pg_dump -U "${POSTGRES_USER:-ingest}" "${POSTGRES_DB:-ingest}" | gzip > "$backup_dir/database.sql.gz"; then
+        print_success "Database backup done"
     else
         print_error "Database backup failed"
-        rm -f "$backup_path"
+        rm -rf "$backup_dir"
         return 1
     fi
+    
+    # 2. Environment file
+    print_info "[2/3] Backing up configuration..."
+    mkdir -p "$backup_dir/config"
+    if [ -f "$ENV_FILE" ]; then
+        cp "$ENV_FILE" "$backup_dir/config/.env"
+        print_success ".env file backed up"
+    fi
+    
+    # 3. Nginx Proxy Manager
+    print_info "[3/3] Backing up Nginx Proxy Manager..."
+    local npm_volume=$(docker volume ls --format "{{.Name}}" | grep -E "npm_data$" | head -1)
+    if [ -n "$npm_volume" ]; then
+        if docker run --rm -v "$npm_volume:/data:ro" alpine tar -czf - /data > "$backup_dir/npm_data.tar.gz" 2>/dev/null; then
+            print_success "NPM data backed up"
+        else
+            print_warning "NPM backup failed (continuing...)"
+        fi
+    fi
+    
+    local npm_ssl_volume=$(docker volume ls --format "{{.Name}}" | grep -E "npm_letsencrypt$" | head -1)
+    if [ -n "$npm_ssl_volume" ]; then
+        if docker run --rm -v "$npm_ssl_volume:/data:ro" alpine tar -czf - /data > "$backup_dir/npm_letsencrypt.tar.gz" 2>/dev/null; then
+            print_success "NPM SSL certificates backed up"
+        else
+            print_warning "NPM SSL backup failed (continuing...)"
+        fi
+    fi
+    
+    # Create metadata
+    cat > "$backup_dir/backup_info.json" << EOF
+{
+    "backup_date": "$(date -Iseconds)",
+    "backup_type": "auto_full",
+    "server_hostname": "$(hostname)",
+    "postgres_db": "${POSTGRES_DB:-ingest}"
+}
+EOF
+    
+    # Compress everything
+    print_info "Compressing backup..."
+    cd "$LOCAL_BACKUP_DIR"
+    tar -czf "${backup_name}.tar.gz" "${backup_name}/"
+    rm -rf "${backup_name}/"
+    
+    # Create checksum
+    sha256sum "${backup_name}.tar.gz" > "${backup_name}.tar.gz.sha256"
+    
+    local size=$(du -sh "$backup_path" | cut -f1)
+    print_success "Full backup created: ${backup_name}.tar.gz ($size)"
+    
+    echo "$backup_path"
+    return 0
 }
 
 # Send backup to remote server
@@ -142,11 +189,11 @@ cleanup_remote_backups() {
     print_info "Cleaning up old backups on remote server (older than $BACKUP_RETENTION_DAYS days)..."
     
     ssh -i "$BACKUP_SSH_KEY" "$BACKUP_SERVER_USER@$BACKUP_SERVER_HOST" \
-        "find $BACKUP_SERVER_PATH -name 'ingest_db_*.sql.gz*' -mtime +$BACKUP_RETENTION_DAYS -delete 2>/dev/null || true"
+        "find $BACKUP_SERVER_PATH -name 'ingest_auto_*.tar.gz*' -mtime +$BACKUP_RETENTION_DAYS -delete 2>/dev/null || true"
     
     # Count remaining backups
     local count=$(ssh -i "$BACKUP_SSH_KEY" "$BACKUP_SERVER_USER@$BACKUP_SERVER_HOST" \
-        "ls -1 $BACKUP_SERVER_PATH/ingest_db_*.sql.gz 2>/dev/null | wc -l")
+        "ls -1 $BACKUP_SERVER_PATH/ingest_auto_*.tar.gz 2>/dev/null | wc -l")
     
     print_info "Remote server has $count backup(s)"
 }
@@ -198,7 +245,7 @@ show_status() {
         
         # Show remote backups
         local count=$(ssh -i "$BACKUP_SSH_KEY" "$BACKUP_SERVER_USER@$BACKUP_SERVER_HOST" \
-            "ls -1 $BACKUP_SERVER_PATH/ingest_db_*.sql.gz 2>/dev/null | wc -l")
+            "ls -1 $BACKUP_SERVER_PATH/ingest_auto_*.tar.gz 2>/dev/null | wc -l")
         echo "  Remote Backups: $count file(s)"
     else
         echo -e "  SSH Connection: ${RED}Failed${NC}"
@@ -226,7 +273,7 @@ main() {
             echo "Usage: $0 [OPTION]"
             echo ""
             echo "Options:"
-            echo "  (no option)  Run backup and send to remote server"
+            echo "  (no option)  Run full backup and send to remote server"
             echo "  --setup      Setup cron job for automatic backup every 6 hours"
             echo "  --status     Show backup system status"
             echo "  --test       Test SSH connection to remote server"
@@ -246,7 +293,7 @@ main() {
             validate_config
             test_ssh_connection || exit 1
             
-            backup_file=$(create_db_backup) || exit 1
+            backup_file=$(create_full_backup) || exit 1
             send_to_remote "$backup_file" || exit 1
             cleanup_remote_backups
             cleanup_local
