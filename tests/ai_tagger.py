@@ -106,19 +106,24 @@ def load_vocabularies_and_terms():
 VALID_UNIT_TYPES = ['full_text', 'article', 'clause', 'subclause', 'note']
 
 def get_units(limit=30, offset=0):
-    """Get ALL legal units (not just untagged) - only specific unit types."""
+    """Get legal units that don't have any tags yet - only specific unit types."""
     conn = get_db_connection()
     cur = conn.cursor()
     
     # فیلتر بر اساس نوع واحد
     type_placeholders = ','.join(['%s'] * len(VALID_UNIT_TYPES))
     
+    # فقط بندهایی که هنوز برچسب ندارند
     cur.execute(f"""
         SELECT lu.id, lu.path_label, lu.content, lu.unit_type, w.title_official as document_title, lu.work_id
         FROM documents_legalunit lu
         LEFT JOIN documents_instrumentwork w ON lu.work_id = w.id
         WHERE lu.content IS NOT NULL AND lu.content != ''
           AND lu.unit_type IN ({type_placeholders})
+          AND NOT EXISTS (
+              SELECT 1 FROM documents_legalunitvocabularyterm luvt 
+              WHERE luvt.legal_unit_id = lu.id
+          )
         ORDER BY lu.work_id, lu.lft
         LIMIT %s OFFSET %s
     """, (*VALID_UNIT_TYPES, limit, offset))
@@ -161,16 +166,21 @@ def get_existing_tags(unit_ids):
     return result
 
 def count_total_units():
-    """Count ALL units (not just untagged)."""
+    """Count units that don't have any tags yet."""
     conn = get_db_connection()
     cur = conn.cursor()
     
     type_placeholders = ','.join(['%s'] * len(VALID_UNIT_TYPES))
     
+    # فقط بندهایی که هنوز برچسب ندارند
     cur.execute(f"""
         SELECT COUNT(*) as count FROM documents_legalunit lu
         WHERE lu.content IS NOT NULL AND lu.content != ''
           AND lu.unit_type IN ({type_placeholders})
+          AND NOT EXISTS (
+              SELECT 1 FROM documents_legalunitvocabularyterm luvt 
+              WHERE luvt.legal_unit_id = lu.id
+          )
     """, VALID_UNIT_TYPES)
     result = cur.fetchone()
     conn.close()
@@ -308,11 +318,10 @@ def process_next_batch():
     state["status"] = "processing"
     state["current_batch"] += 1
     
-    # Calculate offset for pagination
-    offset = (state["current_batch"] - 1) * BATCH_SIZE
-    
-    log(f"Batch {state['current_batch']}: Loading units (offset={offset})...")
-    units = get_units(BATCH_SIZE, offset)
+    # No offset needed - always get first untagged units
+    # (units that get tagged are automatically excluded from next query)
+    log(f"Batch {state['current_batch']}: Loading untagged units...")
+    units = get_units(BATCH_SIZE, 0)
     
     if not units:
         log("No more units to process!")
@@ -461,8 +470,9 @@ def prefetch_next_batch():
     log(f"🔄 Pre-fetching batch {next_batch}...")
     
     try:
-        offset = (next_batch - 1) * BATCH_SIZE
-        units = get_units(BATCH_SIZE, offset)
+        # For prefetch, we need to skip current batch units
+        # Since current batch is being reviewed, get units after BATCH_SIZE offset
+        units = get_units(BATCH_SIZE, BATCH_SIZE)
         
         if not units:
             state["prefetch_status"] = "idle"
@@ -729,6 +739,7 @@ HTML = """
         .btn {
             padding: 8px 20px;
             font-size: 12px;
+            font-family: 'Vazirmatn', Tahoma, sans-serif;
             border: none;
             border-radius: 6px;
             cursor: pointer;
@@ -1216,10 +1227,10 @@ HTML = """
             <!-- Units section -->
             <div id="units-container"></div>
             
-            <div class="controls">
-                <button class="btn btn-success" onclick="approveAll()">✅ تأیید همه و ذخیره</button>
+            <div class="controls" style="display: flex; justify-content: center; gap: 30px; margin-top: 20px;">
                 <button class="btn btn-primary" onclick="approveSelected()">💾 ذخیره انتخاب‌شده‌ها</button>
-                <button class="btn btn-danger" onclick="skipBatch()">⏭️ رد کردن این دسته</button>
+                <button class="btn btn-success" onclick="approveAll()">✅ ذخیره همه</button>
+                <button class="btn btn-danger" onclick="skipBatch()">❌ رد همه</button>
             </div>
         </div>
         
