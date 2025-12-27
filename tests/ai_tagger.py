@@ -485,7 +485,7 @@ def prefetch_next_batch():
         system_prompt, user_prompt = build_prompt(units)
         
         # Save prompts
-        save_prompt_to_file(system_prompt, user_prompt, f"prefetch_{next_batch}")
+        save_prompt_to_file(f"prefetch_{next_batch}", system_prompt, user_prompt)
         
         response = call_gpt(system_prompt, user_prompt)
         
