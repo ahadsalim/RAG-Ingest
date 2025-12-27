@@ -16,8 +16,14 @@
     
     function initializeJalaliDatepickers() {
         // Check if jQuery and Persian datepicker library are available
-        if (typeof jQuery === 'undefined' || typeof jQuery.fn.persianDatepicker === 'undefined') {
-            console.warn('jQuery or Persian datepicker library not loaded. Jalali datepickers will not work.');
+        if (typeof jQuery === 'undefined') {
+            console.warn('jQuery not loaded. Jalali datepickers will not work.');
+            return;
+        }
+        
+        if (typeof jQuery.fn.persianDatepicker === 'undefined') {
+            console.warn('Persian datepicker library not loaded. Retrying in 500ms...');
+            setTimeout(initializeJalaliDatepickers, 500);
             return;
         }
         
