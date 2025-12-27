@@ -246,24 +246,6 @@ def build_prompt(units):
     
     return system, user_prompt
 
-def save_prompt_to_file(batch_num, system, user):
-    """Save prompt to file for debugging."""
-    import os
-    debug_dir = os.path.dirname(os.path.abspath(__file__))
-    filename = os.path.join(debug_dir, f"batch{batch_num}_prompt.txt")
-    
-    with open(filename, 'w', encoding='utf-8') as f:
-        f.write("=" * 80 + "\n")
-        f.write("SYSTEM PROMPT:\n")
-        f.write("=" * 80 + "\n")
-        f.write(system)
-        f.write("\n\n")
-        f.write("=" * 80 + "\n")
-        f.write("USER PROMPT:\n")
-        f.write("=" * 80 + "\n")
-        f.write(user)
-    
-    return filename
 
 def call_gpt(system, user):
     log(f"Calling GPT API ({MODEL_NAME})...")
@@ -336,10 +318,6 @@ def process_next_batch():
     
     try:
         system, user = build_prompt(units)
-        
-        # Save prompt to file for debugging
-        prompt_file = save_prompt_to_file(state['current_batch'], system, user)
-        log(f"Batch {state['current_batch']}: Prompt saved to {prompt_file}")
         
         response = call_gpt(system, user)
         
@@ -484,9 +462,6 @@ def prefetch_next_batch():
         
         system_prompt, user_prompt = build_prompt(units)
         
-        # Save prompts
-        save_prompt_to_file(f"prefetch_{next_batch}", system_prompt, user_prompt)
-        
         response = call_gpt(system_prompt, user_prompt)
         
         # Save response
@@ -613,22 +588,31 @@ def save_approved_batch(approved_data):
             if not vocab_id or not tag_name:
                 continue
             
-            # Check if we already created this term
+            # Check if term already exists in database
             if tag_name in manual_term_map:
                 term_id = manual_term_map[tag_name]
             else:
-                term_id = str(uuid.uuid4())
-                tag_code = ''.join(word.capitalize() for word in tag_name.split())
+                # Check if term exists in database
                 cur.execute("""
-                    INSERT INTO masterdata_vocabularyterm (id, vocabulary_id, term, code, is_active, created_at, updated_at)
-                    VALUES (%s, %s, %s, %s, true, NOW(), NOW())
-                    ON CONFLICT DO NOTHING
-                """, (term_id, vocab_id, tag_name, tag_code))
-                conn.commit()
-                saved_terms += 1
+                    SELECT id FROM masterdata_vocabularyterm 
+                    WHERE vocabulary_id = %s AND term = %s
+                """, (vocab_id, tag_name))
+                existing = cur.fetchone()
+                
+                if existing:
+                    term_id = existing[0]
+                else:
+                    term_id = str(uuid.uuid4())
+                    tag_code = ''.join(word.capitalize() for word in tag_name.split())
+                    cur.execute("""
+                        INSERT INTO masterdata_vocabularyterm (id, vocabulary_id, term, code, is_active, created_at, updated_at)
+                        VALUES (%s, %s, %s, %s, true, NOW(), NOW())
+                    """, (term_id, vocab_id, tag_name, tag_code))
+                    saved_terms += 1
+                    log(f"Added manual term: {tag_name}")
+                
                 state["valid_term_ids"].add(term_id)
                 manual_term_map[tag_name] = term_id
-                log(f"Added manual term: {tag_name}")
             
             # Link to unit
             if unit_id:
@@ -639,8 +623,9 @@ def save_approved_batch(approved_data):
                     VALUES (%s, %s, %s, %s, NOW(), NOW())
                     ON CONFLICT (legal_unit_id, vocabulary_term_id) DO UPDATE SET weight = %s, updated_at = NOW()
                 """, (tag_id, unit_id, term_id, weight, weight))
-                conn.commit()
                 saved_tags += 1
+            
+            conn.commit()
         except Exception as e:
             conn.rollback()
             log(f"Error saving manual term: {e}")
