@@ -957,9 +957,8 @@ class TextEntry(BaseModel):
         ('other', 'سایر'),
     ]
     
-    # عنوان یک خطی
-    title = models.CharField(
-        max_length=500,
+    # عنوان
+    title = models.TextField(
         verbose_name='عنوان'
     )
     
