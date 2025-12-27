@@ -1,0 +1,54 @@
+{
+  "results": [
+    {
+      "unit_id": "bd739daf-d493-4982-875b-37cf30ea44ee",
+      "final_tags": [
+        {"term_id": "96b70710-68b0-470f-ad7f-e9acad373ea7", "tag": "رئیس جمهور", "weight": 8},
+        {"term_id": "110bc905-21fe-4a17-a081-ddacb592416e", "tag": "دادستان", "weight": 6},
+        {"term_id": "98162cf6-9ca5-49a2-9841-81c1c5c3e1c9", "tag": "دیوان عالی کشور", "weight": 6},
+        {"term_id": "f5ab0fc3-fcf2-4dad-b292-e6c037f08606", "tag": "تجدیدنظر", "weight": 5},
+        {"term_id": "cfd28a7c-8e1e-4f22-b7d9-5f23f81bf12a", "tag": "قانون‌گذاری", "weight": 4}
+      ],
+      "new_tags": []
+    },
+    {
+      "unit_id": "852c4bf9-13be-45c1-98a9-97c18f1148ed",
+      "final_tags": [
+        {"term_id": "71b75fbc-7ab2-478b-8189-48524fa85640", "tag": "مجلس شورای اسلامی", "weight": 9},
+        {"term_id": "4167c4ec-e4ae-4703-9274-2cf36be2f34c", "tag": "نامزد", "weight": 8},
+        {"term_id": "1be70750-327b-45cc-82e6-26d7c25b23e9", "tag": "رأی", "weight": 7},
+        {"term_id": "d00c752e-09c8-43f1-a76a-6354de7c2a59", "tag": "شرایط انتخاب", "weight": 6}
+      ],
+      "new_tags": []
+    },
+    {
+      "unit_id": "42e97cc7-c752-4fc8-8409-d273e63a42e6",
+      "final_tags": [
+        {"term_id": "a8193e70-9d25-4e2f-8255-7d10d92abe81", "tag": "دادگاه", "weight": 9},
+        {"term_id": "110bc905-21fe-4a17-a081-ddacb592416e", "tag": "دادستان", "weight": 7},
+        {"term_id": "f5ab0fc3-fcf2-4dad-b292-e6c037f08606", "tag": "تجدیدنظر", "weight": 6},
+        {"term_id": "cfd28a7c-8e1e-4f22-b7d9-5f23f81bf12a", "tag": "قانون‌گذاری", "weight": 4}
+      ],
+      "new_tags": []
+    },
+    {
+      "unit_id": "eb5370bc-b991-4577-ac97-c4969864d08a",
+      "final_tags": [
+        {"term_id": "71b75fbc-7ab2-478b-8189-48524fa85640", "tag": "مجلس شورای اسلامی", "weight": 9},
+        {"term_id": "d00c752e-09c8-43f1-a76a-6354de7c2a59", "tag": "شرایط انتخاب", "weight": 6},
+        {"term_id": "1be70750-327b-45cc-82e6-26d7c25b23e9", "tag": "رأی", "weight": 5},
+        {"term_id": "cfd28a7c-8e1e-4f22-b7d9-5f23f81bf12a", "tag": "قانون‌گذاری", "weight": 4}
+      ],
+      "new_tags": []
+    },
+    {
+      "unit_id": "d26ee5bb-bc3c-4b9b-98bc-5af76768a1d5",
+      "final_tags": [
+        {"term_id": "cfd28a7c-8e1e-4f22-b7d9-5f23f81bf12a", "tag": "قانون‌گذاری", "weight": 8},
+        {"term_id": "71b75fbc-7ab2-478b-8189-48524fa85640", "tag": "مجلس شورای اسلامی", "weight": 7},
+        {"term_id": "1be70750-327b-45cc-82e6-26d7c25b23e9", "tag": "رأی", "weight": 5}
+      ],
+      "new_tags": []
+    }
+  ]
+}

@@ -508,19 +508,22 @@ def prefetch_next_batch():
             unit = unit_map[uid]
             suggested_tags = []
             
-            for tag in unit_result.get('tags', []):
+            # Process final_tags (existing tags from database)
+            for tag in unit_result.get('final_tags', []):
                 term_id = tag.get('term_id', '')
                 is_valid = term_id in state["valid_term_ids"]
                 term_info = state["term_lookup"].get(term_id, {})
                 
                 suggested_tags.append({
                     'term_id': term_id,
-                    'term': term_info.get('term', tag.get('term', '?')),
+                    'term': term_info.get('term', tag.get('tag', '?')),
                     'vocabulary': term_info.get('vocabulary_name', '?'),
                     'weight': tag.get('weight', 5),
-                    'valid': is_valid
+                    'valid': is_valid,
+                    'is_new': False
                 })
             
+            # Process new_tags (suggested new terms)
             for new_tag in unit_result.get('new_tags', []):
                 all_new_terms.append({
                     'unit_id': uid,

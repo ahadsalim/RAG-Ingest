@@ -1,0 +1,49 @@
+{
+  "results": [
+    {
+      "unit_id": "852c4bf9-13be-45c1-98a9-97c18f1148ed",
+      "final_tags": [
+        {"term_id": "d00c752e-09c8-43f1-a76a-6354de7c2a59", "tag": "شرایط انتخاب", "weight": 10},
+        {"term_id": "4167c4ec-e4ae-4703-9274-2cf36be2f34c", "tag": "نامزد", "weight": 8},
+        {"term_id": "2bc06aac-250d-42b7-904e-20509e4ce90b", "tag": "برگه رأی", "weight": 6}
+      ],
+      "new_tags": []
+    },
+    {
+      "unit_id": "42e97cc7-c752-4fc8-8409-d273e63a42e6",
+      "final_tags": [
+        {"term_id": "110bc905-21fe-4a17-a081-ddacb592416e", "tag": "دادستان", "weight": 9},
+        {"term_id": "a8193e70-9d25-4e2f-8255-7d10d92abe81", "tag": "دادگاه", "weight": 8},
+        {"term_id": "98162cf6-9ca5-49a2-9841-81c1c5c3e1c9", "tag": "دیوان عالی کشور", "weight": 6}
+      ],
+      "new_tags": []
+    },
+    {
+      "unit_id": "bd739daf-d493-4982-875b-37cf30ea44ee",
+      "final_tags": [
+        {"term_id": "edcb78c2-834e-4e7d-b6b6-24b4e1307cf8", "tag": "خبرگان", "weight": 10},
+        {"term_id": "cfd28a7c-8e1e-4f22-b7d9-5f23f81bf12a", "tag": "قانون‌گذاری", "weight": 8},
+        {"term_id": "f5ab0fc3-fcf2-4dad-b292-e6c037f08606", "tag": "تجدیدنظر", "weight": 5}
+      ],
+      "new_tags": []
+    },
+    {
+      "unit_id": "dd0bb64b-d210-427b-9895-ac0df9b42f7d",
+      "final_tags": [
+        {"term_id": "b2df8e10-a4c2-432a-affc-76586c2d5f8f", "tag": "سفیه", "weight": 9},
+        {"term_id": "57c76f58-0a54-4d55-99f0-4f0e7c2f4bc0", "tag": "قیم", "weight": 8},
+        {"term_id": "5b90412e-77c8-4f83-958e-5acce16df300", "tag": "محجور", "weight": 6}
+      ],
+      "new_tags": []
+    },
+    {
+      "unit_id": "b7ea6295-dd05-4f66-9d0c-e00f32df07a5",
+      "final_tags": [
+        {"term_id": "3df66fca-90a1-4210-a293-1906eb35c553", "tag": "شخص حقیقی", "weight": 9},
+        {"term_id": "fa018d57-90e0-44e8-b5d3-537aa761ee09", "tag": "شخص حقوقی", "weight": 8},
+        {"term_id": "3f5e3ff9-4d11-43c3-af8c-3cf25f3e0705", "tag": "تکالیف کارفرما", "weight": 6}
+      ],
+      "new_tags": []
+    }
+  ]
+}

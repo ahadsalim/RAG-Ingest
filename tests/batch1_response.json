@@ -1,0 +1,49 @@
+{
+  "results": [
+    {
+      "unit_id": "dddc338d-567a-4278-a260-3f8802a749a3",
+      "final_tags": [
+        {"term_id": "17bdbfa0-9658-4ea4-a8c2-fda3cb30bd98", "tag": "انتقال مالکیت", "weight": 9},
+        {"term_id": "e8e4f363-543a-478d-8ff9-80ea658acfab", "tag": "آزادی", "weight": 8},
+        {"term_id": "cfd28a7c-8e1e-4f22-b7d9-5f23f81bf12a", "tag": "قانون‌گذاری", "weight": 6}
+      ],
+      "new_tags": []
+    },
+    {
+      "unit_id": "c3de261c-abd2-4998-ad1c-45a15c70fd04",
+      "final_tags": [
+        {"term_id": "bd923891-68d8-426d-93f6-1f62440fdc48", "tag": "آزادی بیان", "weight": 8},
+        {"term_id": "e8e4f363-543a-478d-8ff9-80ea658acfab", "tag": "آزادی", "weight": 7},
+        {"term_id": "cfd28a7c-8e1e-4f22-b7d9-5f23f81bf12a", "tag": "قانون‌گذاری", "weight": 5}
+      ],
+      "new_tags": []
+    },
+    {
+      "unit_id": "4d3f1aec-07e1-4a7f-9d81-1c606636f044",
+      "final_tags": [
+        {"term_id": "bf3c71c9-46c2-47e2-9e81-f49842259720", "tag": "برابری", "weight": 9},
+        {"term_id": "e8e4f363-543a-478d-8ff9-80ea658acfab", "tag": "آزادی", "weight": 8},
+        {"term_id": "cfd28a7c-8e1e-4f22-b7d9-5f23f81bf12a", "tag": "قانون‌گذاری", "weight": 6}
+      ],
+      "new_tags": []
+    },
+    {
+      "unit_id": "5777dca9-74a3-4316-807a-95f4d10e8d79",
+      "final_tags": [
+        {"term_id": "cfd28a7c-8e1e-4f22-b7d9-5f23f81bf12a", "tag": "قانون‌گذاری", "weight": 9},
+        {"term_id": "e8e4f363-543a-478d-8ff9-80ea658acfab", "tag": "آزادی", "weight": 8},
+        {"term_id": "71b75fbc-7ab2-478b-8189-48524fa85640", "tag": "مجلس شورای اسلامی", "weight": 6}
+      ],
+      "new_tags": []
+    },
+    {
+      "unit_id": "dd0bb64b-d210-427b-9895-ac0df9b42f7d",
+      "final_tags": [
+        {"term_id": "b2df8e10-a4c2-432a-affc-76586c2d5f8f", "tag": "سفیه", "weight": 9},
+        {"term_id": "57c76f58-0a54-4d55-99f0-4f0e7c2f4bc0", "tag": "قیم", "weight": 8},
+        {"term_id": "cfd28a7c-8e1e-4f22-b7d9-5f23f81bf12a", "tag": "قانون‌گذاری", "weight": 6}
+      ],
+      "new_tags": []
+    }
+  ]
+}
