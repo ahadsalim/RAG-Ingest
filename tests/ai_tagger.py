@@ -474,9 +474,9 @@ def prefetch_next_batch():
     log(f"🔄 Pre-fetching batch {next_batch}...")
     
     try:
-        # For prefetch, we need to skip current batch units
-        # Since current batch is being reviewed, get units after BATCH_SIZE offset
-        units = get_units(BATCH_SIZE, BATCH_SIZE)
+        # Always get first untagged units (offset=0)
+        # Units that get tagged are automatically excluded from query
+        units = get_units(BATCH_SIZE, 0)
         
         if not units:
             state["prefetch_status"] = "idle"
