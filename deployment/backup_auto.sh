@@ -158,7 +158,8 @@ EOF
     local size=$(du -sh "$backup_path" | cut -f1)
     print_success "Full backup created: ${backup_name}.tar.gz ($size)"
     
-    echo "$backup_path"
+    # Return path (don't use echo, set a global variable)
+    BACKUP_FILE_PATH="$backup_path"
     return 0
 }
 
@@ -293,8 +294,8 @@ main() {
             validate_config
             test_ssh_connection || exit 1
             
-            backup_file=$(create_full_backup) || exit 1
-            send_to_remote "$backup_file" || exit 1
+            create_full_backup || exit 1
+            send_to_remote "$BACKUP_FILE_PATH" || exit 1
             cleanup_remote_backups
             cleanup_local
             
