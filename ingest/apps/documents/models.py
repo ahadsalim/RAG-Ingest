@@ -948,10 +948,28 @@ class TextEntry(BaseModel):
     مشابه QAEntry اما با عنوان و متن بزرگ یا فایل.
     """
     
+    TEXT_TYPE_CHOICES = [
+        ('circular', 'بخشنامه'),
+        ('verdict', 'رای'),
+        ('instruction', 'دستورالعمل'),
+        ('bill', 'لایحه'),
+        ('educational', 'آموزشی'),
+        ('other', 'سایر'),
+    ]
+    
     # عنوان یک خطی
     title = models.CharField(
         max_length=500,
         verbose_name='عنوان'
+    )
+    
+    # نوع متن
+    text_type = models.CharField(
+        max_length=20,
+        choices=TEXT_TYPE_CHOICES,
+        default='other',
+        verbose_name='نوع متن',
+        help_text='نوع محتوای متنی'
     )
     
     # محتوای متنی (می‌تواند مستقیم وارد شود یا از فایل استخراج شود)
@@ -975,6 +993,22 @@ class TextEntry(BaseModel):
         max_length=255,
         blank=True,
         verbose_name='نام فایل اصلی'
+    )
+    
+    # تاریخ شروع اعتبار (اختیاری - خالی یعنی از ابتدا معتبر)
+    validity_start_date = models.DateField(
+        blank=True,
+        null=True,
+        verbose_name='تاریخ شروع اعتبار',
+        help_text='در صورت خالی بودن، از ابتدا معتبر است'
+    )
+    
+    # تاریخ پایان اعتبار (اختیاری - خالی یعنی هنوز معتبر)
+    validity_end_date = models.DateField(
+        blank=True,
+        null=True,
+        verbose_name='تاریخ پایان اعتبار',
+        help_text='در صورت خالی بودن، همچنان معتبر است'
     )
     
     # Tags for categorization (مانند LegalUnit)

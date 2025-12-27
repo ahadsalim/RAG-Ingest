@@ -1213,17 +1213,24 @@ class TextEntryAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
     """Admin برای متون با قابلیت آپلود فایل و ارتباط با بندها."""
     
     list_display = (
-        'title', 'content_preview', 'file_info', 'tags_display',
+        'title', 'text_type', 'content_preview', 'validity_status', 'file_info', 'tags_display',
         'created_by', 'jalali_created_at_display', 'jalali_updated_at_display'
     )
-    list_filter = ('created_at', 'vocabulary_terms')
+    list_filter = ('text_type', 'created_at', 'vocabulary_terms', 'validity_start_date', 'validity_end_date')
     search_fields = ('title', 'content')
     readonly_fields = ('jalali_created_at_display', 'jalali_updated_at_display', 'original_filename', 'content_extracted')
     inlines = [TextEntryVocabularyTermInline, TextEntryRelatedUnitInline]
     
     fieldsets = (
+        ('اطلاعات اصلی', {
+            'fields': ('title', 'text_type')
+        }),
         ('محتوا', {
-            'fields': ('title', 'content', 'source_file', 'original_filename')
+            'fields': ('content', 'source_file', 'original_filename')
+        }),
+        ('اعتبار', {
+            'fields': ('validity_start_date', 'validity_end_date'),
+            'description': 'تاریخ شروع خالی = از ابتدا معتبر | تاریخ پایان خالی = همچنان معتبر'
         }),
         ('اطلاعات سیستم', {
             'fields': ('jalali_created_at_display', 'jalali_updated_at_display'),
@@ -1281,6 +1288,22 @@ class TextEntryAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
             return '⏳ در انتظار استخراج'
         return '-'
     content_extracted.short_description = 'وضعیت استخراج'
+    
+    def validity_status(self, obj):
+        """نمایش وضعیت اعتبار."""
+        from django.utils import timezone
+        today = timezone.now().date()
+        
+        # بررسی تاریخ شروع
+        if obj.validity_start_date and today < obj.validity_start_date:
+            return '⏳ هنوز شروع نشده'
+        
+        # بررسی تاریخ پایان
+        if obj.validity_end_date and today > obj.validity_end_date:
+            return '❌ منقضی شده'
+        
+        return '✅ معتبر'
+    validity_status.short_description = 'وضعیت اعتبار'
     
     def save_model(self, request, obj, form, change):
         """Set created_by when creating new entry."""
