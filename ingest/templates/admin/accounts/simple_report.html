@@ -1,54 +1,0 @@
-{% extends "admin/base_site.html" %}
-
-{% block title %}گزارش فعالیت کاربران{% endblock %}
-
-{% block content %}
-<div class="module">
-    <h1>📊 گزارش فعالیت کاربران</h1>
-    
-    <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-        <h3>🔍 فیلترها (تاریخ شمسی)</h3>
-        <form method="get" style="display: flex; gap: 15px; align-items: end; flex-wrap: wrap;">
-            <div>
-                <label>از تاریخ (شمسی):</label><br>
-                <input type="text" name="start_date" value="1403/01/01" 
-                       class="form-control jalali-date-input" placeholder="1403/01/01">
-            </div>
-            <div>
-                <label>تا تاریخ (شمسی):</label><br>
-                <input type="text" name="end_date" value="1403/12/29" 
-                       class="form-control jalali-date-input" placeholder="1403/12/29">
-            </div>
-            <div>
-                <button type="submit" class="default">🔍 نمایش گزارش</button>
-            </div>
-        </form>
-    </div>
-
-    <div style="background: #e3f2fd; padding: 15px; border-radius: 8px; margin: 20px 0;">
-        <h3>📈 خلاصه آمار</h3>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
-            <div style="background: white; padding: 15px; border-radius: 8px; text-align: center;">
-                <div style="font-size: 24px; font-weight: bold; color: #007cba;">{{ user_count|default:0 }}</div>
-                <div style="color: #666;">تعداد کاربران</div>
-            </div>
-            <div style="background: white; padding: 15px; border-radius: 8px; text-align: center;">
-                <div style="font-size: 24px; font-weight: bold; color: #007cba;">{{ total_work_hours|default:0 }}</div>
-                <div style="color: #666;">کل ساعات کار</div>
-            </div>
-            <div style="background: white; padding: 15px; border-radius: 8px; text-align: center;">
-                <div style="font-size: 24px; font-weight: bold; color: #007cba;">{{ total_activities|default:0 }}</div>
-                <div style="color: #666;">کل فعالیت‌ها</div>
-            </div>
-        </div>
-    </div>
-
-    <div style="text-align: center; padding: 40px; color: #666;">
-        📭 سیستم گزارش‌گیری فعالیت کاربران آماده است.
-        <br>
-        برای مشاهده گزارش، بازه زمانی مورد نظر را انتخاب کنید.
-    </div>
-</div>
-
-<script src="{% load static %}{% static 'admin/js/simple-jalali.js' %}"></script>
-{% endblock %}

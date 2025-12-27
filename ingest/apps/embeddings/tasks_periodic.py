@@ -148,7 +148,7 @@ def cleanup_old_logs(retention_days=30):
     """
     from django.utils import timezone
     from datetime import timedelta
-    from ingest.apps.accounts.models import LoginEvent, UserActivityLog
+    from ingest.apps.accounts.models import LoginEvent
     from ingest.apps.documents.models import IngestLog, Chunk, LegalUnit
     from ingest.apps.embeddings.models import SyncLog, Embedding
     
@@ -163,13 +163,6 @@ def cleanup_old_logs(retention_days=30):
         LoginEvent.objects.filter(timestamp__lt=cutoff_date).delete()
         logger.info(f"🗑️  Deleted {login_count} old login events")
         total_deleted += login_count
-    
-    # Cleanup UserActivityLog
-    activity_count = UserActivityLog.objects.filter(timestamp__lt=cutoff_date).count()
-    if activity_count > 0:
-        UserActivityLog.objects.filter(timestamp__lt=cutoff_date).delete()
-        logger.info(f"🗑️  Deleted {activity_count} old user activity logs")
-        total_deleted += activity_count
     
     # Cleanup IngestLog
     ingest_count = IngestLog.objects.filter(created_at__lt=cutoff_date).count()
@@ -224,7 +217,6 @@ def cleanup_old_logs(retention_days=30):
     
     return {
         'login_events': login_count,
-        'activity_logs': activity_count,
         'ingest_logs': ingest_count,
         'sync_logs': sync_count,
         'historical_embeddings': hist_embedding_count,

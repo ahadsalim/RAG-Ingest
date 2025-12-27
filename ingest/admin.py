@@ -105,14 +105,6 @@ class CustomAdminSite(AdminSite):
                 app['name'] = '🔐 احراز هویت و مجوزها'
             elif app['app_label'] == 'accounts':
                 app['name'] = '⚙️ سیستم'
-                # Add custom report link to accounts app at the top
-                app['models'].insert(0, {
-                    'name': '📊 گزارش فعالیت کاربران',
-                    'object_name': 'UserActivityReport',
-                    'admin_url': '/admin/accounts/user-activity-report/',
-                    'add_url': None,
-                    'view_only': True,
-                })
             elif app['app_label'] == 'django_celery_beat':
                 app['name'] = '⏰ برنامه‌ریز وظایف'
                 # Farsi names for models
@@ -136,19 +128,11 @@ class CustomAdminSite(AdminSite):
         
         urls = super().get_urls()
         
-        # Import here to avoid circular imports
-        from ingest.apps.accounts import admin_views
-        
         def redirect_to_index(request):
             """Redirect password change to admin index (OTP-based auth)."""
             return HttpResponseRedirect(reverse('admin:index'))
         
         custom_urls = [
-            path(
-                'accounts/user-activity-report/',
-                self.admin_view(admin_views.user_activity_report),
-                name='user_activity_report',
-            ),
             # Disable password change URLs (redirect to admin index)
             path('password_change/', redirect_to_index, name='password_change'),
             path('password_change/done/', redirect_to_index, name='password_change_done'),
