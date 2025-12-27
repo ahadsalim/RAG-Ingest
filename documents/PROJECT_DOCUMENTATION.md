@@ -223,15 +223,38 @@ DEFAULT_CHUNK_OVERLAP=80    # توکن
 
 ### Celery Tasks
 
+#### Periodic Tasks (زمان‌بندی خودکار)
+
+| نام | Task | زمان‌بندی (UTC) | توضیحات |
+|-----|------|-----------------|---------|
+| `check-missing-embeddings-hourly` | `embeddings.check_missing_embeddings` | هر ساعت (دقیقه 0) | بررسی و تولید embedding های گمشده |
+| `cleanup-orphaned-embeddings-daily` | `embeddings.cleanup_orphaned_embeddings` | 3:00 AM | پاکسازی embedding های یتیم |
+| `auto-sync-new-embeddings` | `ingest.apps.embeddings.tasks.auto_sync_new_embeddings` | هر 5 دقیقه | همگام‌سازی خودکار با Core |
+| `sync-metadata-changes` | `ingest.apps.embeddings.tasks.sync_changed_metadata` | هر 15 دقیقه | همگام‌سازی تغییرات metadata |
+| `cleanup-orphaned-nodes` | `ingest.apps.embeddings.tasks.cleanup_orphaned_nodes` | 2:30 AM | پاکسازی نودهای یتیم در Core |
+| `cleanup-old-logs-daily` | `system.cleanup_old_logs` | 4:00 AM | پاکسازی لاگ‌های قدیمی (30 روز) |
+| `celery.backend_cleanup` | `celery.backend_cleanup` | 4:00 AM | پاکسازی backend سلری (سیستمی) |
+
+#### On-Demand Tasks (فراخوانی دستی)
+
 | Task | توضیحات |
 |------|---------|
 | `process_legal_unit_chunks` | Chunking برای LegalUnit |
 | `process_qa_entry_chunks` | Chunking برای QAEntry |
 | `process_text_entry_chunks` | Chunking برای TextEntry |
-| `generate_embedding_for_chunk` | تولید Embedding |
-| `sync_embedding_to_core` | همگام‌سازی با Core |
-| `check_missing_embeddings` | بررسی دوره‌ای (هر ساعت) |
-| `cleanup_orphan_embeddings` | پاکسازی روزانه |
+| `process_document_chunks` | Chunking برای کل سند |
+| `batch_process_units` | پردازش دسته‌ای چند LegalUnit |
+| `batch_generate_embeddings_for_queryset` | تولید Embedding دسته‌ای |
+| `generate_embeddings_for_new_content` | تولید Embedding برای محتوای جدید |
+| `full_sync_all_embeddings` | همگام‌سازی کامل با Core |
+| `cleanup_duplicate_chunks` | پاکسازی chunk های تکراری |
+
+#### System Cron Jobs (خارج از Celery)
+
+| زمان‌بندی (UTC) | اسکریپت | توضیحات |
+|-----------------|---------|---------|
+| 4:00 AM, 4:00 PM | `backup_minio.sh --auto` | بکاپ MinIO به سرور ریموت |
+| هر 6 ساعت | `backup_auto.sh` | بکاپ DB + .env + NPM |
 
 ---
 
