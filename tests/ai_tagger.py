@@ -1298,9 +1298,6 @@ HTML = """
             // Save existing manual tags before re-render
             const savedManualTags = JSON.parse(JSON.stringify(manualTags));
             
-            // Reload terms and vocabs to get newly added terms
-            loadTermsAndVocabs();
-            
             fetch('/api/results')
                 .then(r => r.json())
                 .then(data => {
