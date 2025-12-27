@@ -574,6 +574,29 @@ show_useful_commands() {
     echo ""
 }
 
+show_cron_jobs() {
+    print_header "⏰ Cron Jobs سیستم"
+    
+    echo ""
+    echo -e "${BOLD}Cron های فعال برای Backup خودکار:${NC}"
+    echo ""
+    echo -e "  ${CYAN}0 4 * * *${NC}   backup_minio.sh   → بکاپ MinIO ساعت 4:00 صبح UTC"
+    echo -e "  ${CYAN}0 16 * * *${NC}  backup_minio.sh   → بکاپ MinIO ساعت 4:00 عصر UTC"
+    echo -e "  ${CYAN}0 */6 * * *${NC} backup_auto.sh    → بکاپ DB+NPM هر 6 ساعت"
+    echo ""
+    echo -e "${BOLD}دستورات ایجاد مجدد (اگر پاک شده باشند):${NC}"
+    echo -e "  ${CYAN}$SCRIPT_DIR/backup_minio.sh setup${NC}"
+    echo -e "  ${CYAN}$SCRIPT_DIR/backup_auto.sh --setup${NC}"
+    echo ""
+    echo -e "${BOLD}مشاهده cron های فعلی:${NC}"
+    echo -e "  ${CYAN}crontab -l${NC}"
+    echo ""
+    echo -e "${BOLD}فایل‌های لاگ:${NC}"
+    echo -e "  • MinIO Backup: ${CYAN}/var/log/minio_backup.log${NC}"
+    echo -e "  • Auto Backup:  ${CYAN}/var/log/ingest_auto_backup.log${NC}"
+    echo ""
+}
+
 # =============================================================================
 # Main
 # =============================================================================
@@ -628,6 +651,7 @@ main() {
     show_nginx_config
     show_post_install_steps
     show_useful_commands
+    show_cron_jobs
     
     # Save credentials to file
     local creds_file="$PROJECT_DIR/CREDENTIALS.txt"

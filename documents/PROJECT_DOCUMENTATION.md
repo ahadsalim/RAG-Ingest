@@ -251,10 +251,47 @@ DEFAULT_CHUNK_OVERLAP=80    # توکن
 
 #### System Cron Jobs (خارج از Celery)
 
+این cron ها در سطح سیستم‌عامل اجرا می‌شوند (نه Celery) تا حتی اگر Django/Celery مشکل داشته باشد، backup همچنان انجام شود.
+
 | زمان‌بندی (UTC) | اسکریپت | توضیحات |
 |-----------------|---------|---------|
 | 4:00 AM, 4:00 PM | `backup_minio.sh --auto` | بکاپ MinIO به سرور ریموت |
-| هر 6 ساعت | `backup_auto.sh` | بکاپ DB + .env + NPM |
+| هر 6 ساعت (0,6,12,18) | `backup_auto.sh` | بکاپ DB + .env + NPM |
+
+##### دستورات ایجاد مجدد Cron Jobs
+
+```bash
+# مشاهده cron های فعلی
+crontab -l
+
+# ایجاد مجدد cron ها (اگر پاک شده باشند)
+# روش 1: با اسکریپت‌های setup
+/srv/deployment/backup_minio.sh setup
+/srv/deployment/backup_auto.sh --setup
+
+# روش 2: دستی
+(crontab -l 2>/dev/null | grep -v "backup"; cat << 'EOF'
+0 4 * * * /srv/deployment/backup_minio.sh --auto >> /var/log/minio_backup.log 2>&1
+0 16 * * * /srv/deployment/backup_minio.sh --auto >> /var/log/minio_backup.log 2>&1
+0 */6 * * * /srv/deployment/backup_auto.sh >> /var/log/ingest_auto_backup.log 2>&1
+EOF
+) | crontab -
+```
+
+##### توضیح هر Cron Job
+
+| Cron | توضیح |
+|------|-------|
+| `0 4 * * *` | هر روز ساعت 4:00 صبح UTC |
+| `0 16 * * *` | هر روز ساعت 4:00 عصر UTC (16:00) |
+| `0 */6 * * *` | هر 6 ساعت (0:00, 6:00, 12:00, 18:00 UTC) |
+
+##### فایل‌های لاگ
+
+| لاگ | مسیر |
+|-----|------|
+| MinIO Backup | `/var/log/minio_backup.log` |
+| Auto Backup | `/var/log/ingest_auto_backup.log` |
 
 ---
 
