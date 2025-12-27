@@ -7,8 +7,9 @@ from django.utils import timezone
 from django.conf import settings
 
 # Proxy models for Celery Beat to group under accounts app
+# Only PeriodicTask and CrontabSchedule are used (IntervalSchedule and ClockedSchedule removed)
 try:
-    from django_celery_beat.models import PeriodicTask, CrontabSchedule, IntervalSchedule, ClockedSchedule
+    from django_celery_beat.models import PeriodicTask, CrontabSchedule
     
     class PeriodicTaskProxy(PeriodicTask):
         class Meta:
@@ -23,30 +24,12 @@ try:
             app_label = 'accounts'
             verbose_name = 'زمان‌بندی Crontab'
             verbose_name_plural = 'زمان‌بندی‌های Crontab'
-    
-    class IntervalScheduleProxy(IntervalSchedule):
-        class Meta:
-            proxy = True
-            app_label = 'accounts'
-            verbose_name = 'زمان‌بندی بازه‌ای'
-            verbose_name_plural = 'زمان‌بندی‌های بازه‌ای'
-    
-    class ClockedScheduleProxy(ClockedSchedule):
-        class Meta:
-            proxy = True
-            app_label = 'accounts'
-            verbose_name = 'زمان‌بندی یکباره'
-            verbose_name_plural = 'زمان‌بندی‌های یکباره'
 
 except ImportError:
     # If django_celery_beat is not available, create empty proxy classes
     class PeriodicTaskProxy:
         pass
     class CrontabScheduleProxy:
-        pass
-    class IntervalScheduleProxy:
-        pass
-    class ClockedScheduleProxy:
         pass
 
 

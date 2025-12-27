@@ -121,10 +121,6 @@ class CustomAdminSite(AdminSite):
                     'periodic tasks': 'وظایف دوره‌ای',
                     'crontab': 'زمان‌بندی Crontab',
                     'crontabs': 'زمان‌بندی‌های Crontab',
-                    'interval': 'زمان‌بندی بازه‌ای',
-                    'intervals': 'زمان‌بندی‌های بازه‌ای',
-                    'clocked': 'زمان‌بندی یکباره',
-                    'clockeds': 'زمان‌بندی‌های یکباره',
                 }
                 for model in app.get('models', []):
                     model_name_lower = model['name'].lower()

@@ -23,28 +23,17 @@ class IngestConfig(AppConfig):
         except AlreadyRegistered:
             print("DEBUG: User/Group already registered, skipping")
         
-        # Register django_celery_beat models
-        # Farsi names are handled in admin.py CustomAdminSite.get_app_list()
+        # Register django_celery_beat models (only PeriodicTask and CrontabSchedule)
+        # IntervalSchedule and ClockedSchedule are not used and hidden from admin
         try:
-            from django_celery_beat.models import (
-                PeriodicTask, CrontabSchedule, IntervalSchedule, 
-                ClockedSchedule
-            )
-            from django_celery_beat.admin import (
-                PeriodicTaskAdmin, CrontabScheduleAdmin,
-                ClockedScheduleAdmin
-            )
-            from django.contrib import admin as django_admin
+            from django_celery_beat.models import PeriodicTask, CrontabSchedule
+            from django_celery_beat.admin import PeriodicTaskAdmin, CrontabScheduleAdmin
             
-            # Register models with their original admin classes
+            # Register only the models we use
             if PeriodicTask not in admin_site._registry:
                 admin_site.register(PeriodicTask, PeriodicTaskAdmin)
             if CrontabSchedule not in admin_site._registry:
                 admin_site.register(CrontabSchedule, CrontabScheduleAdmin)
-            if IntervalSchedule not in admin_site._registry:
-                admin_site.register(IntervalSchedule, django_admin.ModelAdmin)
-            if ClockedSchedule not in admin_site._registry:
-                admin_site.register(ClockedSchedule, ClockedScheduleAdmin)
             
             print(f"DEBUG: Registered celery beat models. Total models: {len(admin_site._registry)}")
         except ImportError as e:
