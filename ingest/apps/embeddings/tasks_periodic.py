@@ -142,15 +142,15 @@ def cleanup_orphaned_embeddings():
 @shared_task(name='system.cleanup_old_logs')
 def cleanup_old_logs(retention_days=30):
     """
-    Periodic task to cleanup old log entries.
+    Periodic task to cleanup old log entries and historical records.
     Keeps only logs from the last 30 days by default.
     Runs daily to keep database clean.
     """
     from django.utils import timezone
     from datetime import timedelta
     from ingest.apps.accounts.models import LoginEvent, UserActivityLog
-    from ingest.apps.documents.models import IngestLog
-    from ingest.apps.embeddings.models import SyncLog
+    from ingest.apps.documents.models import IngestLog, Chunk, LegalUnit
+    from ingest.apps.embeddings.models import SyncLog, Embedding
     
     cutoff_date = timezone.now() - timedelta(days=retention_days)
     logger.info(f"🧹 Starting cleanup of logs older than {retention_days} days (before {cutoff_date.date()})")
@@ -191,6 +191,32 @@ def cleanup_old_logs(retention_days=30):
         logger.info(f"🗑️  Deleted {sync_count} old sync logs")
         total_deleted += sync_count
     
+    # Cleanup Historical records (django-simple-history)
+    historical_deleted = 0
+    
+    # Historical Embedding
+    hist_embedding_count = Embedding.history.filter(history_date__lt=cutoff_date).count()
+    if hist_embedding_count > 0:
+        Embedding.history.filter(history_date__lt=cutoff_date).delete()
+        logger.info(f"🗑️  Deleted {hist_embedding_count} old historical embeddings")
+        historical_deleted += hist_embedding_count
+    
+    # Historical Chunk
+    hist_chunk_count = Chunk.history.filter(history_date__lt=cutoff_date).count()
+    if hist_chunk_count > 0:
+        Chunk.history.filter(history_date__lt=cutoff_date).delete()
+        logger.info(f"🗑️  Deleted {hist_chunk_count} old historical chunks")
+        historical_deleted += hist_chunk_count
+    
+    # Historical LegalUnit
+    hist_legalunit_count = LegalUnit.history.filter(history_date__lt=cutoff_date).count()
+    if hist_legalunit_count > 0:
+        LegalUnit.history.filter(history_date__lt=cutoff_date).delete()
+        logger.info(f"🗑️  Deleted {hist_legalunit_count} old historical legal units")
+        historical_deleted += hist_legalunit_count
+    
+    total_deleted += historical_deleted
+    
     if total_deleted == 0:
         logger.info("✅ No old logs to cleanup")
     else:
@@ -201,6 +227,9 @@ def cleanup_old_logs(retention_days=30):
         'activity_logs': activity_count,
         'ingest_logs': ingest_count,
         'sync_logs': sync_count,
+        'historical_embeddings': hist_embedding_count,
+        'historical_chunks': hist_chunk_count,
+        'historical_legalunits': hist_legalunit_count,
         'total_deleted': total_deleted,
         'retention_days': retention_days
     }
