@@ -253,7 +253,6 @@ class InstrumentExpressionAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
     list_filter = ('consolidation_level', 'language', 'created_at')
     search_fields = ('work__title_official', 'eli_uri_expr')
     readonly_fields = ('id', 'created_at', 'updated_at')
-    inlines = [EmbeddingInline]
     
     def get_queryset(self, request):
         """Optimize queryset with select_related."""
@@ -286,7 +285,7 @@ class InstrumentManifestationAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
     list_filter = ('repeal_status', 'publication_date', 'created_at')
     search_fields = ('expr__work__title_official', 'official_gazette_name', 'source_url')
     readonly_fields = ('id', 'checksum_sha256', 'retrieval_date', 'created_at', 'updated_at')
-    inlines = [FileAssetInline, EmbeddingInline]
+    inlines = [FileAssetInline]
     
     def get_queryset(self, request):
         """Optimize queryset with select_related."""
