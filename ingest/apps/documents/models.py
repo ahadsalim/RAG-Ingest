@@ -968,8 +968,7 @@ class TextEntry(BaseModel):
         max_length=20,
         choices=TEXT_TYPE_CHOICES,
         default='other',
-        verbose_name='نوع متن',
-        help_text='نوع محتوای متنی'
+        verbose_name='نوع متن'
     )
     
     # محتوای متنی (می‌تواند مستقیم وارد شود یا از فایل استخراج شود)
