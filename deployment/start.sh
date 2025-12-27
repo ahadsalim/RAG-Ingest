@@ -414,6 +414,26 @@ configure_firewall() {
     print_success "فایروال تنظیم شد"
 }
 
+setup_cron_jobs() {
+    print_info "تنظیم Cron Jobs برای Backup خودکار..."
+    
+    # Remove existing backup cron jobs
+    crontab -l 2>/dev/null | grep -v "backup_minio.sh" | grep -v "backup_auto.sh" | crontab - 2>/dev/null || true
+    
+    # Add new cron jobs
+    (crontab -l 2>/dev/null; cat << 'CRON_EOF'
+# RAG-Ingest Backup Cron Jobs
+0 4 * * * /srv/deployment/backup_minio.sh --auto >> /var/log/minio_backup.log 2>&1
+0 16 * * * /srv/deployment/backup_minio.sh --auto >> /var/log/minio_backup.log 2>&1
+0 */6 * * * /srv/deployment/backup_auto.sh >> /var/log/ingest_auto_backup.log 2>&1
+CRON_EOF
+    ) | crontab -
+    
+    print_success "Cron Jobs تنظیم شد:"
+    print_info "  • backup_minio.sh: 4:00 AM و 4:00 PM UTC"
+    print_info "  • backup_auto.sh: هر 6 ساعت"
+}
+
 # =============================================================================
 # Post-Installation Guide
 # =============================================================================
@@ -640,6 +660,7 @@ main() {
     # Deployment
     build_and_start
     configure_firewall
+    setup_cron_jobs
     
     # Post-installation guide
     echo ""
