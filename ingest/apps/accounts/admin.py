@@ -228,4 +228,4 @@ class OTPCodeAdmin(SimpleJalaliAdminMixin, admin.ModelAdmin):
 
 # Register new models
 admin_site.register(UserProfile, UserProfileAdmin)
-admin_site.register(OTPCode, OTPCodeAdmin)
+# OTPCode is not registered - it contains sensitive security data and should not be visible to users
