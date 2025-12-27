@@ -226,7 +226,6 @@ class InstrumentWorkAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
     list_filter = ('doc_type', 'jurisdiction', 'authority', 'created_at')
     search_fields = ('title_official', 'urn_lex', 'subject_summary')
     readonly_fields = ('id', 'created_at', 'updated_at')
-    inlines = [EmbeddingInline]
     
     def get_queryset(self, request):
         """Optimize queryset with select_related."""

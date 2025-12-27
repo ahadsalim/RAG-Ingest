@@ -11,11 +11,7 @@ class ConsolidationLevel(models.TextChoices):
 class DocumentType(models.TextChoices):
     LAW = 'law', 'قانون'
     BYLAW = 'bylaw', 'آیین‌نامه'
-    CIRCULAR = 'circular', 'بخشنامه'
-    RULING = 'ruling', 'رأی'
     DECREE = 'decree', 'مصوبه'
-    REGULATION = 'regulation', 'مقررات'
-    INSTRUCTION = 'instruction', 'دستورالعمل'
     OTHER = 'other', 'سایر'
 
 

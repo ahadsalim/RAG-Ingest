@@ -11,7 +11,7 @@ from django.utils.decorators import method_decorator
 from django.http import JsonResponse
 from .forms import MobileLoginForm, OTPVerifyForm
 from .services import otp_service
-from .models import LoginEvent, UserActivityLog, UserWorkSession
+from .models import LoginEvent
 
 logger = logging.getLogger(__name__)
 
@@ -114,13 +114,6 @@ class OTPVerifyView(View):
                     success=True
                 )
                 
-                # Create work session
-                UserWorkSession.objects.create(
-                    user=user,
-                    login_time=user.last_login,
-                    ip_address=ip
-                )
-                
                 # Clear session data
                 del request.session['otp_mobile']
                 
@@ -162,25 +155,6 @@ class OTPLogoutView(View):
     
     def post(self, request):
         if request.user.is_authenticated:
-            # Update work session
-            try:
-                from django.utils import timezone
-                session = UserWorkSession.objects.filter(
-                    user=request.user,
-                    logout_time__isnull=True
-                ).latest('login_time')
-                session.logout_time = timezone.now()
-                session.calculate_duration()
-            except UserWorkSession.DoesNotExist:
-                pass
-            
-            # Record logout activity
-            UserActivityLog.objects.create(
-                user=request.user,
-                action='logout',
-                ip_address=get_client_ip(request)
-            )
-            
             logout(request)
             messages.success(request, 'با موفقیت خارج شدید.')
         
