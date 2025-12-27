@@ -150,6 +150,7 @@ def cleanup_old_logs(retention_days=30):
     from datetime import timedelta
     from ingest.apps.accounts.models import LoginEvent, UserActivityLog
     from ingest.apps.documents.models import IngestLog
+    from ingest.apps.embeddings.models import SyncLog
     
     cutoff_date = timezone.now() - timedelta(days=retention_days)
     logger.info(f"🧹 Starting cleanup of logs older than {retention_days} days (before {cutoff_date.date()})")
@@ -177,6 +178,19 @@ def cleanup_old_logs(retention_days=30):
         logger.info(f"🗑️  Deleted {ingest_count} old ingest logs")
         total_deleted += ingest_count
     
+    # Cleanup SyncLog (only synced/verified entries older than retention period)
+    sync_count = SyncLog.objects.filter(
+        created_at__lt=cutoff_date,
+        status__in=['synced', 'verified']
+    ).count()
+    if sync_count > 0:
+        SyncLog.objects.filter(
+            created_at__lt=cutoff_date,
+            status__in=['synced', 'verified']
+        ).delete()
+        logger.info(f"🗑️  Deleted {sync_count} old sync logs")
+        total_deleted += sync_count
+    
     if total_deleted == 0:
         logger.info("✅ No old logs to cleanup")
     else:
@@ -186,6 +200,7 @@ def cleanup_old_logs(retention_days=30):
         'login_events': login_count,
         'activity_logs': activity_count,
         'ingest_logs': ingest_count,
+        'sync_logs': sync_count,
         'total_deleted': total_deleted,
         'retention_days': retention_days
     }
