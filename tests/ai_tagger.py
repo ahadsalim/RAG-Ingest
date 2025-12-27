@@ -436,15 +436,8 @@ def process_next_batch():
         }
         state["status"] = "waiting_approval"
         
-        # Start prefetching next batch in background
-        log("Starting prefetch thread...")
-        try:
-            prefetch_thread = threading.Thread(target=prefetch_next_batch)
-            prefetch_thread.daemon = True
-            prefetch_thread.start()
-            log("Prefetch thread started successfully")
-        except Exception as e:
-            log(f"Failed to start prefetch thread: {e}")
+        # Don't prefetch here - units haven't been tagged yet
+        # Prefetch will be triggered after approval in api_approve
         
         return True
         
@@ -2201,6 +2194,16 @@ def api_approve():
     # Refresh term list if new terms were added
     if saved_terms > 0:
         load_vocabularies_and_terms()
+    
+    # Start prefetching next batch after approval (units are now tagged)
+    log("Starting prefetch thread after approval...")
+    try:
+        prefetch_thread = threading.Thread(target=prefetch_next_batch)
+        prefetch_thread.daemon = True
+        prefetch_thread.start()
+        log("Prefetch thread started successfully")
+    except Exception as e:
+        log(f"Failed to start prefetch thread: {e}")
     
     # Check if prefetch is ready
     has_prefetch = state["prefetch_status"] == "ready" and state["prefetch_results"] is not None
