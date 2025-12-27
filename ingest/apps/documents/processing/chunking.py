@@ -295,17 +295,40 @@ class ChunkProcessingService(BaseProcessingService):
             hash_input = f"{chunk_text}_{textentry_id}_{i}".encode('utf-8')
             chunk_hash = hashlib.sha256(hash_input).hexdigest()
             
+            # Build metadata with text_type, validity dates, and tags
+            metadata = {
+                'textentry_id': str(textentry_id),
+                'title': textentry.title,
+                'text_type': textentry.text_type,
+                'text_type_display': textentry.get_text_type_display(),
+                'chunk_index': i,
+                'total_chunks': len(chunks)
+            }
+            
+            # Add validity dates if present
+            if textentry.validity_start_date:
+                metadata['validity_start_date'] = textentry.validity_start_date.isoformat()
+            if textentry.validity_end_date:
+                metadata['validity_end_date'] = textentry.validity_end_date.isoformat()
+            
+            # Add tags
+            tags = []
+            for term in textentry.vocabulary_terms.select_related('vocabulary').all():
+                tags.append({
+                    'term_id': str(term.id),
+                    'term': term.term,
+                    'vocabulary': term.vocabulary.name,
+                    'vocabulary_code': term.vocabulary.code
+                })
+            if tags:
+                metadata['tags'] = tags
+            
             chunk = Chunk.objects.create(
                 textentry=textentry,
                 chunk_text=chunk_text,
                 token_count=len(chunk_text.split()),
                 overlap_prev=self.chunk_overlap if i > 0 else 0,
-                citation_payload_json={
-                    'textentry_id': str(textentry_id),
-                    'title': textentry.title[:100],
-                    'chunk_index': i,
-                    'total_chunks': len(chunks)
-                },
+                citation_payload_json=metadata,
                 hash=chunk_hash
             )
             created_chunks.append(chunk)
