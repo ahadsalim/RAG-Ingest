@@ -1,16 +1,23 @@
 #!/usr/bin/env python3
 """
-Legal Unit Intelligent Tagger v2
-================================
+Legal Unit Intelligent Tagger v2.1
+===================================
 Interactive tool for tagging legal units using OpenAI GPT-4o-mini.
 Shows a table for each batch with unit content, existing tags, and suggested tags.
 User must approve each batch before saving.
 
+Version: 2.1.0 (2025-12-27)
+- Fixed foreign key constraint for manual terms
+- Added term reload on batch change
+- Enhanced logging to file
+
 Usage:
 1. Set your OpenAI API key and base URL below
-2. Run: python legal_unit_tagger_v2.py
+2. Run: python ai_tagger.py
 3. Open http://localhost:5000 in your browser
 """
+
+VERSION = "2.1.0"
 
 # ============================================
 # CONFIGURATION - SET THESE VALUES
@@ -76,8 +83,19 @@ def get_db_connection():
 
 def log(msg):
     ts = datetime.now().strftime("%H:%M:%S")
-    state["logs"].append(f"[{ts}] {msg}")
-    print(f"[{ts}] {msg}")
+    log_msg = f"[{ts}] {msg}"
+    state["logs"].append(log_msg)
+    print(log_msg)
+    
+    # Write to log file
+    import os
+    log_dir = os.path.dirname(os.path.abspath(__file__))
+    log_file = os.path.join(log_dir, "ai_tagger.log")
+    try:
+        with open(log_file, 'a', encoding='utf-8') as f:
+            f.write(log_msg + "\n")
+    except Exception as e:
+        print(f"Failed to write to log file: {e}")
 
 def load_vocabularies_and_terms():
     """Load all vocabularies and terms from database."""
@@ -1163,7 +1181,7 @@ HTML = """
 </head>
 <body>
     <div class="container">
-        <h1>🏷️ برچسب‌گذار هوشمند بندهای حقوقی</h1>
+        <h1>🏷️ برچسب‌گذار هوشمند بندهای حقوقی <span style="font-size:0.5em;color:#666;">v2.1.0</span></h1>
         
         <div class="stats">
             <div class="stat">
@@ -1297,6 +1315,9 @@ HTML = """
         function loadResults() {
             // Save existing manual tags before re-render
             const savedManualTags = JSON.parse(JSON.stringify(manualTags));
+            
+            // Reload terms and vocabs to get newly added terms
+            loadTermsAndVocabs();
             
             fetch('/api/results')
                 .then(r => r.json())
@@ -2224,12 +2245,28 @@ def api_skip():
     return jsonify({"success": True})
 
 if __name__ == '__main__':
+    import os
+    log_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ai_tagger.log")
+    
+    # Clear old log file and write header
+    with open(log_file, 'w', encoding='utf-8') as f:
+        f.write("=" * 60 + "\n")
+        f.write(f"Legal Unit Intelligent Tagger v{VERSION}\n")
+        f.write("=" * 60 + "\n")
+        f.write(f"Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        f.write(f"Database: {DB_CONFIG['host']}:{DB_CONFIG['port']}/{DB_CONFIG['database']}\n")
+        f.write(f"Model: {MODEL_NAME}\n")
+        f.write(f"Batch Size: {BATCH_SIZE}\n")
+        f.write(f"Log File: {log_file}\n")
+        f.write("=" * 60 + "\n\n")
+    
     print("=" * 60)
-    print("Legal Unit Intelligent Tagger v2")
+    print(f"Legal Unit Intelligent Tagger v{VERSION}")
     print("=" * 60)
     print(f"Database: {DB_CONFIG['host']}:{DB_CONFIG['port']}/{DB_CONFIG['database']}")
     print(f"Model: {MODEL_NAME}")
     print(f"Batch Size: {BATCH_SIZE}")
+    print(f"Log File: {log_file}")
     print("=" * 60)
     print("Open http://localhost:5000 in your browser")
     print("=" * 60)
