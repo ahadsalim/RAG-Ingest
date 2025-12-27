@@ -137,3 +137,55 @@ def cleanup_orphaned_embeddings():
         'orphaned_qa': orphaned_qa_count,
         'total_cleaned': total_cleaned
     }
+
+
+@shared_task(name='system.cleanup_old_logs')
+def cleanup_old_logs(retention_days=30):
+    """
+    Periodic task to cleanup old log entries.
+    Keeps only logs from the last 30 days by default.
+    Runs daily to keep database clean.
+    """
+    from django.utils import timezone
+    from datetime import timedelta
+    from ingest.apps.accounts.models import LoginEvent, UserActivityLog
+    from ingest.apps.documents.models import IngestLog
+    
+    cutoff_date = timezone.now() - timedelta(days=retention_days)
+    logger.info(f"🧹 Starting cleanup of logs older than {retention_days} days (before {cutoff_date.date()})")
+    
+    total_deleted = 0
+    
+    # Cleanup LoginEvent
+    login_count = LoginEvent.objects.filter(timestamp__lt=cutoff_date).count()
+    if login_count > 0:
+        LoginEvent.objects.filter(timestamp__lt=cutoff_date).delete()
+        logger.info(f"🗑️  Deleted {login_count} old login events")
+        total_deleted += login_count
+    
+    # Cleanup UserActivityLog
+    activity_count = UserActivityLog.objects.filter(timestamp__lt=cutoff_date).count()
+    if activity_count > 0:
+        UserActivityLog.objects.filter(timestamp__lt=cutoff_date).delete()
+        logger.info(f"🗑️  Deleted {activity_count} old user activity logs")
+        total_deleted += activity_count
+    
+    # Cleanup IngestLog
+    ingest_count = IngestLog.objects.filter(created_at__lt=cutoff_date).count()
+    if ingest_count > 0:
+        IngestLog.objects.filter(created_at__lt=cutoff_date).delete()
+        logger.info(f"🗑️  Deleted {ingest_count} old ingest logs")
+        total_deleted += ingest_count
+    
+    if total_deleted == 0:
+        logger.info("✅ No old logs to cleanup")
+    else:
+        logger.info(f"✅ Total cleaned up: {total_deleted} log entries")
+    
+    return {
+        'login_events': login_count,
+        'activity_logs': activity_count,
+        'ingest_logs': ingest_count,
+        'total_deleted': total_deleted,
+        'retention_days': retention_days
+    }

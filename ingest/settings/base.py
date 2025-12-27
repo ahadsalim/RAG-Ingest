@@ -281,6 +281,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'ingest.apps.embeddings.tasks.cleanup_orphaned_nodes',
         'schedule': crontab(hour=2, minute=30),  # Daily at 2:30 AM
     },
+    'cleanup-old-logs-daily': {
+        'task': 'system.cleanup_old_logs',
+        'schedule': crontab(hour=4, minute=0),  # Daily at 4 AM
+    },
 }
 
 # Core Service Integration
