@@ -241,6 +241,8 @@ def build_prompt(units):
             tags_by_vocab[vname] = []
         tags_by_vocab[vname].append({"id": str(t['id']), "term": t['term']})
     
+    log(f"Building prompt with {len(state['terms'])} terms from {len(tags_by_vocab)} vocabularies")
+    
     tags_list = "## existing_tags:\n\n"
     for vname, terms in tags_by_vocab.items():
         tags_list += f"### {vname}:\n"
@@ -368,6 +370,9 @@ def process_next_batch():
             
             if unit_result:
                 # Process final_tags (existing tags from database)
+                final_tags_count = len(unit_result.get('final_tags', []))
+                log(f"Unit {uid[:8]}: Processing {final_tags_count} final_tags")
+                
                 for tag in unit_result.get('final_tags', []):
                     tid = tag.get('term_id')
                     if is_valid_uuid(tid) and tid in state["term_lookup"]:
@@ -381,6 +386,7 @@ def process_next_batch():
                             'is_new': False
                         })
                     else:
+                        log(f"⚠️ Invalid term_id: {tid} (not in term_lookup)")
                         suggested_tags.append({
                             'term_id': tid,
                             'term': tag.get('tag', '❌ نامعتبر'),
@@ -410,6 +416,8 @@ def process_next_batch():
                     })
                 
                 all_new_terms.extend(unit_new_tags)
+            else:
+                log(f"⚠️ Unit {uid[:8]}: No result from GPT")
             
             display_data.append({
                 'unit_id': uid,
