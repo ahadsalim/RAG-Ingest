@@ -27,7 +27,8 @@ from .models import (
     QAEntryVocabularyTerm, QAEntryRelatedUnit
 )
 from .forms import (
-    InstrumentExpressionForm, InstrumentManifestationForm, InstrumentRelationForm, LegalUnitForm, FileAssetForm
+    InstrumentExpressionForm, InstrumentManifestationForm, InstrumentRelationForm, LegalUnitForm, FileAssetForm,
+    TextEntryForm
 )
 from .enums import QAStatus
 from ingest.admin import admin_site
@@ -1212,6 +1213,7 @@ class TextEntryRelatedUnitInline(admin.TabularInline):
 class TextEntryAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
     """Admin برای متون با قابلیت آپلود فایل و ارتباط با بندها."""
     
+    form = TextEntryForm
     list_display = (
         'title', 'text_type', 'content_preview', 'validity_status', 'file_info', 'tags_display',
         'created_by', 'jalali_created_at_display', 'jalali_updated_at_display'

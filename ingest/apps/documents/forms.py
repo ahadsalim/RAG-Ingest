@@ -31,7 +31,8 @@ from .models import (
     InstrumentManifestation, 
     InstrumentRelation,
     LegalUnit,
-    LUnit
+    LUnit,
+    TextEntry
 )
 from .widgets import ParentAutocompleteWidget
 
@@ -437,3 +438,32 @@ class LegalUnitChangeForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         if JALALI_AVAILABLE:
             self.fields['effective_date'].widget = JalaliDateWidget()
+
+
+class TextEntryForm(forms.ModelForm):
+    """Form for TextEntry with wider title field."""
+    
+    validity_start_date = JalaliDateField(
+        label='تاریخ شروع اعتبار',
+        required=False,
+        help_text='در صورت خالی بودن، از ابتدا معتبر است'
+    )
+    
+    validity_end_date = JalaliDateField(
+        label='تاریخ پایان اعتبار',
+        required=False,
+        help_text='در صورت خالی بودن، همچنان معتبر است'
+    )
+    
+    class Meta:
+        model = TextEntry
+        fields = '__all__'
+        widgets = {
+            'title': forms.TextInput(attrs={'style': 'width: 70%;'}),
+        }
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if JALALI_AVAILABLE:
+            self.fields['validity_start_date'].widget = JalaliDateWidget()
+            self.fields['validity_end_date'].widget = JalaliDateWidget()
