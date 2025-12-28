@@ -959,7 +959,7 @@ class TextEntry(BaseModel):
     
     # عنوان
     title = models.CharField(
-        max_length=500,
+        max_length=1000,
         verbose_name='عنوان'
     )
     
