@@ -6,10 +6,11 @@ Interactive tool for tagging legal units using OpenAI GPT-4o-mini.
 Shows a table for each batch with unit content, existing tags, and suggested tags.
 User must approve each batch before saving.
 
-Version: 2.1.0 (2025-12-27)
-- Fixed foreign key constraint for manual terms
-- Added term reload on batch change
-- Enhanced logging to file
+Version: 2.2.0 (2025-12-28)
+- Added document selection before tagging
+- User can now select specific document to tag
+- Auto-return to document selection after completing all units
+- Filter units by selected document work_id
 
 Usage:
 1. Set your OpenAI API key and base URL below
@@ -17,7 +18,7 @@ Usage:
 3. Open http://localhost:5000 in your browser
 """
 
-VERSION = "2.1.0"
+VERSION = "2.2.0"
 
 # ============================================
 # CONFIGURATION - SET THESE VALUES
@@ -1232,7 +1233,7 @@ HTML = """
 </head>
 <body>
     <div class="container">
-        <h1>🏷️ برچسب‌گذار هوشمند بندهای حقوقی <span style="font-size:0.5em;color:#666;">v2.1.0</span></h1>
+        <h1>🏷️ برچسب‌گذار هوشمند بندهای حقوقی <span style="font-size:0.5em;color:#666;">v2.2.0</span></h1>
         
         <div class="stats">
             <div class="stat">
