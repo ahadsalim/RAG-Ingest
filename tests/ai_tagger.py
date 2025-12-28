@@ -55,7 +55,7 @@ app = Flask(__name__)
 
 # Global state
 state = {
-    "status": "idle",  # idle, processing, waiting_approval, saving
+    "status": "idle",  # idle, processing, waiting_approval, saving, selecting_document
     "current_batch": 0,
     "total_batches": 0,
     "total_units": 0,
@@ -69,6 +69,8 @@ state = {
     "current_units": None,  # Current batch units
     "prefetch_results": None,  # Pre-fetched next batch results
     "prefetch_status": "idle",  # idle, fetching, ready
+    "selected_work_id": None,  # Currently selected document work_id
+    "available_documents": [],  # List of documents with untagged units
 }
 
 def get_db_connection():
@@ -123,7 +125,7 @@ def load_vocabularies_and_terms():
 # فقط این نوع واحدها نیاز به برچسب دارند (مقادیر انگلیسی در دیتابیس)
 VALID_UNIT_TYPES = ['full_text', 'article', 'clause', 'subclause', 'note']
 
-def get_units(limit=30, offset=0):
+def get_units(limit=30, offset=0, work_id=None):
     """Get legal units that don't have any tags yet - only specific unit types."""
     conn = get_db_connection()
     cur = conn.cursor()
@@ -132,19 +134,26 @@ def get_units(limit=30, offset=0):
     type_placeholders = ','.join(['%s'] * len(VALID_UNIT_TYPES))
     
     # فقط بندهایی که هنوز برچسب ندارند
+    work_filter = "AND lu.work_id = %s" if work_id else ""
+    params = list(VALID_UNIT_TYPES)
+    if work_id:
+        params.append(work_id)
+    params.extend([limit, offset])
+    
     cur.execute(f"""
         SELECT lu.id, lu.path_label, lu.content, lu.unit_type, w.title_official as document_title, lu.work_id
         FROM documents_legalunit lu
         LEFT JOIN documents_instrumentwork w ON lu.work_id = w.id
         WHERE lu.content IS NOT NULL AND lu.content != ''
           AND lu.unit_type IN ({type_placeholders})
+          {work_filter}
           AND NOT EXISTS (
               SELECT 1 FROM documents_legalunitvocabularyterm luvt 
               WHERE luvt.legal_unit_id = lu.id
           )
         ORDER BY lu.work_id, lu.lft
         LIMIT %s OFFSET %s
-    """, (*VALID_UNIT_TYPES, limit, offset))
+    """, params)
     
     units = list(cur.fetchall())
     conn.close()
@@ -183,7 +192,7 @@ def get_existing_tags(unit_ids):
     conn.close()
     return result
 
-def count_total_units():
+def count_total_units(work_id=None):
     """Count units that don't have any tags yet."""
     conn = get_db_connection()
     cur = conn.cursor()
@@ -191,18 +200,49 @@ def count_total_units():
     type_placeholders = ','.join(['%s'] * len(VALID_UNIT_TYPES))
     
     # فقط بندهایی که هنوز برچسب ندارند
+    work_filter = "AND lu.work_id = %s" if work_id else ""
+    params = list(VALID_UNIT_TYPES)
+    if work_id:
+        params.append(work_id)
+    
     cur.execute(f"""
         SELECT COUNT(*) as count FROM documents_legalunit lu
+        WHERE lu.content IS NOT NULL AND lu.content != ''
+          AND lu.unit_type IN ({type_placeholders})
+          {work_filter}
+          AND NOT EXISTS (
+              SELECT 1 FROM documents_legalunitvocabularyterm luvt 
+              WHERE luvt.legal_unit_id = lu.id
+          )
+    """, params)
+    result = cur.fetchone()
+    conn.close()
+    return result["count"]
+
+def get_documents_with_untagged_units():
+    """Get list of documents that have untagged units."""
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    type_placeholders = ','.join(['%s'] * len(VALID_UNIT_TYPES))
+    
+    cur.execute(f"""
+        SELECT DISTINCT w.id, w.title_official, COUNT(lu.id) as untagged_count
+        FROM documents_instrumentwork w
+        INNER JOIN documents_legalunit lu ON lu.work_id = w.id
         WHERE lu.content IS NOT NULL AND lu.content != ''
           AND lu.unit_type IN ({type_placeholders})
           AND NOT EXISTS (
               SELECT 1 FROM documents_legalunitvocabularyterm luvt 
               WHERE luvt.legal_unit_id = lu.id
           )
+        GROUP BY w.id, w.title_official
+        ORDER BY w.title_official
     """, VALID_UNIT_TYPES)
-    result = cur.fetchone()
+    
+    documents = list(cur.fetchall())
     conn.close()
-    return result["count"]
+    return documents
 
 def build_prompt(units):
     """Build prompt for GPT based on Legal Tagging Engine template."""
@@ -322,12 +362,18 @@ def process_next_batch():
     
     # No offset needed - always get first untagged units
     # (units that get tagged are automatically excluded from next query)
-    log(f"Batch {state['current_batch']}: Loading untagged units...")
-    units = get_units(BATCH_SIZE, 0)
+    work_id = state.get("selected_work_id")
+    log(f"Batch {state['current_batch']}: Loading untagged units for work_id={work_id}...")
+    units = get_units(BATCH_SIZE, 0, work_id=work_id)
     
     if not units:
-        log("No more units to process!")
-        state["status"] = "idle"
+        log("No more units to process for this document!")
+        # Reset to document selection
+        state["selected_work_id"] = None
+        state["current_batch"] = 0
+        state["processed_units"] = 0
+        state["available_documents"] = get_documents_with_untagged_units()
+        state["status"] = "selecting_document"
         return False
     
     state["current_units"] = units
@@ -469,7 +515,8 @@ def prefetch_next_batch():
     try:
         # Always get first untagged units (offset=0)
         # Units that get tagged are automatically excluded from query
-        units = get_units(BATCH_SIZE, 0)
+        work_id = state.get("selected_work_id")
+        units = get_units(BATCH_SIZE, 0, work_id=work_id)
         
         if not units:
             state["prefetch_status"] = "idle"
@@ -1206,6 +1253,19 @@ HTML = """
             <span id="status-text">آماده شروع</span>
         </div>
         
+        <!-- Document selection -->
+        <div class="controls" id="document-selection" style="display:none;">
+            <div style="margin-bottom: 15px;">
+                <label style="display:block; margin-bottom:8px; font-weight:bold;">📄 انتخاب سند برای برچسب‌گذاری:</label>
+                <select id="document-select" style="width:100%; padding:10px; font-size:14px; border-radius:8px; border:2px solid #00d4ff;">
+                    <option value="">-- یک سند را انتخاب کنید --</option>
+                </select>
+            </div>
+            <button class="btn btn-primary" id="btn-select-document" onclick="selectDocument()">
+                ✅ انتخاب و شروع
+            </button>
+        </div>
+        
         <div class="controls" id="main-controls">
             <button class="btn btn-primary" id="btn-start" onclick="startProcess()">
                 🚀 شروع برچسب‌گذاری
@@ -1253,6 +1313,18 @@ HTML = """
             fetch('/api/status')
                 .then(r => r.json())
                 .then(data => {
+                    // Check if we need to show document selection
+                    if (data.status === 'selecting_document') {
+                        fetch('/api/init', {method: 'POST'})
+                            .then(r => r.json())
+                            .then(initData => {
+                                if (initData.documents && initData.documents.length > 0) {
+                                    showDocumentSelection(initData.documents);
+                                }
+                            });
+                        return;
+                    }
+                    
                     document.getElementById('total-units').textContent = data.total_units || '-';
                     document.getElementById('processed').textContent = data.processed_units;
                     document.getElementById('current-batch').textContent = data.current_batch;
@@ -2043,11 +2115,56 @@ HTML = """
                 .catch(err => console.error('Prefetch status error:', err));
         }
         
+        function selectDocument() {
+            const select = document.getElementById('document-select');
+            const workId = select.value;
+            
+            if (!workId) {
+                alert('لطفاً یک سند را انتخاب کنید');
+                return;
+            }
+            
+            fetch('/api/select_document', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({work_id: workId})
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('document-selection').style.display = 'none';
+                    document.getElementById('main-controls').style.display = 'block';
+                    updateStatus();
+                }
+            });
+        }
+        
+        function showDocumentSelection(documents) {
+            const select = document.getElementById('document-select');
+            select.innerHTML = '<option value="">— یک سند را انتخاب کنید —</option>';
+            
+            documents.forEach(doc => {
+                const option = document.createElement('option');
+                option.value = doc.id;
+                option.textContent = `${doc.title_official} (تعداد بندهای بدون تگ: ${doc.untagged_count})`;
+                select.appendChild(option);
+            });
+            
+            document.getElementById('document-selection').style.display = 'block';
+            document.getElementById('main-controls').style.display = 'none';
+            document.getElementById('results-section').classList.add('hidden');
+        }
+        
         // Initial load
-        fetch('/api/init', {method: 'POST'}).then(() => {
-            updateStatus();
-            loadTermsAndVocabs();
-        });
+        fetch('/api/init', {method: 'POST'})
+            .then(r => r.json())
+            .then(data => {
+                if (data.documents && data.documents.length > 0) {
+                    showDocumentSelection(data.documents);
+                }
+                updateStatus();
+                loadTermsAndVocabs();
+            });
         setInterval(updateStatus, 5000);
         setInterval(updatePrefetchIndicator, 3000);
     </script>
@@ -2062,9 +2179,37 @@ def index():
 @app.route('/api/init', methods=['POST'])
 def api_init():
     load_vocabularies_and_terms()
-    state["total_units"] = count_total_units()
+    # Load available documents
+    state["available_documents"] = get_documents_with_untagged_units()
+    state["status"] = "selecting_document"
+    return jsonify({
+        "success": True,
+        "documents": state["available_documents"]
+    })
+
+@app.route('/api/select_document', methods=['POST'])
+def api_select_document():
+    """Select a document to process."""
+    data = request.json
+    work_id = data.get('work_id')
+    
+    if not work_id:
+        return jsonify({"success": False, "error": "work_id is required"})
+    
+    state["selected_work_id"] = work_id
+    state["current_batch"] = 0
+    state["processed_units"] = 0
+    state["total_units"] = count_total_units(work_id=work_id)
     state["total_batches"] = (state["total_units"] + BATCH_SIZE - 1) // BATCH_SIZE
-    return jsonify({"success": True})
+    state["status"] = "idle"
+    
+    log(f"Selected document work_id={work_id}, total units={state['total_units']}")
+    
+    return jsonify({
+        "success": True,
+        "total_units": state["total_units"],
+        "total_batches": state["total_batches"]
+    })
 
 @app.route('/api/status')
 def api_status():
