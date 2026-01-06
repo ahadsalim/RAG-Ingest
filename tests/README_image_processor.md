@@ -18,16 +18,18 @@
 ## نصب
 
 ```bash
-pip install -r requirements_image_processor.txt
+pip install -r requirements_ai_image.txt
 ```
 
 ## استفاده
 
-1. تصاویر JPG خود را در همان پوشه‌ای که فایل `legal_image_processor.py` قرار دارد کپی کنید
+1. یک پوشه بنام `jpg` در کنار فایل `ai_image.py` ایجاد کنید
 
-2. اسکریپت را اجرا کنید:
+2. تصاویر JPG خود را در پوشه `jpg` کپی کنید
+
+3. اسکریپت را اجرا کنید:
 ```bash
-python legal_image_processor.py
+python ai_image.py
 ```
 
 3. مرورگر خود را باز کنید و به آدرس زیر بروید:
@@ -63,12 +65,12 @@ http://localhost:5001
 - تاریخ‌ها باید به صورت شمسی باشند (مثال: 1346/4/22)
 - امضای "هیات عمومی دیوان عالی کشور" در محتوا ذخیره نمی‌شود
 - فایل‌های پردازش شده به طور خودکار حذف می‌شوند
-- لاگ‌ها در فایل `legal_image_processor.log` ذخیره می‌شوند
+- لاگ‌ها در فایل `ai_image.log` ذخیره می‌شوند
 - پاسخ‌های API در فایل‌های `batch*_response.json` ذخیره می‌شوند
 
 ## تنظیمات
 
-در صورت نیاز، می‌توانید تنظیمات زیر را در ابتدای فایل `legal_image_processor.py` تغییر دهید:
+در صورت نیاز، می‌توانید تنظیمات زیر را در ابتدای فایل `ai_image.py` تغییر دهید:
 
 - `OPENAI_API_KEY`: کلید API
 - `OPENAI_BASE_URL`: آدرس پایه API
