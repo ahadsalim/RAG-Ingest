@@ -166,6 +166,23 @@ services:
       - npm_letsencrypt:/etc/letsencrypt
     networks: [ advisor_net ]
 
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    privileged: true
+    devices:
+      - /dev/kmsg
+    networks: [ advisor_net ]
+
 volumes:
   postgres_data:
   static_volume:
