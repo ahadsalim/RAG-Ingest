@@ -1,37 +1,60 @@
 #!/usr/bin/env python3
 """
-Legal Document Image Processor
-================================
+Legal Document Image Processor with Multi-page Support
+========================================================
 Processes images of legal documents (رای وحدت رویه) using AI vision,
 extracts structured information, and provides a web interface for review.
 
+Features:
+- Multi-page document detection and merging
+- Incomplete document handling across batches
+- Dual API support with automatic retry and fallback
+- Auto-processing of next batch after approval
+- Shamsi to Gregorian date conversion
+
 Usage:
-1. Set your OpenAI API key and base URL below
-2. Place JPG images in the same directory as this script
-3. Run: python legal_image_processor.py
+1. Create config.py with API keys (not committed to git)
+2. Place JPG images in jpg/ subdirectory
+3. Run: python ai_image.py
 4. Open http://localhost:5001 in your browser
 """
 
-VERSION = "1.0.0"
+VERSION = "1.2.0"
 
 # ============================================
-# CONFIGURATION - SET THESE VALUES
+# CONFIGURATION - Import from config.py
 # ============================================
-OPENAI_API_KEY = "sk-o92MoYgtEGcJrtvYEPS8t3BTWCwUfdg6o3HzdA67L3yWtddO"
-OPENAI_BASE_URL = "https://api.gapgpt.app/v1"
+try:
+    from config import API_CONFIGS, DB_CONFIG, MODEL_NAME, BATCH_SIZE
+except ImportError:
+    print("ERROR: config.py not found!")
+    print("Please create config.py with:")
+    print("""
+API_CONFIGS = [
+    {
+        "name": "OpenAI",
+        "api_key": "your-openai-key",
+        "base_url": "https://api.openai.com/v1"
+    },
+    {
+        "name": "GapGPT",
+        "api_key": "your-gapgpt-key",
+        "base_url": "https://api.gapgpt.app/v1"
+    }
+]
 
-# Database connection
 DB_CONFIG = {
-    "host": "45.92.219.229",
+    "host": "your-host",
     "port": 15432,
     "database": "ingest",
     "user": "ingest",
-    "password": "rQXRweJEjVSD7tMKX4TrV3LQHDNhklt2"
+    "password": "your-password"
 }
 
-# Model settings
-MODEL_NAME = "gpt-4o"  # Vision model
-BATCH_SIZE = 5  # Process 5 images at a time
+MODEL_NAME = "gpt-4.1-mini"
+BATCH_SIZE = 10
+""")
+    exit(1)
 
 # ============================================
 # DO NOT MODIFY BELOW THIS LINE
@@ -41,12 +64,15 @@ import os
 import json
 import uuid
 import base64
+import re
+import time
 from datetime import datetime
 from pathlib import Path
 from flask import Flask, render_template_string, request, jsonify
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from openai import OpenAI
+import jdatetime
 
 app = Flask(__name__)
 
@@ -56,11 +82,13 @@ state = {
     "current_batch": 0,
     "total_images": 0,
     "processed_images": 0,
+    "current_images": [],
+    "current_results": None,
+    "incomplete_entry": None,  # Store incomplete entry to continue in next batch
     "logs": [],
-    "current_results": None,  # Current batch results waiting for approval
-    "current_images": None,  # Current batch image filenames
     "script_dir": os.path.dirname(os.path.abspath(__file__)),
-    "jpg_dir": os.path.join(os.path.dirname(os.path.abspath(__file__)), "jpg")
+    "jpg_dir": os.path.join(os.path.dirname(os.path.abspath(__file__)), "jpg"),
+    "api_index": 0  # Track which API to use next (alternates)
 }
 
 def get_db_connection():
@@ -107,59 +135,110 @@ def encode_image(image_path):
     with open(image_path, "rb") as image_file:
         return base64.b64encode(image_file.read()).decode('utf-8')
 
-def build_vision_prompt():
-    """Build prompt for GPT Vision."""
+def build_vision_prompt(image_files):
+    """Build prompt for GPT Vision with actual filenames."""
     system = """تو یک Legal Document Extractor هستی. تصاویر رای‌های وحدت رویه هیأت عمومی دیوان عالی کشور را تحلیل می‌کنی.
 
 ## ساختار تصاویر:
-- رای شماره: [شماره] - [تاریخ شمسی]
-- بسمه تعالی یا باسمه تعالی
-- متن رای
-- هیات عمومی دیوان عالی کشور (امضا - نباید در محتوا باشد)
+- سطر اول: رای شماره: [تاریخ شمسی] - [شماره رای]
+  مثال: "رای شماره: 1346/4/22 - 123" یا "رای شماره: 1346/4/22-123"
+  **مهم**: فرمت دقیق "تاریخ - شماره" است (تاریخ اول، شماره دوم)
+- سطر دوم: بسمه تعالی یا باسمه تعالی
+- سطر سوم: رأی وحدت رویه هیأت عمومی دیوان عالی کشور
+- متن اصلی رای (کامل و بدون حذف)
+- سطر آخر: هیات عمومی دیوان عالی کشور (امضا)
+
+**مهمترین نکته - شناسایی اتمام رای:**
+امضای "هیات عمومی دیوان عالی کشور" نشانه پایان رای است.
+- اگر این امضا در تصویر وجود دارد → رای کامل است
+- اگر این امضا نیست → رای ناقص است و در تصویر بعدی ادامه دارد
 
 ## خروجی JSON (بدون هیچ متن اضافه):
 {
   "results": [
     {
-      "image_file": "filename.jpg",
+      "image_files": ["file1.jpg"] یا ["file1.jpg", "file2.jpg"],
       "title": "رأی وحدت رویه هیأت عمومی دیوان عالی کشور - [تاریخ شمسی]",
       "text_type": "رای",
-      "content": "[تمام محتوای صفحه از شماره رای تا انتها بدون امضا]",
+      "content": "رای شماره: [فقط شماره رای]\n\n[تمام متن اصلی رای - کامل و بدون حذف]",
       "effective_date": "[تاریخ شمسی در فرمت YYYY/MM/DD]",
-      "confidence": "[high/medium/low]"
+      "confidence": "[high/medium/low]",
+      "is_complete": true
+    }
+  ],
+  "incomplete": [
+    {
+      "image_files": ["last_file.jpg"],
+      "partial_content": "...",
+      "reason": "امضا ندارد - ادامه در تصویر بعدی"
     }
   ]
 }
 
 ## نکات مهم:
-1. تاریخ شمسی است (مثل 1346/4/22)
-2. محتوا باید شامل شماره رای باشد
-3. امضای "هیات عمومی دیوان عالی کشور" در محتوا نباشد
-4. اگر تصویر واضح نیست، confidence را low بگذار"""
+1. **CRITICAL - استخراج شماره رای:**
+   - فرمت در تصویر: "رای شماره: [تاریخ] - [شماره]"
+   - مثال در تصویر: "رای شماره: 1346/4/22 - 123"
+   - شماره رای = عدد بعد از خط تیره (123)
+   - تاریخ = قبل از خط تیره (1346/4/22)
+   - در content فقط بنویس: "رای شماره: 123" (بدون تاریخ)
+2. **تاریخ:** فقط در title و effective_date استفاده شود
+3. **محتوا:** تمام متن اصلی رای را کامل بنویس (هیچ چیز حذف نشود)
+4. فقط این موارد از ابتدا/انتها حذف شوند:
+   - بسمه تعالی (اگر در ابتدا باشد)
+   - رأی وحدت رویه هیأت عمومی دیوان عالی کشور (اگر در ابتدا باشد)
+   - هیأت عمومی دیوان عالی کشور (اگر در انتها به عنوان امضا باشد)
+5. **CRITICAL - چند صفحه‌ای**: اگر تصویر بعدی ادامه همان رای است:
+   - در image_files هر دو فایل را بنویس ([فایل اول, فایل دوم])
+   - محتوای هر دو صفحه را ترکیب کن
+   - is_complete = true بگذار (چون امضا دارد)
+6. **CRITICAL - رای ناقص**: اگر آخرین تصویر امضا ندارد:
+   - این رای را در results نگذار
+   - آن را در incomplete بگذار
+   - دلیل: "امضا ندارد - ادامه در تصویر بعدی"
+7. **CRITICAL**: در فیلد image_files باید دقیقاً از نام فایل‌های زیر استفاده کنی (به ترتیب ارسال تصاویر)"""
 
-    user = """لطفاً تمام تصاویر زیر را تحلیل کن و برای هر کدام اطلاعات را استخراج کن."""
+    # Build filenames list for the prompt
+    filenames_list = "\n".join([f"{i+1}. {fname}" for i, fname in enumerate(image_files)])
+    
+    user = f"""لطفاً تمام تصاویر زیر را تحلیل کن.
+
+**نام فایل‌های تصاویر (به ترتیب پشت سر هم):**
+{filenames_list}
+
+**مهم:**
+1. تصاویر به ترتیب پشت سر هم ارسال شده‌اند
+2. بررسی کن آیا تصویر بعدی ادامه همان رای است یا رای جدید
+3. اگر چند تصویر یک رای هستند و امضا دارند:
+   - در image_files همه فایل‌ها را بنویس: ["file1.jpg", "file2.jpg", "file3.jpg"]
+   - محتوای همه صفحات را ترکیب کن
+   - is_complete = true
+   - در results بگذار
+4. اگر آخرین تصویر امضا ندارد (رای ناقص):
+   - در incomplete بگذار (نه results)
+   - محتوای تا اینجا را ذخیره کن
+   - دلیل: "امضا ندارد - ادامه در تصویر بعدی"
+5. در JSON خروجی، دقیقاً از همان نام فایل‌های بالا استفاده کن"""
     
     return system, user
 
 def call_gpt_vision(image_files):
-    """Call GPT Vision API with multiple images."""
-    log(f"Calling GPT Vision API ({MODEL_NAME}) for {len(image_files)} images...")
+    """Call GPT Vision API to extract information from images with retry logic."""
     
-    try:
-        client = OpenAI(
-            api_key=OPENAI_API_KEY,
-            base_url=OPENAI_BASE_URL,
-            timeout=180.0
-        )
+    max_retries = 3
+    retry_delay = 2  # seconds
+    
+    # Try current API first, then fallback to alternate
+    apis_to_try = [state["api_index"], (state["api_index"] + 1) % len(API_CONFIGS)]
+    
+    for api_attempt, api_idx in enumerate(apis_to_try):
+        api_config = API_CONFIGS[api_idx]
+        log(f"Using API: {api_config['name']} (attempt {api_attempt + 1}/{len(apis_to_try)})")
+        client = OpenAI(api_key=api_config["api_key"], base_url=api_config["base_url"])
         
-        system, user = build_vision_prompt()
-        
-        # Build messages with images
-        messages = [
-            {"role": "system", "content": system}
-        ]
-        
-        # Add user message with all images
+        # Build messages once
+        system, user = build_vision_prompt(image_files)
+        messages = [{"role": "system", "content": system}]
         content = [{"type": "text", "text": user}]
         
         for img_file in image_files:
@@ -167,40 +246,61 @@ def call_gpt_vision(image_files):
             base64_image = encode_image(img_path)
             content.append({
                 "type": "image_url",
-                "image_url": {
-                    "url": f"data:image/jpeg;base64,{base64_image}"
-                }
+                "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}
             })
-            log(f"Added image: {img_file}")
         
         messages.append({"role": "user", "content": content})
+        log(f"Prepared {len(image_files)} images for API call")
         
-        log("Sending request to API...")
-        response = client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=messages,
-            temperature=0.1,
-            max_tokens=4096
-        )
+        # Retry logic for this API
+        for retry in range(max_retries):
+            try:
+                log(f"Sending request to API (retry {retry + 1}/{max_retries})...")
+                response = client.chat.completions.create(
+                    model=MODEL_NAME,
+                    messages=messages,
+                    temperature=0.1,
+                    max_tokens=4096,
+                    timeout=60.0
+                )
         
-        result = response.choices[0].message.content
-        log(f"Got response: {len(result)} chars")
+                result = response.choices[0].message.content
+                log(f"✓ Got response: {len(result)} chars")
+                
+                # Update API index for next call
+                state["api_index"] = (api_idx + 1) % len(API_CONFIGS)
         
-        # Extract JSON from response
-        if result.strip().startswith('{'):
-            return result
-        
-        import re
-        json_match = re.search(r'\{[\s\S]*\}', result)
-        if json_match:
-            return json_match.group()
-        
-        log(f"Warning: No JSON found in response")
-        return '{"results": []}'
-        
-    except Exception as e:
-        log(f"API Error: {type(e).__name__}: {e}")
-        raise
+                # Extract JSON from response
+                json_match = re.search(r'\{[\s\S]*\}', result)
+                if json_match:
+                    json_str = json_match.group()
+                elif result.strip().startswith('{'):
+                    json_str = result.strip()
+                else:
+                    log(f"Warning: No JSON found in response")
+                    return '{"results": []}'
+                
+                return json_str
+                
+            except Exception as e:
+                error_msg = str(e)
+                log(f"API Error: {type(e).__name__}: {error_msg}")
+                
+                if retry < max_retries - 1:
+                    wait_time = retry_delay * (2 ** retry)  # exponential backoff
+                    log(f"Retrying in {wait_time} seconds...")
+                    time.sleep(wait_time)
+                else:
+                    log(f"Max retries reached for {api_config['name']}")
+                    if api_attempt < len(apis_to_try) - 1:
+                        log(f"Switching to alternate API...")
+                        break  # Try next API
+                    else:
+                        log(f"All APIs failed!")
+                        raise Exception(f"All API attempts failed. Last error: {error_msg}")
+    
+    # Should not reach here
+    raise Exception("Unexpected error in API call loop")
 
 def process_next_batch():
     """Process next batch of images."""
@@ -229,42 +329,112 @@ def process_next_batch():
             f.write(response)
         log(f"Response saved to {response_file}")
         
-        result = json.loads(response)
+        # Parse JSON with error handling
+        try:
+            result = json.loads(response)
+        except json.JSONDecodeError as e:
+            log(f"JSON parsing error: {e}")
+            log(f"Attempting to repair JSON...")
+            # Try to extract valid JSON objects
+            matches = re.findall(r'\{[^{}]*"image_files"[^{}]*\}', response, re.DOTALL)
+            if matches:
+                try:
+                    repaired_json = '{"results": [' + ','.join(matches) + ']}'
+                    result = json.loads(repaired_json)
+                    log(f"Successfully repaired JSON with {len(matches)} results")
+                except:
+                    log(f"Failed to repair JSON, using empty results")
+                    result = {"results": []}
+            else:
+                log(f"No valid results found in response")
+                result = {"results": []}
+        
         results = result.get("results", [])
+        incomplete_entries = result.get("incomplete", [])
         
-        log(f"Got {len(results)} results")
+        log(f"Got {len(results)} complete results")
+        if incomplete_entries:
+            log(f"Warning: {len(incomplete_entries)} incomplete entries (will continue in next batch)")
+            # Store incomplete entry for next batch
+            state["incomplete_entry"] = incomplete_entries[0] if incomplete_entries else None
         
-        # Build display data
+        # Build display data - handle multi-image entries
         display_data = []
-        for i, img_file in enumerate(batch_images):
-            # Find matching result
-            img_result = next((r for r in results if r.get('image_file') == img_file), None)
+        processed_images = set()
+        
+        for result in results:
+            # Get image files for this result (can be single or multiple)
+            image_files = result.get('image_files', [])
+            if not image_files:
+                # Fallback to old format
+                image_files = [result.get('image_file', '')]
             
-            if not img_result:
-                # Create default result
-                img_result = {
-                    "image_file": img_file,
+            # Read all images for this entry
+            images_base64 = []
+            for img_file in image_files:
+                if img_file in batch_images:
+                    processed_images.add(img_file)
+                    img_path = os.path.join(state["jpg_dir"], img_file)
+                    with open(img_path, "rb") as f:
+                        images_base64.append({
+                            "filename": img_file,
+                            "base64": base64.b64encode(f.read()).decode('utf-8')
+                        })
+            
+            if images_base64:
+                display_data.append({
+                    "image_files": image_files,
+                    "images_base64": images_base64,
+                    "title": result.get("title", ""),
+                    "text_type": result.get("text_type", "رای"),
+                    "content": result.get("content", ""),
+                    "effective_date": result.get("effective_date", ""),
+                    "confidence": result.get("confidence", "low")
+                })
+        
+        # Add any unprocessed images as separate entries
+        for img_file in batch_images:
+            if img_file not in processed_images:
+                img_path = os.path.join(state["jpg_dir"], img_file)
+                with open(img_path, "rb") as f:
+                    img_base64 = base64.b64encode(f.read()).decode('utf-8')
+                
+                display_data.append({
+                    "image_files": [img_file],
+                    "images_base64": [{"filename": img_file, "base64": img_base64}],
                     "title": f"رأی وحدت رویه هیأت عمومی دیوان عالی کشور - [تاریخ]",
                     "text_type": "رای",
                     "content": "",
                     "effective_date": "",
                     "confidence": "low"
-                }
-            
-            # Read image for preview
-            img_path = os.path.join(state["jpg_dir"], img_file)
-            with open(img_path, "rb") as f:
-                img_base64 = base64.b64encode(f.read()).decode('utf-8')
-            
-            display_data.append({
-                "image_file": img_file,
-                "image_base64": img_base64,
-                "title": img_result.get("title", ""),
-                "text_type": img_result.get("text_type", "رای"),
-                "content": img_result.get("content", ""),
-                "effective_date": img_result.get("effective_date", ""),
-                "confidence": img_result.get("confidence", "low")
-            })
+                })
+        
+        # Add incomplete entries at the end with warning
+        if incomplete_entries:
+            for incomplete in incomplete_entries:
+                incomplete_files = incomplete.get('image_files', [])
+                images_base64 = []
+                for img_file in incomplete_files:
+                    if img_file in batch_images:
+                        img_path = os.path.join(state["jpg_dir"], img_file)
+                        with open(img_path, "rb") as f:
+                            images_base64.append({
+                                "filename": img_file,
+                                "base64": base64.b64encode(f.read()).decode('utf-8')
+                            })
+                
+                if images_base64:
+                    display_data.append({
+                        "image_files": incomplete_files,
+                        "images_base64": images_base64,
+                        "title": incomplete.get('title', 'رای ناقص - ادامه در دسته بعدی'),
+                        "text_type": "رای",
+                        "content": incomplete.get('partial_content', ''),
+                        "effective_date": incomplete.get('effective_date', ''),
+                        "confidence": "medium",
+                        "is_incomplete": True,
+                        "incomplete_reason": incomplete.get('reason', 'امضا ندارد')
+                    })
         
         state["current_results"] = display_data
         state["status"] = "waiting_approval"
@@ -278,58 +448,129 @@ def process_next_batch():
         state["status"] = "idle"
         return False
 
+def clean_content(content):
+    """Remove only header/footer elements, preserve all legal content."""
+    if not content:
+        return ""
+    
+    cleaned = content
+    
+    # Remove quotes
+    cleaned = cleaned.replace('"', '')
+    
+    # Remove "بسمه تعالی" or "باسمه تعالی" ONLY if at the very beginning
+    cleaned = re.sub(r'^[\s\n]*(بسمه تعالی|باسمه تعالی)[\s\n]*', '', cleaned, flags=re.MULTILINE)
+    
+    # Remove "رأی وحدت رویه هیأت عمومی دیوان عالی کشور" ONLY if at the very beginning
+    cleaned = re.sub(r'^[\s\n]*(رأی وحدت رویه هیأت عمومی دیوان عالی کشور)[\s\n]*', '', cleaned, flags=re.MULTILINE)
+    
+    # Remove "هیأت عمومی دیوان عالی کشور" ONLY if at the very end (signature)
+    cleaned = re.sub(r'[\s\n]*(هیأت عمومی دیوان عالی کشور)[\s\n]*$', '', cleaned, flags=re.MULTILINE)
+    
+    # Clean up excessive whitespace but preserve paragraph structure
+    cleaned = re.sub(r'\n\n\n+', '\n\n', cleaned)  # Max 2 newlines
+    cleaned = cleaned.strip()
+    
+    return cleaned
+
+def shamsi_to_gregorian(shamsi_date_str):
+    """Convert Shamsi date (YYYY/MM/DD) to Gregorian date."""
+    if not shamsi_date_str:
+        return None
+    
+    try:
+        parts = shamsi_date_str.split('/')
+        if len(parts) != 3:
+            return None
+        
+        year, month, day = int(parts[0]), int(parts[1]), int(parts[2])
+        j_date = jdatetime.date(year, month, day)
+        g_date = j_date.togregorian()
+        return g_date.strftime('%Y-%m-%d')
+    except:
+        return None
+
 def save_approved_batch(approved_data):
     """Save approved entries to database and delete image files."""
     state["status"] = "saving"
     conn = get_db_connection()
     cur = conn.cursor()
     
+    # Get or create AI user
+    cur.execute("SELECT id FROM accounts_user WHERE mobile_number = '00000000000' LIMIT 1")
+    ai_user = cur.fetchone()
+    if not ai_user:
+        # Create AI user without password
+        ai_user_id = str(uuid.uuid4())
+        cur.execute("""
+            INSERT INTO accounts_user (id, mobile_number, is_active, created_at, updated_at)
+            VALUES (%s, '00000000000', true, NOW(), NOW())
+        """, (ai_user_id,))
+        conn.commit()
+        log("Created AI user")
+    else:
+        ai_user_id = ai_user['id']
+    
     saved_count = 0
     deleted_files = []
     
-    for entry in approved_data.get('entries', []):
+    # Extract entries from the data dict
+    entries = approved_data.get('entries', [])
+    
+    for entry in entries:
         if not entry.get('approved'):
             continue
         
         try:
             entry_id = str(uuid.uuid4())
             
-            # Parse effective_date (format: YYYY/MM/DD)
-            effective_date = entry.get('effective_date', '')
-            if effective_date:
-                try:
-                    # Convert to PostgreSQL date format
-                    parts = effective_date.split('/')
-                    if len(parts) == 3:
-                        effective_date = f"{parts[0]}-{parts[1]}-{parts[2]}"
-                except:
-                    effective_date = None
-            else:
-                effective_date = None
+            # Clean content
+            raw_content = entry.get('content', '')
+            cleaned_content = clean_content(raw_content)
+            
+            # Convert Shamsi to Gregorian
+            shamsi_date = entry.get('effective_date', '')
+            gregorian_date = shamsi_to_gregorian(shamsi_date)
             
             cur.execute("""
                 INSERT INTO documents_textentry 
-                (id, title, text_type, content, effective_date, created_at, updated_at)
-                VALUES (%s, %s, %s, %s, %s, NOW(), NOW())
+                (id, title, text_type, content, validity_start_date, original_filename, created_by_id, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
             """, (
                 entry_id,
                 entry.get('title', ''),
-                entry.get('text_type', 'رای'),
-                entry.get('content', ''),
-                effective_date
+                'verdict',
+                cleaned_content,
+                gregorian_date,
+                '',
+                ai_user_id
             ))
             conn.commit()
             saved_count += 1
             log(f"Saved entry: {entry.get('title', '')[:50]}...")
             
-            # Delete the image file
-            img_file = entry.get('image_file')
-            if img_file:
-                img_path = os.path.join(state["jpg_dir"], img_file)
-                if os.path.exists(img_path):
-                    os.remove(img_path)
-                    deleted_files.append(img_file)
-                    log(f"Deleted image: {img_file}")
+            # Delete the image file(s) - can be multiple for multi-page entries
+            # BUT: Don't delete if this entry is marked as incomplete
+            image_files = entry.get('image_files', [])
+            if not image_files:
+                # Fallback to old format
+                img_file = entry.get('image_file')
+                if img_file:
+                    image_files = [img_file]
+            
+            # Check if this is an incomplete entry (should not be deleted)
+            is_incomplete = entry.get('is_incomplete', False)
+            
+            if not is_incomplete:
+                for img_file in image_files:
+                    if img_file:
+                        img_path = os.path.join(state["jpg_dir"], img_file)
+                        if os.path.exists(img_path):
+                            os.remove(img_path)
+                            deleted_files.append(img_file)
+                            log(f"Deleted image: {img_file}")
+            else:
+                log(f"Skipped deletion of incomplete entry images: {image_files}")
             
         except Exception as e:
             conn.rollback()
@@ -338,18 +579,31 @@ def save_approved_batch(approved_data):
     conn.close()
     state["processed_images"] += saved_count
     log(f"Saved {saved_count} entries, deleted {len(deleted_files)} files")
-    state["status"] = "idle"
+    
+    # Clear incomplete entry after successful save
+    state["incomplete_entry"] = None
+    
+    # Check if there are more images to process
+    remaining_images = get_jpg_images()
+    if remaining_images:
+        log(f"Auto-starting next batch ({len(remaining_images)} images remaining)...")
+        # Process next batch automatically
+        process_next_batch()
+    else:
+        log("All images processed!")
+        state["status"] = "idle"
+        state["incomplete_entry"] = None
     
     return saved_count, deleted_files
 
-# HTML Template
+# HTML Template with buttons at bottom
 HTML = """
 <!DOCTYPE html>
 <html dir="rtl" lang="fa">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>پردازشگر تصاویر اسناد حقوقی v1.0</title>
+    <title>پردازشگر تصاویر اسناد حقوقی v{{ version }}</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -501,14 +755,16 @@ HTML = """
         
         #results { margin-top: 20px; }
         
-        .batch-actions {
-            display: flex;
+        #bottom-controls {
+            display: none;
+            position: sticky;
+            bottom: 0;
+            background: rgba(26, 26, 46, 0.95);
+            padding: 20px;
+            border-top: 2px solid rgba(0,212,255,0.3);
             justify-content: center;
             gap: 15px;
-            margin: 20px 0;
-            padding: 20px;
-            background: rgba(0,212,255,0.1);
-            border-radius: 10px;
+            z-index: 1000;
         }
     </style>
 </head>
@@ -535,13 +791,16 @@ HTML = """
         
         <div class="controls">
             <button class="btn btn-primary" id="btn-start" onclick="startProcessing()">شروع پردازش</button>
-            <button class="btn btn-success" id="btn-approve" onclick="approveBatch()" style="display:none;">تأیید و ذخیره</button>
-            <button class="btn btn-danger" id="btn-skip" onclick="skipBatch()" style="display:none;">رد کردن</button>
         </div>
         
         <div class="log-box" id="logs"></div>
         
         <div id="results"></div>
+        
+        <div id="bottom-controls">
+            <button class="btn btn-success" onclick="approveBatch()">تأیید و ذخیره</button>
+            <button class="btn btn-danger" onclick="skipBatch()">رد کردن</button>
+        </div>
     </div>
     
     <script>
@@ -559,8 +818,8 @@ HTML = """
                 statusDiv.textContent = 'آماده';
                 statusDiv.classList.add('status-idle');
                 document.getElementById('btn-start').style.display = 'inline-block';
-                document.getElementById('btn-approve').style.display = 'none';
-                document.getElementById('btn-skip').style.display = 'none';
+                document.getElementById('bottom-controls').style.display = 'none';
+                document.getElementById('results').innerHTML = '';
             } else if (data.status === 'processing') {
                 statusDiv.textContent = '⏳ در حال پردازش...';
                 statusDiv.classList.add('status-processing');
@@ -569,9 +828,8 @@ HTML = """
                 statusDiv.textContent = '✅ آماده برای بررسی و تأیید';
                 statusDiv.classList.add('status-waiting');
                 document.getElementById('btn-start').style.display = 'none';
-                document.getElementById('btn-approve').style.display = 'inline-block';
-                document.getElementById('btn-skip').style.display = 'inline-block';
                 showResults(data.current_results);
+                document.getElementById('bottom-controls').style.display = 'flex';
             }
             
             // Update logs
@@ -583,19 +841,42 @@ HTML = """
         function showResults(results) {
             if (!results) return;
             
-            const html = results.map((entry, idx) => `
-                <div class="entry-card">
+            const html = results.map((entry, idx) => {
+                // Handle multi-image entries
+                const images = entry.images_base64 || [{filename: entry.image_file, base64: entry.image_base64}];
+                const imageFilesStr = entry.image_files ? entry.image_files.join(', ') : entry.image_file;
+                const imageFilesJson = JSON.stringify(entry.image_files || [entry.image_file]);
+                
+                const imagesHtml = images.map(img => `
+                    <div style="margin-bottom: 10px;">
+                        <img src="data:image/jpeg;base64,${img.base64}" class="image-preview" alt="${img.filename}">
+                        <div style="color: #aaa; font-size: 11px; margin-top: 5px; text-align: center;">${img.filename}</div>
+                    </div>
+                `).join('');
+                
+                const isIncomplete = entry.is_incomplete || false;
+                const incompleteWarning = isIncomplete ? `
+                    <div style="background: #ff6600; color: #000; padding: 8px; border-radius: 4px; margin-top: 10px; font-weight: bold; text-align: center;">
+                        ⚠️ رای ناقص - ادامه در دسته بعدی<br>
+                        <span style="font-size: 11px;">${entry.incomplete_reason || 'امضا ندارد'}</span><br>
+                        <span style="font-size: 11px;">این عکس حذف نخواهد شد</span>
+                    </div>
+                ` : '';
+                
+                return `
+                <div class="entry-card" ${isIncomplete ? 'style="border: 3px solid #ff6600;"' : ''}>
                     <div>
-                        <img src="data:image/jpeg;base64,${entry.image_base64}" class="image-preview" alt="${entry.image_file}">
+                        ${imagesHtml}
                         <div style="margin-top: 10px; text-align: center;">
                             <span class="confidence-badge confidence-${entry.confidence}">${entry.confidence}</span>
-                            <div style="color: #aaa; font-size: 11px; margin-top: 5px;">${entry.image_file}</div>
+                            ${images.length > 1 ? `<div style="color: #00ff88; font-size: 12px; margin-top: 5px; font-weight: bold;">چند صفحه‌ای (${images.length} عکس)</div>` : ''}
                         </div>
+                        ${incompleteWarning}
                     </div>
                     <div class="entry-form">
                         <div class="approve-checkbox">
-                            <input type="checkbox" id="approve-${idx}" checked>
-                            <label for="approve-${idx}">تأیید و ذخیره این مورد</label>
+                            <input type="checkbox" id="approve-${idx}" ${isIncomplete ? '' : 'checked'}>
+                            <label for="approve-${idx}">${isIncomplete ? 'رد کردن (برای ادامه در دسته بعدی)' : 'تأیید و ذخیره این مورد'}</label>
                         </div>
                         
                         <div class="form-group">
@@ -618,10 +899,12 @@ HTML = """
                             <textarea class="form-textarea" id="content-${idx}">${entry.content}</textarea>
                         </div>
                         
-                        <input type="hidden" id="image_file-${idx}" value="${entry.image_file}">
+                        <input type="hidden" id="image_files-${idx}" value='${imageFilesJson}'>
+                        <input type="hidden" id="is_incomplete-${idx}" value='${isIncomplete}'>
                     </div>
                 </div>
-            `).join('');
+                `;
+            }).join('');
             
             document.getElementById('results').innerHTML = html;
         }
@@ -640,13 +923,18 @@ HTML = """
             const entries = [];
             
             results.forEach((card, idx) => {
+                const imageFilesStr = document.getElementById(`image_files-${idx}`).value;
+                const imageFiles = JSON.parse(imageFilesStr);
+                const isIncomplete = document.getElementById(`is_incomplete-${idx}`).value === 'true';
+                
                 entries.push({
                     approved: document.getElementById(`approve-${idx}`).checked,
-                    image_file: document.getElementById(`image_file-${idx}`).value,
+                    image_files: imageFiles,
                     title: document.getElementById(`title-${idx}`).value,
                     text_type: document.getElementById(`text_type-${idx}`).value,
                     content: document.getElementById(`content-${idx}`).value,
-                    effective_date: document.getElementById(`effective_date-${idx}`).value
+                    effective_date: document.getElementById(`effective_date-${idx}`).value,
+                    is_incomplete: isIncomplete
                 });
             });
             
@@ -658,11 +946,8 @@ HTML = """
             .then(r => r.json())
             .then(data => {
                 updateUI(data);
-                document.getElementById('results').innerHTML = '';
-                // Continue processing next batch
-                if (data.total_images > 0) {
-                    setTimeout(() => startProcessing(), 1000);
-                }
+                // Start polling to catch the auto-started next batch
+                startPolling();
             });
         }
         
@@ -671,11 +956,6 @@ HTML = """
                 .then(r => r.json())
                 .then(data => {
                     updateUI(data);
-                    document.getElementById('results').innerHTML = '';
-                    // Continue processing next batch
-                    if (data.total_images > 0) {
-                        setTimeout(() => startProcessing(), 1000);
-                    }
                 });
         }
         
@@ -686,6 +966,7 @@ HTML = """
                     .then(r => r.json())
                     .then(data => {
                         updateUI(data);
+                        // Stop polling when idle or waiting for approval
                         if (data.status === 'idle' || data.status === 'waiting_approval') {
                             clearInterval(pollInterval);
                         }
@@ -726,6 +1007,9 @@ def api_start():
     if state["status"] != "idle":
         return jsonify({"error": "Already processing"}), 400
     
+    # Clear previous results
+    state["current_results"] = None
+    
     # Count total images
     all_images = get_jpg_images()
     state["total_images"] = len(all_images)
@@ -765,7 +1049,7 @@ def api_approve():
     import threading
     threading.Thread(target=lambda: save_approved_batch(data), daemon=True).start()
     
-    # Wait a bit for save to complete
+    # Wait a bit for save to start
     import time
     time.sleep(0.5)
     

@@ -67,3 +67,4 @@ test/
 
 # Test scripts and data - do not commit
 tests/
+tests/ai_image.py
