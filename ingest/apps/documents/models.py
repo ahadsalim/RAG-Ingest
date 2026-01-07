@@ -920,18 +920,16 @@ class QAEntry(BaseModel):
     
     def save(self, *args, **kwargs):
         """Override save to generate canonical question and normalize answer for indexing."""
+        from ingest.core.text_processing import prepare_for_embedding
+        
         if self.question:
-            from ingest.core.text_processing import prepare_for_embedding
             # Use proper Persian text normalization for question
             normalized_question = prepare_for_embedding(self.question)
             self.canonical_question = normalized_question[:512]  # Respect field max_length
         
-        # Also normalize answer text for better search and embedding
+        # Normalize answer text for better search and embedding
         if self.answer:
-            from ingest.core.text_processing import prepare_for_embedding
-            # Normalize answer text (store in same field but process both)
-            normalized_answer = prepare_for_embedding(self.answer)
-            # We can store both normalized texts in embedding_text property
+            self.answer = prepare_for_embedding(self.answer)
         
         super().save(*args, **kwargs)
     
@@ -1087,10 +1085,19 @@ class TextEntry(BaseModel):
         return title_preview
     
     def save(self, *args, **kwargs):
-        """Override save to extract content from file if uploaded."""
+        """Override save to extract content from file if uploaded and normalize text."""
+        from ingest.core.text_processing import prepare_for_embedding
+        
         # اگر فایل جدید آپلود شده، محتوا را استخراج کن
         if self.source_file and not self.content:
             self.extract_content_from_file()
+        
+        # Normalize title and content for better search and embedding
+        if self.title:
+            self.title = prepare_for_embedding(self.title)
+        
+        if self.content:
+            self.content = prepare_for_embedding(self.content)
         
         super().save(*args, **kwargs)
     
