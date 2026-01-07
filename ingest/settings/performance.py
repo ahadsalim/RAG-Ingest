@@ -16,7 +16,7 @@ DATABASES['default'].update({
     'CONN_HEALTH_CHECKS': True,  # Django 4.1+ feature for connection health
     'OPTIONS': {
         'connect_timeout': 10,
-        'options': '-c statement_timeout=30000',  # 30 second statement timeout
+        'options': '-c statement_timeout=120000',  # 120 second (2 minutes) statement timeout for delete operations
         'keepalives': 1,
         'keepalives_idle': 30,
         'keepalives_interval': 10,

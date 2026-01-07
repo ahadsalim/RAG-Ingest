@@ -235,7 +235,9 @@ def _delete_from_core(node_id: str) -> bool:
             logger.info(f"Successfully deleted node {node_id} from Core")
             return True
         else:
-            logger.warning(f"Failed to delete node {node_id} from Core: {error}")
+            # Don't log warning for HTTP 405 (Method Not Allowed) - Core API doesn't support DELETE yet
+            if error and 'HTTP 405' not in str(error):
+                logger.warning(f"Failed to delete node {node_id} from Core: {error}")
             return False
             
     except ImportError:
