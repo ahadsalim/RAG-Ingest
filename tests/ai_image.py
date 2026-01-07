@@ -22,39 +22,35 @@ Usage:
 VERSION = "1.2.0"
 
 # ============================================
-# CONFIGURATION - Import from config.py
+# CONFIGURATION
 # ============================================
-try:
-    from config import API_CONFIGS, DB_CONFIG, MODEL_NAME, BATCH_SIZE
-except ImportError:
-    print("ERROR: config.py not found!")
-    print("Please create config.py with:")
-    print("""
+
+# API Configuration
 API_CONFIGS = [
     {
-        "name": "OpenAI",
-        "api_key": "your-openai-key",
-        "base_url": "https://api.openai.com/v1"
+        "name": "GapGPT",
+        "api_key": "sk-o92MoYgtEGcJrtvYEPS8t3BTWCwUfdg6o3HzdA67L3yWtddO",
+        "base_url": "https://api.gapgpt.app/v1"
     },
     {
-        "name": "GapGPT",
-        "api_key": "your-gapgpt-key",
-        "base_url": "https://api.gapgpt.app/v1"
+        "name": "OpenAI",
+        "api_key": "sk-proj-your-key-here",
+        "base_url": "https://api.openai.com/v1"
     }
 ]
 
+# Database Configuration
 DB_CONFIG = {
-    "host": "your-host",
+    "host": "45.92.219.229",
     "port": 15432,
     "database": "ingest",
     "user": "ingest",
-    "password": "your-password"
+    "password": "rQXRweJEjVSD7tMKX4TrV3LQHDNhklt2"
 }
 
+# Model Settings
 MODEL_NAME = "gpt-4.1-mini"
 BATCH_SIZE = 10
-""")
-    exit(1)
 
 # ============================================
 # DO NOT MODIFY BELOW THIS LINE
@@ -464,8 +460,9 @@ def clean_content(content):
     # Remove "رأی وحدت رویه هیأت عمومی دیوان عالی کشور" ONLY if at the very beginning
     cleaned = re.sub(r'^[\s\n]*(رأی وحدت رویه هیأت عمومی دیوان عالی کشور)[\s\n]*', '', cleaned, flags=re.MULTILINE)
     
-    # Remove "هیأت عمومی دیوان عالی کشور" ONLY if at the very end (signature)
-    cleaned = re.sub(r'[\s\n]*(هیأت عمومی دیوان عالی کشور)[\s\n]*$', '', cleaned, flags=re.MULTILINE)
+    # Remove "هیأت عمومی دیوان عالی کشور" or "هیات عمومی دیوان عالی کشور" ONLY if at the very end (signature)
+    # Support both spellings: هیأت (with hamza) and هیات (without hamza)
+    cleaned = re.sub(r'[\s\n]*(هیأت عمومی دیوان عالی کشور|هیات عمومی دیوان عالی کشور)[\s\n]*$', '', cleaned, flags=re.MULTILINE)
     
     # Clean up excessive whitespace but preserve paragraph structure
     cleaned = re.sub(r'\n\n\n+', '\n\n', cleaned)  # Max 2 newlines
@@ -496,23 +493,20 @@ def save_approved_batch(approved_data):
     conn = get_db_connection()
     cur = conn.cursor()
     
-    # Get or create AI user
-    cur.execute("SELECT id FROM accounts_user WHERE mobile_number = '00000000000' LIMIT 1")
+    # Get existing AI user (09000000000)
+    cur.execute("SELECT id FROM auth_user WHERE username = '09000000000' LIMIT 1")
     ai_user = cur.fetchone()
     if not ai_user:
-        # Create AI user without password
-        ai_user_id = str(uuid.uuid4())
-        cur.execute("""
-            INSERT INTO accounts_user (id, mobile_number, is_active, created_at, updated_at)
-            VALUES (%s, '00000000000', true, NOW(), NOW())
-        """, (ai_user_id,))
-        conn.commit()
-        log("Created AI user")
-    else:
-        ai_user_id = ai_user['id']
+        log("ERROR: AI user 09000000000 not found in database!")
+        conn.close()
+        state["status"] = "idle"
+        return 0, []
+    
+    ai_user_id = ai_user['id']
     
     saved_count = 0
     deleted_files = []
+    files_to_delete = []  # Collect files to delete AFTER all saves succeed
     
     # Extract entries from the data dict
     entries = approved_data.get('entries', [])
@@ -549,7 +543,7 @@ def save_approved_batch(approved_data):
             saved_count += 1
             log(f"Saved entry: {entry.get('title', '')[:50]}...")
             
-            # Delete the image file(s) - can be multiple for multi-page entries
+            # Collect files to delete AFTER successful save
             # BUT: Don't delete if this entry is marked as incomplete
             image_files = entry.get('image_files', [])
             if not image_files:
@@ -562,19 +556,25 @@ def save_approved_batch(approved_data):
             is_incomplete = entry.get('is_incomplete', False)
             
             if not is_incomplete:
-                for img_file in image_files:
-                    if img_file:
-                        img_path = os.path.join(state["jpg_dir"], img_file)
-                        if os.path.exists(img_path):
-                            os.remove(img_path)
-                            deleted_files.append(img_file)
-                            log(f"Deleted image: {img_file}")
+                files_to_delete.extend(image_files)
             else:
                 log(f"Skipped deletion of incomplete entry images: {image_files}")
             
         except Exception as e:
             conn.rollback()
             log(f"Error saving entry: {e}")
+    
+    # NOW delete files AFTER all database operations succeeded
+    for img_file in files_to_delete:
+        if img_file:
+            img_path = os.path.join(state["jpg_dir"], img_file)
+            if os.path.exists(img_path):
+                try:
+                    os.remove(img_path)
+                    deleted_files.append(img_file)
+                    log(f"Deleted image: {img_file}")
+                except Exception as e:
+                    log(f"Error deleting {img_file}: {e}")
     
     conn.close()
     state["processed_images"] += saved_count
@@ -588,6 +588,7 @@ def save_approved_batch(approved_data):
     if remaining_images:
         log(f"Auto-starting next batch ({len(remaining_images)} images remaining)...")
         # Process next batch automatically
+        state["status"] = "idle"  # Reset status before processing
         process_next_batch()
     else:
         log("All images processed!")
@@ -797,7 +798,7 @@ HTML = """
         
         <div id="results"></div>
         
-        <div id="bottom-controls">
+        <div id="bottom-controls" style="display: flex;">
             <button class="btn btn-success" onclick="approveBatch()">تأیید و ذخیره</button>
             <button class="btn btn-danger" onclick="skipBatch()">رد کردن</button>
         </div>
@@ -885,11 +886,6 @@ HTML = """
                         </div>
                         
                         <div class="form-group">
-                            <label class="form-label">نوع متن:</label>
-                            <input type="text" class="form-input" id="text_type-${idx}" value="${entry.text_type}">
-                        </div>
-                        
-                        <div class="form-group">
                             <label class="form-label">تاریخ شروع اعتبار (YYYY/MM/DD):</label>
                             <input type="text" class="form-input" id="effective_date-${idx}" value="${entry.effective_date}">
                         </div>
@@ -931,7 +927,6 @@ HTML = """
                     approved: document.getElementById(`approve-${idx}`).checked,
                     image_files: imageFiles,
                     title: document.getElementById(`title-${idx}`).value,
-                    text_type: document.getElementById(`text_type-${idx}`).value,
                     content: document.getElementById(`content-${idx}`).value,
                     effective_date: document.getElementById(`effective_date-${idx}`).value,
                     is_incomplete: isIncomplete
@@ -1040,30 +1035,34 @@ def api_start():
 
 @app.route('/api/approve', methods=['POST'])
 def api_approve():
-    if state["status"] != "waiting_approval":
-        return jsonify({"error": "No batch waiting for approval"}), 400
-    
-    data = request.json
-    
-    # Save in background thread
-    import threading
-    threading.Thread(target=lambda: save_approved_batch(data), daemon=True).start()
-    
-    # Wait a bit for save to start
-    import time
-    time.sleep(0.5)
-    
-    # Update image count
-    all_images = get_jpg_images()
-    state["total_images"] = len(all_images)
-    
-    return jsonify({
-        "status": state["status"],
-        "current_batch": state["current_batch"],
-        "total_images": state["total_images"],
-        "processed_images": state["processed_images"],
-        "logs": state["logs"][-20:]
-    })
+    try:
+        log(f"Approve request received. Current status: {state['status']}")
+        
+        data = request.json
+        log(f"Approve data: {len(data.get('entries', []))} entries")
+        
+        # Save synchronously (no threading to avoid duplicate saves)
+        saved_count, deleted_files = save_approved_batch(data)
+        log(f"Save completed: {saved_count} entries, {len(deleted_files)} files deleted")
+        
+        # Update image count
+        all_images = get_jpg_images()
+        state["total_images"] = len(all_images)
+        
+        return jsonify({
+            "status": state["status"],
+            "current_batch": state["current_batch"],
+            "total_images": state["total_images"],
+            "processed_images": state["processed_images"],
+            "logs": state["logs"][-20:],
+            "saved_count": saved_count
+        })
+    except Exception as e:
+        log(f"ERROR in api_approve: {e}")
+        import traceback
+        log(traceback.format_exc())
+        state["status"] = "idle"
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/skip', methods=['POST'])
 def api_skip():

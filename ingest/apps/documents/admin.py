@@ -1215,12 +1215,12 @@ class TextEntryAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
     
     form = TextEntryForm
     list_display = (
-        'title', 'text_type', 'content_preview', 'validity_status', 'file_info', 'tags_display',
-        'created_by', 'jalali_created_at_display', 'jalali_updated_at_display'
+        'title', 'text_type', 'validity_status', 'jalali_validity_start_display', 
+        'created_by', 'jalali_created_at_display'
     )
     list_filter = ('text_type', 'created_at', 'vocabulary_terms', 'validity_start_date', 'validity_end_date')
     search_fields = ('title', 'content')
-    readonly_fields = ('jalali_created_at_display', 'jalali_updated_at_display', 'original_filename', 'content_extracted')
+    readonly_fields = ('jalali_created_at_display', 'jalali_updated_at_display', 'jalali_validity_start_display', 'original_filename', 'content_extracted')
     inlines = [TextEntryVocabularyTermInline, TextEntryRelatedUnitInline]
     
     fieldsets = (
@@ -1281,6 +1281,15 @@ class TextEntryAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
         return '-'
     jalali_updated_at_display.short_description = 'زمان ویرایش (شمسی)'
     jalali_updated_at_display.admin_order_field = 'updated_at'
+    
+    def jalali_validity_start_display(self, obj):
+        """Display validity_start_date in Jalali format."""
+        if obj.validity_start_date:
+            from ingest.core.jalali import to_jalali_date
+            return to_jalali_date(obj.validity_start_date)
+        return '-'
+    jalali_validity_start_display.short_description = 'تاریخ شروع اعتبار'
+    jalali_validity_start_display.admin_order_field = 'validity_start_date'
     
     def content_extracted(self, obj):
         """نمایش وضعیت استخراج محتوا."""
