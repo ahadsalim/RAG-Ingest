@@ -368,16 +368,28 @@ class LegalUnit(MPTTModel, BaseModel):
             })
 
     def save(self, *args, **kwargs):
-        # Auto-generate path_label
+        from ingest.core.text_processing import prepare_for_embedding
+        
+        # Normalize all text fields before saving (using prepare_for_embedding for consistency)
+        if self.number:
+            self.number = prepare_for_embedding(self.number)
+        
+        if self.order_index:
+            self.order_index = prepare_for_embedding(self.order_index)
+        
+        # Auto-generate path_label with normalized text
         current_label = f"{self.get_unit_type_display()} {self.number}".strip()
         if self.parent:
             self.path_label = f"{self.parent.path_label} > {current_label}"
         else:
             self.path_label = current_label
         
+        # Normalize path_label
+        if self.path_label:
+            self.path_label = prepare_for_embedding(self.path_label)
+        
         # Normalize content text before saving
         if self.content:
-            from ingest.core.text_processing import prepare_for_embedding
             # Normalize content and store it - chunks will use this normalized version
             self.content = prepare_for_embedding(self.content)
         

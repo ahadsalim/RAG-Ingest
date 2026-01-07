@@ -53,6 +53,10 @@ class TextNormalizer:
         if not text or not isinstance(text, str):
             return text or ""
         
+        # Convert Persian numbers to English BEFORE hazm normalization
+        # (hazm with persian_numbers=False keeps Persian numbers unchanged)
+        text = self._convert_persian_to_english_numbers(text)
+        
         # Get normalizer
         normalizer = self._get_normalizer()
         if not normalizer:
@@ -63,8 +67,7 @@ class TextNormalizer:
             # Apply hazm normalization
             normalized = normalizer.normalize(text)
             
-            # Convert any remaining Persian numbers to English
-            # (in case hazm didn't convert them or input had Persian numbers)
+            # Convert any remaining Persian numbers to English again (just to be safe)
             normalized = self._convert_persian_to_english_numbers(normalized)
             
             # Optional stemming for better embedding quality
