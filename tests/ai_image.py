@@ -301,12 +301,20 @@ def call_gpt_vision(image_files):
 def process_next_batch():
     """Process next batch of images."""
     state["status"] = "processing"
-    state["current_batch"] += 1
     
     # Get unprocessed images
     all_images = get_jpg_images()
-    start_idx = (state["current_batch"] - 1) * BATCH_SIZE
-    batch_images = all_images[start_idx:start_idx + BATCH_SIZE]
+    
+    # If no images, stop
+    if not all_images:
+        log("No more images to process!")
+        state["status"] = "idle"
+        return False
+    
+    # Calculate batch based on remaining images, not counter
+    # This ensures we always process from the start of remaining images
+    state["current_batch"] += 1
+    batch_images = all_images[:BATCH_SIZE]  # Always take first BATCH_SIZE images
     
     if not batch_images:
         log("No more images to process!")
