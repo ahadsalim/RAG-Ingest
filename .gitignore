@@ -64,3 +64,6 @@ docs/_build/
 
 # Temporary files
 test/
+
+# Test scripts and data - do not commit
+tests/
