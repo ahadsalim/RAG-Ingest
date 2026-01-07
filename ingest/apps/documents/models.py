@@ -104,6 +104,15 @@ class InstrumentWork(BaseModel):
     
     history = HistoricalRecords()
     
+    def save(self, *args, **kwargs):
+        from ingest.core.text_processing import prepare_for_embedding
+        
+        # Normalize title_official for better search and duplicate detection
+        if self.title_official:
+            self.title_official = prepare_for_embedding(self.title_official)
+        
+        super().save(*args, **kwargs)
+    
     def __str__(self):
         return f"{self.title_official} ({self.get_doc_type_display()})"
 
@@ -206,9 +215,17 @@ class InstrumentManifestation(BaseModel):
             })
     
     def save(self, *args, **kwargs):
-        # تولید چکسام SHA256 خودکار بر اساس فیلدهای فرم
+        from ingest.core.text_processing import prepare_for_embedding
         import hashlib
         
+        # Normalize text fields
+        if self.official_gazette_name:
+            self.official_gazette_name = prepare_for_embedding(self.official_gazette_name)
+        
+        if self.gazette_issue_no:
+            self.gazette_issue_no = prepare_for_embedding(self.gazette_issue_no)
+        
+        # تولید چکسام SHA256 خودکار بر اساس فیلدهای فرم
         # ترکیب فیلدهای کلیدی برای تولید چکسام یکتا
         content_parts = [
             str(self.expr_id) if self.expr_id else '',
