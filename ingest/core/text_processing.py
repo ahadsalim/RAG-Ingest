@@ -102,6 +102,7 @@ class TextNormalizer:
         """
         Normalize hamza characters (remove hamza from alef and waw).
         Examples: رأی → رای, مؤسسه → موسسه
+        Note: ئ (Yeh with hamza) is NOT normalized because it's used in valid words like مسئول
         
         Args:
             text: Input text
@@ -113,11 +114,12 @@ class TextNormalizer:
             return ""
         
         # Hamza normalization mapping
+        # Note: We do NOT normalize ئ because it's used in words like مسئول
         hamza_mapping = {
             'أ': 'ا',  # Alef with hamza above → Alef
             'إ': 'ا',  # Alef with hamza below → Alef
             'ؤ': 'و',  # Waw with hamza above → Waw
-            'ئ': 'ی',  # Yeh with hamza above → Yeh
+            # 'ئ': 'ی',  # Yeh with hamza - NOT normalized (used in مسئول, etc.)
             'ء': '',   # Standalone hamza → remove
         }
         
