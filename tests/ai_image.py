@@ -154,7 +154,7 @@ def build_vision_prompt(image_files):
   "results": [
     {
       "image_files": ["file1.jpg"] یا ["file1.jpg", "file2.jpg"],
-      "title": "رأی وحدت رویه هیأت عمومی دیوان عالی کشور - [تاریخ شمسی]",
+      "title": "رأی وحدت رویه هیأت عمومی دیوان عالی کشور - [تاریخ شمسی] - [شماره رای]",
       "text_type": "رای",
       "content": "رای شماره: [فقط شماره رای]\n\n[تمام متن اصلی رای - کامل و بدون حذف]",
       "effective_date": "[تاریخ شمسی در فرمت YYYY/MM/DD]",
@@ -178,7 +178,9 @@ def build_vision_prompt(image_files):
    - شماره رای = عدد بعد از خط تیره (123)
    - تاریخ = قبل از خط تیره (1346/4/22)
    - در content فقط بنویس: "رای شماره: 123" (بدون تاریخ)
-2. **تاریخ:** فقط در title و effective_date استفاده شود
+2. **تاریخ و شماره رای:** در title به این فرمت بنویس: "رأی وحدت رویه هیأت عمومی دیوان عالی کشور - [تاریخ] - [شماره رای]"
+   - مثال: "رأی وحدت رویه هیأت عمومی دیوان عالی کشور - 1346/4/22 - 123"
+3. **effective_date:** فقط تاریخ (بدون شماره رای)
 3. **محتوا:** تمام متن اصلی رای را کامل بنویس (هیچ چیز حذف نشود)
 4. فقط این موارد از ابتدا/انتها حذف شوند:
    - بسمه تعالی (اگر در ابتدا باشد)
@@ -406,7 +408,7 @@ def process_next_batch():
                 display_data.append({
                     "image_files": [img_file],
                     "images_base64": [{"filename": img_file, "base64": img_base64}],
-                    "title": f"رأی وحدت رویه هیأت عمومی دیوان عالی کشور - [تاریخ]",
+                    "title": f"رأی وحدت رویه هیأت عمومی دیوان عالی کشور - [تاریخ] - [شماره رای]",
                     "text_type": "رای",
                     "content": "",
                     "effective_date": "",
@@ -923,6 +925,20 @@ HTML = """
         }
         
         function approveBatch() {
+            // Disable button immediately to prevent duplicate clicks
+            const saveBtn = document.querySelector('.btn-success');
+            const skipBtn = document.querySelector('.btn-danger');
+            if (saveBtn.disabled) return; // Already processing
+            
+            saveBtn.disabled = true;
+            skipBtn.disabled = true;
+            saveBtn.textContent = '⏳ در حال ذخیره...';
+            
+            // Show loading state
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = '⏳ در حال ذخیره در دیتابیس...';
+            statusDiv.className = 'status status-processing';
+            
             const results = document.querySelectorAll('.entry-card');
             const entries = [];
             
@@ -948,9 +964,22 @@ HTML = """
             })
             .then(r => r.json())
             .then(data => {
+                // Re-enable buttons after save completes
+                saveBtn.disabled = false;
+                skipBtn.disabled = false;
+                saveBtn.textContent = 'تأیید و ذخیره';
+                
                 updateUI(data);
                 // Start polling to catch the auto-started next batch
                 startPolling();
+            })
+            .catch(err => {
+                // Re-enable buttons on error
+                saveBtn.disabled = false;
+                skipBtn.disabled = false;
+                saveBtn.textContent = 'تأیید و ذخیره';
+                statusDiv.textContent = '❌ خطا در ذخیره';
+                statusDiv.className = 'status status-idle';
             });
         }
         
