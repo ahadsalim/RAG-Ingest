@@ -57,6 +57,9 @@ class TextNormalizer:
         # (hazm with persian_numbers=False keeps Persian numbers unchanged)
         text = self._convert_persian_to_english_numbers(text)
         
+        # Normalize hamza characters (Hazm doesn't do this)
+        text = self._normalize_hamza(text)
+        
         # Get normalizer
         normalizer = self._get_normalizer()
         if not normalizer:
@@ -69,6 +72,9 @@ class TextNormalizer:
             
             # Convert any remaining Persian numbers to English again (just to be safe)
             normalized = self._convert_persian_to_english_numbers(normalized)
+            
+            # Normalize hamza again (just to be safe)
+            normalized = self._normalize_hamza(normalized)
             
             # Optional stemming for better embedding quality
             if apply_stemming:
@@ -91,6 +97,35 @@ class TextNormalizer:
         except Exception as e:
             logger.warning(f"Text normalization failed: {e}, falling back to basic normalization")
             return self._basic_normalize(text)
+    
+    def _normalize_hamza(self, text: str) -> str:
+        """
+        Normalize hamza characters (remove hamza from alef and waw).
+        Examples: رأی → رای, مؤسسه → موسسه
+        
+        Args:
+            text: Input text
+            
+        Returns:
+            Text with normalized hamza
+        """
+        if not text:
+            return ""
+        
+        # Hamza normalization mapping
+        hamza_mapping = {
+            'أ': 'ا',  # Alef with hamza above → Alef
+            'إ': 'ا',  # Alef with hamza below → Alef
+            'ؤ': 'و',  # Waw with hamza above → Waw
+            'ئ': 'ی',  # Yeh with hamza above → Yeh
+            'ء': '',   # Standalone hamza → remove
+        }
+        
+        result = text
+        for hamza_char, normalized_char in hamza_mapping.items():
+            result = result.replace(hamza_char, normalized_char)
+        
+        return result
     
     def _convert_persian_to_english_numbers(self, text: str) -> str:
         """

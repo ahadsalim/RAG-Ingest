@@ -205,7 +205,8 @@ class EmbeddingAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
         chunk_ct = ContentType.objects.get_for_model(Chunk)
         
         # === آمار LegalUnit ===
-        total_legal_units = LegalUnit.objects.count()
+        # فقط LegalUnit های با محتوا را شمارش کن
+        total_legal_units = LegalUnit.objects.exclude(content='').exclude(content__isnull=True).count()
         lu_chunks = Chunk.objects.filter(unit__isnull=False).count()
         lu_chunks_with_embeddings = Chunk.objects.filter(
             unit__isnull=False,
@@ -230,7 +231,8 @@ class EmbeddingAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
         
         # === آمار کلی Chunks ===
         total_chunks = Chunk.objects.count()
-        chunks_with_embeddings = Embedding.objects.filter(content_type=chunk_ct).count()
+        # شمارش صحیح chunk های با embedding
+        chunks_with_embeddings = Chunk.objects.filter(embeddings__isnull=False).distinct().count()
         
         # Recent activity (last 24 hours)
         yesterday = datetime.now() - timedelta(days=1)
