@@ -140,6 +140,15 @@ class VocabularyTerm(BaseModel):
         verbose_name_plural = 'واژگان'
         ordering = ['vocabulary__name', 'term']
         unique_together = ['vocabulary', 'code']
+    
+    def save(self, *args, **kwargs):
+        """Normalize term text before saving."""
+        from ingest.core.text_processing import prepare_for_embedding
+        
+        if self.term:
+            self.term = prepare_for_embedding(self.term)
+        
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.vocabulary.name}: {self.term}"
