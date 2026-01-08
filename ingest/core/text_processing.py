@@ -76,6 +76,15 @@ class TextNormalizer:
             # Normalize hamza again (just to be safe)
             normalized = self._normalize_hamza(normalized)
             
+            # Fix dates: remove spaces around slashes (Hazm adds them)
+            # 1361 / 02 / 13 → 1361/02/13
+            # This needs to be applied multiple times for dates with multiple slashes
+            import re
+            # Remove space before slash
+            normalized = re.sub(r'(\d+)\s+/', r'\1/', normalized)
+            # Remove space after slash
+            normalized = re.sub(r'/\s+(\d+)', r'/\1', normalized)
+            
             # Optional stemming for better embedding quality
             if apply_stemming:
                 stemmer = self._get_stemmer()
