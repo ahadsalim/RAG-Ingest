@@ -20,8 +20,12 @@ class TextNormalizer:
             try:
                 from hazm import Normalizer
                 # persian_numbers=False to keep English numbers for better search
-                self._normalizer = Normalizer(persian_numbers=False)
-                logger.info("Hazm normalizer initialized successfully (English numbers preserved)")
+                # correct_spacing=False to preserve dates like 1361/02/13 (no spaces around /)
+                self._normalizer = Normalizer(
+                    persian_numbers=False,
+                    correct_spacing=False
+                )
+                logger.info("Hazm normalizer initialized successfully (English numbers preserved, spacing preserved)")
             except ImportError:
                 logger.warning("hazm library not available - text normalization disabled")
                 self._normalizer = False
@@ -75,15 +79,6 @@ class TextNormalizer:
             
             # Normalize hamza again (just to be safe)
             normalized = self._normalize_hamza(normalized)
-            
-            # Fix dates: remove spaces around slashes (Hazm adds them)
-            # 1361 / 02 / 13 → 1361/02/13
-            # This needs to be applied multiple times for dates with multiple slashes
-            import re
-            # Remove space before slash
-            normalized = re.sub(r'(\d+)\s+/', r'\1/', normalized)
-            # Remove space after slash
-            normalized = re.sub(r'/\s+(\d+)', r'/\1', normalized)
             
             # Optional stemming for better embedding quality
             if apply_stemming:
