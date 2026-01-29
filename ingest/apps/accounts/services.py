@@ -1,6 +1,6 @@
 """
-Bale Messenger OTP Service
-Sends OTP codes via Bale Safir API (https://safir.bale.ai)
+SMS OTP Service
+Sends OTP codes via SMS API (Kavenegar or any HTTP SMS API)
 """
 import logging
 import requests
@@ -8,6 +8,153 @@ from django.conf import settings
 from django.core.cache import cache
 
 logger = logging.getLogger(__name__)
+
+
+class SMSService:
+    """
+    Service for sending OTP codes via SMS API.
+    
+    Supports Kavenegar SMS API by default, but can be configured for any HTTP SMS API.
+    
+    Required settings:
+        SMS_API_URL: Base URL for SMS API
+        SMS_API_KEY: API key for SMS service
+        SMS_SENDER: Sender number or ID
+        SMS_API_TYPE: API type ('kavenegar', 'generic', etc.)
+        SMS_TEMPLATE_NAME: Template name for OTP messages (for Kavenegar)
+    """
+    
+    def __init__(self):
+        self.api_url = getattr(settings, 'SMS_API_URL', 'https://api.kavenegar.com/v1')
+        self.api_key = getattr(settings, 'SMS_API_KEY', None)
+        self.sender = getattr(settings, 'SMS_SENDER', '100010010')
+        self.api_type = getattr(settings, 'SMS_API_TYPE', 'kavenegar')
+        self.template_name = getattr(settings, 'SMS_TEMPLATE_NAME', 'otp')
+        
+        if not self.api_key:
+            logger.warning("SMS API credentials not configured (SMS_API_KEY)")
+    
+    def _normalize_phone(self, mobile: str) -> str:
+        """
+        Normalize phone number to Iranian format (09XXXXXXXXX).
+        
+        Input formats:
+            - 09123456789 -> 09123456789
+            - 9123456789 -> 09123456789
+            - +989123456789 -> 09123456789
+            - 989123456789 -> 09123456789
+        """
+        # Remove spaces, dashes, and plus sign
+        phone = mobile.replace(' ', '').replace('-', '').replace('+', '')
+        
+        # Remove leading 98 if present and add 0
+        if phone.startswith('98') and len(phone) == 12:
+            phone = '0' + phone[2:]
+        # Add leading 0 if missing and number starts with 9
+        elif phone.startswith('9') and len(phone) == 10:
+            phone = '0' + phone
+        
+        return phone
+    
+    def send_otp(self, mobile: str, code: str) -> dict:
+        """
+        Send OTP code to user via SMS API.
+        
+        Args:
+            mobile: User's mobile number (any format)
+            code: OTP code (3-8 digits)
+        
+        Returns:
+            dict with 'success', 'message' or 'error'
+        """
+        if not self.api_key:
+            return {
+                'success': False,
+                'error': 'سرویس پیامک پیکربندی نشده است. لطفاً با پشتیبانی تماس بگیرید.'
+            }
+        
+        try:
+            if self.api_type == 'kavenegar':
+                return self._send_kavenegar_otp(mobile, code)
+            else:
+                return self._send_generic_otp(mobile, code)
+                
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to send OTP via SMS: {e}")
+            return {
+                'success': False,
+                'error': 'خطا در ارسال پیامک. لطفاً دوباره تلاش کنید.'
+            }
+    
+    def _send_kavenegar_otp(self, mobile: str, code: str) -> dict:
+        """Send OTP via Kavenegar API."""
+        normalized_mobile = self._normalize_phone(mobile)
+        
+        # Kavenegar verify lookup API for OTP
+        url = f"{self.api_url}/{self.api_key}/verify/lookup.json"
+        
+        payload = {
+            'receptor': normalized_mobile,
+            'token': code,
+            'template': self.template_name  # Use template name from settings
+        }
+        
+        response = requests.post(url, data=payload, timeout=10)
+        
+        if response.status_code == 200:
+            result = response.json()
+            if result.get('return', {}).get('status') == 200:
+                logger.info(f"OTP sent to {normalized_mobile[:4]}**** via SMS")
+                return {
+                    'success': True,
+                    'message': 'کد تایید به شماره موبایل شما ارسال شد.'
+                }
+            else:
+                error_message = result.get('return', {}).get('message', 'خطای نامشخص')
+                logger.error(f"Kavenegar API error: {error_message}")
+                return {
+                    'success': False,
+                    'error': f"خطا در ارسال پیامک: {error_message}"
+                }
+        else:
+            logger.error(f"Kavenegar HTTP error: {response.status_code}")
+            return {
+                'success': False,
+                'error': 'خطا در ارتباط با سرویس پیامک.'
+            }
+    
+    def _send_generic_otp(self, mobile: str, code: str) -> dict:
+        """Send OTP via generic HTTP SMS API."""
+        normalized_mobile = self._normalize_phone(mobile)
+        
+        # Generic SMS API - adjust according to your SMS provider
+        url = f"{self.api_url}/send"
+        
+        headers = {
+            'Authorization': f'Bearer {self.api_key}',
+            'Content-Type': 'application/json'
+        }
+        
+        payload = {
+            'to': normalized_mobile,
+            'from': self.sender,
+            'message': f'کد تایید شما: {code}\n\nاین کد ۵ دقیقه معتبر است.'
+        }
+        
+        response = requests.post(url, json=payload, headers=headers, timeout=10)
+        
+        if response.status_code == 200:
+            logger.info(f"OTP sent to {normalized_mobile[:4]}**** via SMS")
+            return {
+                'success': True,
+                'message': 'کد تایید به شماره موبایل شما ارسال شد.'
+            }
+        else:
+            logger.error(f"Generic SMS API error: {response.status_code}")
+            return {
+                'success': False,
+                'error': 'خطا در ارسال پیامک.'
+            }
 
 
 class BaleMessengerService:
@@ -201,10 +348,12 @@ class OTPService:
     """
     
     def __init__(self):
+        self.sms_service = SMSService()
         self.bale_service = BaleMessengerService()
+        self.use_sms = getattr(settings, 'USE_SMS_FOR_OTP', True)  # Default to SMS
     
     def send_otp(self, mobile: str) -> dict:
-        """Generate and send OTP to user via Bale Safir API."""
+        """Generate and send OTP to user via SMS or Bale."""
         from .models import OTPCode
         from django.contrib.auth.models import User
         
@@ -218,13 +367,18 @@ class OTPService:
         # Generate OTP
         otp = OTPCode.generate_code(mobile)
         
-        # Send via Bale Safir API (uses phone number directly)
-        result = self.bale_service.send_otp(mobile, otp.code)
+        # Send via SMS or Bale based on configuration
+        if self.use_sms:
+            result = self.sms_service.send_otp(mobile, otp.code)
+            if result['success']:
+                result['message'] = result.get('message', 'کد تایید به شماره موبایل شما ارسال شد.')
+        else:
+            result = self.bale_service.send_otp(mobile, otp.code)
         
         if result['success']:
             return {
                 'success': True,
-                'message': result.get('message', 'کد تایید به پیام‌رسان بله ارسال شد.'),
+                'message': result.get('message', 'کد تایید ارسال شد.'),
                 'expires_in': 300  # 5 minutes
             }
         else:

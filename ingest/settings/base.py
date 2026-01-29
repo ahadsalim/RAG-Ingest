@@ -372,10 +372,18 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = 50 * 1024 * 1024  # 50MB
 # Embedding Settings
 EMBEDDINGS_ENABLED = os.getenv('EMBEDDINGS_ENABLED', 'true').lower() == 'true'
 
-# Bale Messenger OTP Authentication (Safir API)
+# Bale Messenger OTP Authentication (Safir API) - DEPRECATED
 BALE_API_URL = os.getenv('BALE_API_URL', 'https://safir.bale.ai/api/v2')
 BALE_CLIENT_ID = os.getenv('BALE_CLIENT_ID', '')
 BALE_CLIENT_SECRET = os.getenv('BALE_CLIENT_SECRET', '')
+
+# SMS OTP Authentication
+USE_SMS_FOR_OTP = os.getenv('USE_SMS_FOR_OTP', 'true').lower() == 'true'
+SMS_API_URL = os.getenv('SMS_API_URL', 'https://api.kavenegar.com/v1')
+SMS_API_KEY = os.getenv('SMS_API_KEY', '')
+SMS_SENDER = os.getenv('SMS_SENDER', '100010010')
+SMS_API_TYPE = os.getenv('SMS_API_TYPE', 'kavenegar')  # Options: 'kavenegar', 'generic'
+SMS_TEMPLATE_NAME = os.getenv('SMS_TEMPLATE_NAME', 'otp')  # Kavenegar template name
 
 # Jalali Date Settings
 JALALI_DATE_DEFAULTS = {

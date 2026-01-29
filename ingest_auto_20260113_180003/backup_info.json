@@ -1,6 +1,0 @@
-{
-    "backup_date": "2026-01-13T18:02:32+00:00",
-    "backup_type": "auto_full",
-    "server_hostname": "ingest.tejarat.chat",
-    "postgres_db": "ingest"
-}

@@ -68,6 +68,9 @@ services:
       - DJANGO_SETTINGS_MODULE=ingest.settings.prod
     env_file:
       - ../.env
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     depends_on:
       db:
         condition: service_healthy
