@@ -315,14 +315,23 @@ class CoreSyncService:
         """
         try:
             url = f"{self.config.core_api_url}/api/v1/sync/node/{node_id}"
-            params = {}
+            headers = {}
             if self.config.core_api_key:
-                params['api_key'] = self.config.core_api_key
+                headers['X-API-Key'] = self.config.core_api_key
             
-            response = requests.get(url, params=params, timeout=30)
+            response = requests.get(url, headers=headers, timeout=30)
             
             if response.status_code == 200:
-                return response.json()
+                result = response.json()
+                # Core API returns {'status': 'success', 'node': {...}}
+                if result.get('status') == 'success' and 'node' in result:
+                    return {
+                        'exists': True,
+                        'node_id': node_id,
+                        'node': result['node']
+                    }
+                else:
+                    return {'exists': False, 'node_id': node_id, 'error': 'Invalid response format'}
             elif response.status_code == 404:
                 return {'exists': False, 'node_id': node_id}
             else:

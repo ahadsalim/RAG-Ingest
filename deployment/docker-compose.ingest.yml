@@ -18,7 +18,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    networks: [ advisor_net ]
+    networks: [ ingest_net ]
 
   redis:
     image: redis:7-alpine
@@ -31,7 +31,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-    networks: [ advisor_net ]
+    networks: [ ingest_net ]
 
   minio:
     image: minio/minio:latest
@@ -50,7 +50,7 @@ services:
       interval: 30s
       timeout: 20s
       retries: 3
-    networks: [ advisor_net ]
+    networks: [ ingest_net ]
 
   web:
     build: 
@@ -83,14 +83,14 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-    networks: [ advisor_net ]
+    networks: [ ingest_net ]
 
   worker:
     build: 
       context: ..
       dockerfile: deployment/Dockerfile
     restart: unless-stopped
-    command: celery -A ingest worker --loglevel=info
+    command: celery -A ingest worker --loglevel=info --concurrency=5 --max-tasks-per-child=50
     volumes:
       - static_volume:/app/staticfiles
       - model_volume:/app/models
@@ -112,7 +112,7 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-    networks: [ advisor_net ]
+    networks: [ ingest_net ]
 
   beat:
     build: 
@@ -135,7 +135,7 @@ services:
         condition: service_healthy
       web:
         condition: service_healthy
-    networks: [ advisor_net ]
+    networks: [ ingest_net ]
   
   minio-init:
     image: minio/mc:latest
@@ -153,7 +153,7 @@ services:
       web:
         condition: service_healthy
     restart: "no"
-    networks: [ advisor_net ]
+    networks: [ ingest_net ]
 
   nginx-proxy-manager:
     image: jc21/nginx-proxy-manager:latest
@@ -167,7 +167,7 @@ services:
     volumes:
       - npm_data:/data
       - npm_letsencrypt:/etc/letsencrypt
-    networks: [ advisor_net ]
+    networks: [ ingest_net ]
 
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:latest
@@ -184,7 +184,7 @@ services:
     privileged: true
     devices:
       - /dev/kmsg
-    networks: [ advisor_net ]
+    networks: [ ingest_net ]
 
 volumes:
   postgres_data:
@@ -195,5 +195,5 @@ volumes:
   npm_letsencrypt:
 
 networks:
-  advisor_net:
+  ingest_net:
     external: true

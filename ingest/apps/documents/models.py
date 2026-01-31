@@ -980,6 +980,7 @@ class TextEntry(BaseModel):
         ('verdict', 'رای'),
         ('instruction', 'دستورالعمل'),
         ('bill', 'لایحه'),
+        ('regulation', 'آیین نامه'),
         ('educational', 'آموزشی'),
         ('other', 'سایر'),
     ]

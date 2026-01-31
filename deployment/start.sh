@@ -333,8 +333,8 @@ setup_directories() {
 
 setup_network() {
     print_step "تنظیم شبکه Docker..."
-    if ! docker network ls | grep -q advisor_net; then
-        docker network create advisor_net
+    if ! docker network ls | grep -q ingest_net; then
+        docker network create ingest_net
     fi
 }
 
@@ -482,7 +482,7 @@ show_nginx_config() {
     echo -e "${BOLD}📝 مراحل تنظیم Nginx Proxy Manager:${NC}"
     echo ""
     echo "1. نصب Nginx Proxy Manager:"
-    echo -e "   ${CYAN}docker run -d --name npm --network advisor_net \\
+    echo -e "   ${CYAN}docker run -d --name npm --network ingest_net \\
      -p 80:80 -p 443:443 -p 81:81 \\
      -v npm_data:/data -v npm_letsencrypt:/etc/letsencrypt \\
      jc21/nginx-proxy-manager:latest${NC}"
