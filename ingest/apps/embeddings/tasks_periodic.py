@@ -10,6 +10,62 @@ from django.conf import settings
 logger = logging.getLogger(__name__)
 
 
+@shared_task(name='embeddings.verify_synced_nodes')
+def verify_synced_nodes_in_core():
+    """
+    Periodic task to verify synced nodes in Core.
+    Checks if nodes that were synced to Core actually exist there.
+    Runs daily to ensure data integrity.
+    """
+    from ingest.core.sync.sync_service import CoreSyncService
+    from ingest.apps.embeddings.models import SyncLog
+    
+    logger.info("🔍 Starting periodic verification of synced nodes in Core...")
+    
+    try:
+        service = CoreSyncService()
+        
+        # Get unverified logs (synced but not verified)
+        unverified_count = SyncLog.objects.filter(
+            status='synced',
+            verified_at__isnull=True
+        ).count()
+        
+        if unverified_count == 0:
+            logger.info("✅ No unverified nodes found")
+            return {
+                'status': 'success',
+                'message': 'No nodes to verify',
+                'verified': 0,
+                'failed': 0
+            }
+        
+        logger.info(f"📊 Found {unverified_count} unverified nodes")
+        
+        # Verify batch (1000 at a time for faster processing)
+        result = service.verify_batch(batch_size=1000, max_retries=3)
+        
+        logger.info(
+            f"✅ Verification complete: "
+            f"{result['verified']} verified, "
+            f"{result['failed']} failed"
+        )
+        
+        return {
+            'status': 'success',
+            'total_unverified': unverified_count,
+            'verified': result['verified'],
+            'failed': result['failed']
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Error in verification task: {e}")
+        return {
+            'status': 'error',
+            'error': str(e)
+        }
+
+
 @shared_task(name='embeddings.check_missing_embeddings')
 def check_and_generate_missing_embeddings():
     """

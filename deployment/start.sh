@@ -525,6 +525,65 @@ client_max_body_size 100M;${NC}"
     echo "   • در تب SSL گزینه Request a new SSL Certificate را انتخاب کنید"
     echo "   • Force SSL را فعال کنید"
     echo ""
+    echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    echo -e "${BOLD}🗄️  تنظیمات MinIO در NPM:${NC}"
+    echo ""
+    echo -e "${CYAN}5. ایجاد Proxy Host برای S3 API (s3.tejarat.chat):${NC}"
+    echo -e "   • Domain: ${GREEN}s3.tejarat.chat${NC}"
+    echo -e "   • Forward Hostname: ${GREEN}minio${NC}"
+    echo -e "   • Forward Port: ${GREEN}9000${NC}"
+    echo -e "   • Enable: ${GREEN}Cache Assets, Block Common Exploits, Websockets Support${NC}"
+    echo ""
+    echo -e "   ${BOLD}Custom Nginx Configuration (Advanced):${NC}"
+    echo -e "${YELLOW}# Increase timeouts for large file uploads
+client_max_body_size 1000M;
+proxy_connect_timeout 600;
+proxy_send_timeout 600;
+proxy_read_timeout 600;
+send_timeout 600;
+
+# S3 specific headers
+proxy_set_header X-Real-IP \$remote_addr;
+proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+proxy_set_header X-Forwarded-Proto \$scheme;
+proxy_set_header Host \$http_host;
+
+# Disable buffering for streaming
+proxy_buffering off;
+proxy_request_buffering off;${NC}"
+    echo ""
+    echo -e "${CYAN}6. ایجاد Proxy Host برای MinIO Console (storage.tejarat.chat):${NC}"
+    echo -e "   • Domain: ${GREEN}storage.tejarat.chat${NC}"
+    echo -e "   • Forward Hostname: ${GREEN}minio${NC}"
+    echo -e "   • Forward Port: ${GREEN}9001${NC}"
+    echo -e "   • Enable: ${GREEN}Cache Assets, Block Common Exploits, Websockets Support${NC}"
+    echo ""
+    echo -e "   ${BOLD}Custom Nginx Configuration (Advanced):${NC}"
+    echo -e "${YELLOW}# Console specific settings
+proxy_set_header X-Real-IP \$remote_addr;
+proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+proxy_set_header X-Forwarded-Proto \$scheme;
+proxy_set_header Host \$http_host;
+
+# WebSocket support for real-time updates
+proxy_http_version 1.1;
+proxy_set_header Upgrade \$http_upgrade;
+proxy_set_header Connection \"upgrade\";
+
+# Timeouts
+proxy_connect_timeout 600;
+proxy_send_timeout 600;
+proxy_read_timeout 600;${NC}"
+    echo ""
+    echo -e "${BOLD}⚠️  نکات مهم MinIO:${NC}"
+    echo -e "   • ${GREEN}s3.tejarat.chat${NC} برای S3 API (عملیات فایل از ماشین‌های دیگر)"
+    echo -e "   • ${GREEN}storage.tejarat.chat${NC} برای MinIO Console (رابط مدیریتی وب)"
+    echo -e "   • پورت 9000 = S3 API | پورت 9001 = Web Console"
+    echo -e "   • برای ساخت Service Account: ورود به Console → Access Keys → Create"
+    echo -e "   • جزئیات بیشتر: ${CYAN}/srv/deployment/NPM_MINIO_CONFIG.md${NC}"
+    echo -e "   • راهنمای Service Accounts: ${CYAN}/srv/deployment/MINIO_SERVICE_ACCOUNTS.md${NC}"
+    echo ""
 }
 
 show_post_install_steps() {
