@@ -93,11 +93,13 @@ class SyncLog(BaseModel):
         return f"SyncLog Chunk {self.chunk_id} - Node {self.node_id} - {self.status}"
     
     def get_source_type(self):
-        """تشخیص اینکه Chunk از LegalUnit است یا QAEntry"""
+        """تشخیص اینکه Chunk از کجا آمده (LegalUnit, QAEntry, یا TextEntry)"""
         if self.chunk.unit:
             return 'legalunit'
         elif self.chunk.qaentry:
             return 'qaentry'
+        elif self.chunk.textentry:
+            return 'textentry'
         return 'unknown'
     
     @classmethod

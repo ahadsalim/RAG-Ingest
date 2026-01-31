@@ -626,19 +626,19 @@ class CoreConfigAdmin(SimpleJalaliAdminMixin, admin.ModelAdmin):
 class SyncLogAdmin(SimpleJalaliAdminMixin, admin.ModelAdmin):
     """Admin برای SyncLog"""
     
-    list_display = ('node_id', 'get_source_type', 'get_chunk_ref', 'status', 'synced_at', 'verified_at', 'retry_count')
-    list_filter = ('status', 'synced_at', 'verified_at')
+    list_display = ('node_id', 'get_source_type', 'get_chunk_ref', 'status', 'jalali_synced_at', 'retry_count')
+    list_filter = ('status', 'synced_at')
     search_fields = ('node_id', 'error_message')
-    readonly_fields = ('node_id', 'chunk', 'synced_at', 'verified_at', 
+    readonly_fields = ('node_id', 'chunk', 'jalali_synced_at_display', 
                       'status', 'retry_count', 'error_message', 'core_response',
-                      'created_at', 'updated_at', 'get_source_type')
+                      'jalali_created_at_display', 'jalali_updated_at_display', 'get_source_type')
     
     fieldsets = (
         ('محتوا', {
             'fields': ('chunk', 'get_source_type', 'node_id')
         }),
         ('وضعیت', {
-            'fields': ('status', 'synced_at', 'verified_at', 'retry_count')
+            'fields': ('status', 'jalali_synced_at_display', 'retry_count')
         }),
         ('خطا', {
             'fields': ('error_message',),
@@ -649,7 +649,7 @@ class SyncLogAdmin(SimpleJalaliAdminMixin, admin.ModelAdmin):
             'classes': ('collapse',)
         }),
         ('سیستم', {
-            'fields': ('created_at', 'updated_at'),
+            'fields': ('jalali_created_at_display', 'jalali_updated_at_display'),
             'classes': ('collapse',)
         }),
     )
@@ -667,6 +667,23 @@ class SyncLogAdmin(SimpleJalaliAdminMixin, admin.ModelAdmin):
             return f"Chunk (QA {obj.chunk.qaentry_id})"
         return f"Chunk {obj.chunk_id}"
     get_chunk_ref.short_description = 'Chunk'
+    
+    def jalali_synced_at(self, obj):
+        """نمایش زمان Sync به تاریخ شمسی و ساعت تهران"""
+        if not obj.synced_at:
+            return "-"
+        from ingest.core.jalali import to_jalali_datetime
+        return to_jalali_datetime(obj.synced_at, include_timezone=False)
+    jalali_synced_at.short_description = 'زمان Sync (شمسی)'
+    jalali_synced_at.admin_order_field = 'synced_at'
+    
+    def jalali_synced_at_display(self, obj):
+        """نمایش زمان Sync در صفحه جزئیات"""
+        if not obj.synced_at:
+            return "-"
+        from ingest.core.jalali import to_jalali_datetime
+        return to_jalali_datetime(obj.synced_at, include_timezone=False)
+    jalali_synced_at_display.short_description = 'زمان Sync (شمسی - تهران)'
     
     def has_add_permission(self, request):
         return False
@@ -809,12 +826,29 @@ class DeletionLogAdmin(SimpleJalaliAdminMixin, admin.ModelAdmin):
 class SyncStatsAdmin(SimpleJalaliAdminMixin, admin.ModelAdmin):
     """Admin برای SyncStats"""
     
-    list_display = ('timestamp', 'total_embeddings', 'synced_count', 'verified_count', 
+    list_display = ('jalali_timestamp', 'total_embeddings', 'synced_count', 'verified_count', 
                    'failed_count', 'sync_percentage', 'verification_percentage')
     list_filter = ('timestamp',)
-    readonly_fields = ('timestamp', 'total_embeddings', 'synced_count', 'verified_count',
+    readonly_fields = ('jalali_timestamp_display', 'total_embeddings', 'synced_count', 'verified_count',
                       'failed_count', 'pending_count', 'core_total_nodes',
                       'sync_percentage', 'verification_percentage')
+    
+    def jalali_timestamp(self, obj):
+        """نمایش زمان به تاریخ شمسی و ساعت تهران"""
+        if not obj.timestamp:
+            return "-"
+        from ingest.core.jalali import to_jalali_datetime
+        return to_jalali_datetime(obj.timestamp, include_timezone=False)
+    jalali_timestamp.short_description = 'زمان (شمسی)'
+    jalali_timestamp.admin_order_field = 'timestamp'
+    
+    def jalali_timestamp_display(self, obj):
+        """نمایش زمان در صفحه جزئیات"""
+        if not obj.timestamp:
+            return "-"
+        from ingest.core.jalali import to_jalali_datetime
+        return to_jalali_datetime(obj.timestamp, include_timezone=False)
+    jalali_timestamp_display.short_description = 'زمان (شمسی - تهران)'
     
     def has_add_permission(self, request):
         return False
