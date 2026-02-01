@@ -1378,6 +1378,38 @@ class TextEntryAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
         return super().get_queryset(request).select_related(
             'created_by'
         ).prefetch_related('vocabulary_terms', 'related_units')
+    
+    def delete_model(self, request, obj):
+        """Override delete to clean up SyncLogs, chunks, and embeddings first."""
+        from django.db import transaction, connection
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        
+        try:
+            with transaction.atomic():
+                # Get chunk IDs for this TextEntry
+                from .models import Chunk
+                chunk_ids = list(Chunk.objects.filter(textentry_id=obj.id).values_list('id', flat=True))
+                
+                if chunk_ids:
+                    # Delete SyncLogs using raw SQL to bypass permissions
+                    with connection.cursor() as cursor:
+                        placeholders = ','.join(['%s'] * len(chunk_ids))
+                        query = f"DELETE FROM embeddings_synclog WHERE chunk_id IN ({placeholders})"
+                        cursor.execute(query, chunk_ids)
+                        deleted_count = cursor.rowcount
+                        
+                        if deleted_count > 0:
+                            logger.info(f'Deleted {deleted_count} SyncLog entries before deleting TextEntry {obj.id}')
+                
+                # Now delete the object (signals will handle chunk and embedding cleanup)
+                super().delete_model(request, obj)
+                
+        except Exception as e:
+            logger.error(f'Error deleting TextEntry {obj.id}: {e}', exc_info=True)
+            self.message_user(request, f'❌ خطا در حذف: {e}', level='error')
+            raise
 
 
 # ============================================================================

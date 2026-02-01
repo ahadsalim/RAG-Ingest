@@ -145,61 +145,63 @@ def handle_chunk_pre_delete(sender, instance, **kwargs):
     """
     قبل از حذف Chunk:
     1. ایجاد DeletionLog برای پیگیری
-    2. تلاش برای حذف از Core (اگر sync شده)
+    2. حذف از Core (اگر sync شده) - باید موفق باشد
     3. حذف Embedding و SyncLog محلی
     """
-    try:
-        from ingest.apps.embeddings.models import Embedding
-        from ingest.apps.embeddings.models_synclog import SyncLog, DeletionLog
-        from django.contrib.contenttypes.models import ContentType
+    from ingest.apps.embeddings.models import Embedding
+    from ingest.apps.embeddings.models_synclog import SyncLog, DeletionLog
+    from django.contrib.contenttypes.models import ContentType
+    
+    chunk_ct = ContentType.objects.get_for_model(sender)
+    embeddings = Embedding.objects.filter(
+        content_type=chunk_ct,
+        object_id=instance.id
+    )
+    
+    for embedding in embeddings:
+        node_id = None
+        synced_to_core = embedding.synced_to_core
         
-        chunk_ct = ContentType.objects.get_for_model(sender)
-        embeddings = Embedding.objects.filter(
-            content_type=chunk_ct,
-            object_id=instance.id
-        )
+        # اگر به Core sync شده، node_id را پیدا کن
+        if synced_to_core:
+            sync_log = SyncLog.objects.filter(
+                chunk_id=instance.id
+            ).order_by('-synced_at').first()
+            
+            if sync_log:
+                node_id = sync_log.node_id
         
-        for embedding in embeddings:
-            node_id = None
-            synced_to_core = embedding.synced_to_core
-            
-            # اگر به Core sync شده، node_id را پیدا کن
-            if synced_to_core:
-                sync_log = SyncLog.objects.filter(
-                    chunk_id=instance.id
-                ).order_by('-synced_at').first()
-                
-                if sync_log:
-                    node_id = sync_log.node_id
-            
-            # ایجاد DeletionLog برای پیگیری حذف
-            try:
-                DeletionLog.objects.create(
-                    chunk_id=str(instance.id),
-                    embedding_id=str(embedding.id),
-                    node_id=node_id,
-                    deletion_status='pending' if node_id else 'local_only',
-                    chunk_metadata={
-                        'unit_id': str(instance.unit_id) if instance.unit_id else None,
-                        'expr_id': str(instance.expr_id) if instance.expr_id else None,
-                        'token_count': instance.token_count,
-                    }
-                )
-            except Exception as e:
-                logger.warning(f"Could not create DeletionLog: {e}")
-            
-            # حذف از Core اگر sync شده
-            if node_id:
-                _delete_from_core(node_id)
-            
-            # حذف embedding
-            embedding.delete()
+        # ایجاد DeletionLog برای پیگیری حذف
+        try:
+            DeletionLog.objects.create(
+                chunk_id=str(instance.id),
+                embedding_id=str(embedding.id),
+                node_id=node_id,
+                deletion_status='pending' if node_id else 'local_only',
+                chunk_metadata={
+                    'unit_id': str(instance.unit_id) if instance.unit_id else None,
+                    'expr_id': str(instance.expr_id) if instance.expr_id else None,
+                    'qaentry_id': str(instance.qaentry_id) if instance.qaentry_id else None,
+                    'textentry_id': str(instance.textentry_id) if instance.textentry_id else None,
+                    'token_count': instance.token_count,
+                }
+            )
+        except Exception as e:
+            logger.warning(f"Could not create DeletionLog: {e}")
         
-        # حذف SyncLog های مرتبط
-        SyncLog.objects.filter(chunk_id=instance.id).delete()
+        # حذف از Core اگر sync شده - باید موفق باشد
+        if node_id:
+            success = _delete_from_core(node_id)
+            if not success:
+                error_msg = f"Failed to delete node {node_id} from Core. Cannot proceed with Chunk deletion to prevent orphaned nodes."
+                logger.error(error_msg)
+                raise Exception(error_msg)
         
-    except Exception as e:
-        logger.error(f"Error in pre_delete handler for Chunk {instance.id}: {e}")
+        # حذف embedding
+        embedding.delete()
+    
+    # حذف SyncLog های مرتبط
+    SyncLog.objects.filter(chunk_id=instance.id).delete()
 
 
 @receiver(post_delete, sender='documents.Chunk')
@@ -224,7 +226,10 @@ def _delete_from_core(node_id: str) -> bool:
         node_id: شناسه نود در Core
         
     Returns:
-        True اگر موفق، False در غیر این صورت
+        True اگر موفق یا Core API هنوز DELETE را پشتیبانی نمی‌کند (HTTP 405)
+        
+    Raises:
+        Exception: اگر حذف ناموفق باشد
     """
     try:
         from ingest.core.sync.node_verifier import create_deleter_from_config
@@ -235,9 +240,12 @@ def _delete_from_core(node_id: str) -> bool:
             logger.info(f"Successfully deleted node {node_id} from Core")
             return True
         else:
-            # Don't log warning for HTTP 405 (Method Not Allowed) - Core API doesn't support DELETE yet
-            if error and 'HTTP 405' not in str(error):
-                logger.warning(f"Failed to delete node {node_id} from Core: {error}")
+            # اگر Core API هنوز DELETE را پشتیبانی نمی‌کند، اجازه حذف بده
+            if error and 'HTTP 405' in str(error):
+                logger.warning(f"Core API doesn't support DELETE yet (HTTP 405). Allowing local deletion for node {node_id}")
+                return True
+            # در غیر این صورت خطا
+            logger.error(f"Failed to delete node {node_id} from Core: {error}")
             return False
             
     except ImportError:
@@ -258,8 +266,16 @@ def _delete_from_core(node_id: str) -> bool:
                 if response.status_code in [200, 204]:
                     logger.info(f"Successfully deleted node {node_id} from Core")
                     return True
+                elif response.status_code == 405:
+                    # Core API هنوز DELETE را پشتیبانی نمی‌کند
+                    logger.warning(f"Core API doesn't support DELETE yet (HTTP 405). Allowing local deletion for node {node_id}")
+                    return True
+                elif response.status_code == 404:
+                    # نود در Core وجود ندارد - احتمالاً قبلاً حذف شده
+                    logger.warning(f"Node {node_id} not found in Core (HTTP 404). Allowing local deletion.")
+                    return True
                 else:
-                    logger.warning(f"Failed to delete node {node_id}: HTTP {response.status_code}")
+                    logger.error(f"Failed to delete node {node_id}: HTTP {response.status_code}")
                     return False
         except Exception as e:
             logger.error(f"Error deleting node {node_id} from Core: {e}")

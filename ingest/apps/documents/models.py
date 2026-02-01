@@ -769,7 +769,14 @@ class Chunk(BaseModel):
         ]
 
     def __str__(self):
-        return f"{self.unit.path_label} - چانک {self.token_count} توکن"
+        if self.unit:
+            return f"{self.unit.path_label} - چانک {self.token_count} توکن"
+        elif self.qaentry:
+            return f"QA: {self.qaentry.question[:50]} - چانک {self.token_count} توکن"
+        elif self.textentry:
+            return f"متن: {self.textentry.title[:50]} - چانک {self.token_count} توکن"
+        else:
+            return f"چانک {self.token_count} توکن"
 
 
 class IngestLog(BaseModel):
