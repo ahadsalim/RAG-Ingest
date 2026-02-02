@@ -479,12 +479,37 @@ class CoreSyncManagerAdmin(admin.ModelAdmin):
                 except Exception as e:
                     messages.error(request, f'❌ خطا در شروع همگام‌سازی: {str(e)}')
         
-        # Get stats
+        # Get local stats
         config = CoreConfig.get_config()
         total_embeddings = Embedding.objects.count()
         synced_embeddings = Embedding.objects.filter(synced_to_core=True).count()
         pending_embeddings = total_embeddings - synced_embeddings
         failed_embeddings = Embedding.objects.filter(sync_error__isnull=False).exclude(sync_error='').count()
+        
+        # Get Core API status and statistics
+        core_status = None
+        core_statistics = None
+        
+        if config.is_active and config.core_api_url:
+            try:
+                headers = {'Content-Type': 'application/json'}
+                if config.core_api_key:
+                    headers['X-API-Key'] = config.core_api_key
+                
+                # GET /api/v1/sync/status
+                status_url = f"{config.core_api_url}/api/v1/sync/status"
+                status_response = requests.get(status_url, headers=headers, timeout=5)
+                if status_response.status_code == 200:
+                    core_status = status_response.json()
+                
+                # GET /api/v1/sync/statistics
+                stats_url = f"{config.core_api_url}/api/v1/sync/statistics"
+                stats_response = requests.get(stats_url, headers=headers, timeout=5)
+                if stats_response.status_code == 200:
+                    core_statistics = stats_response.json()
+                    
+            except Exception as e:
+                messages.warning(request, f'⚠️ خطا در دریافت اطلاعات از Core: {str(e)}')
         
         # Recent sync logs
         recent_logs = SyncLog.objects.select_related('chunk').order_by('-synced_at')[:20]
@@ -497,11 +522,14 @@ class CoreSyncManagerAdmin(admin.ModelAdmin):
             'failed_embeddings': failed_embeddings,
             'sync_percentage': round((synced_embeddings / total_embeddings * 100) if total_embeddings > 0 else 0, 1),
             'recent_logs': recent_logs,
-            # اطلاعات وضعیت و آمار از CoreConfig
+            # اطلاعات وضعیت و آمار - استفاده از اعداد واقعی Embedding
             'is_active': config.is_active,
             'last_sync_error': config.last_sync_error,
-            'total_synced': config.total_synced,
-            'total_errors': config.total_errors,
+            'total_synced': synced_embeddings,  # تعداد واقعی sync شده
+            'total_errors': failed_embeddings,  # تعداد واقعی خطاها
+            # اطلاعات از Core API
+            'core_status': core_status,
+            'core_statistics': core_statistics,
         })
         
         return render(request, 'admin/embeddings/core_sync_manager.html', context)
@@ -685,13 +713,29 @@ class SyncLogAdmin(SimpleJalaliAdminMixin, admin.ModelAdmin):
         return to_jalali_datetime(obj.synced_at, include_timezone=False)
     jalali_synced_at_display.short_description = 'زمان Sync (شمسی - تهران)'
     
+    def jalali_created_at_display(self, obj):
+        """نمایش زمان ایجاد"""
+        if not obj.created_at:
+            return "-"
+        from ingest.core.jalali import to_jalali_datetime
+        return to_jalali_datetime(obj.created_at, include_timezone=False)
+    jalali_created_at_display.short_description = 'زمان ایجاد (شمسی)'
+    
+    def jalali_updated_at_display(self, obj):
+        """نمایش زمان بروزرسانی"""
+        if not obj.updated_at:
+            return "-"
+        from ingest.core.jalali import to_jalali_datetime
+        return to_jalali_datetime(obj.updated_at, include_timezone=False)
+    jalali_updated_at_display.short_description = 'زمان بروزرسانی (شمسی)'
+    
     def has_add_permission(self, request):
         return False
     
     def has_delete_permission(self, request, obj=None):
         return False
     
-    actions = ['verify_selected']
+    actions = ['verify_selected', 'view_in_core']
     
     def verify_selected(self, request, queryset):
         """Verify selected sync logs"""
@@ -714,6 +758,55 @@ class SyncLogAdmin(SimpleJalaliAdminMixin, admin.ModelAdmin):
         )
     
     verify_selected.short_description = 'Verify selected logs'
+    
+    def view_in_core(self, request, queryset):
+        """View selected nodes in Core using GET /api/v1/sync/node/{id}"""
+        config = CoreConfig.get_config()
+        
+        if not config.is_active or not config.core_api_url:
+            self.message_user(request, '❌ Core API غیرفعال است', level=messages.ERROR)
+            return
+        
+        found = 0
+        not_found = 0
+        errors = 0
+        
+        for sync_log in queryset[:10]:  # محدود به 10 مورد
+            if not sync_log.node_id:
+                continue
+                
+            try:
+                headers = {'Content-Type': 'application/json'}
+                if config.core_api_key:
+                    headers['X-API-Key'] = config.core_api_key
+                
+                # تبدیل UUID به Point ID
+                import hashlib
+                md5_hash = hashlib.md5(sync_log.node_id.encode()).hexdigest()
+                point_id = int(md5_hash[:16], 16)
+                
+                url = f"{config.core_api_url}/api/v1/sync/node/{point_id}"
+                response = requests.get(url, headers=headers, timeout=5)
+                
+                if response.status_code == 200:
+                    found += 1
+                elif response.status_code == 404:
+                    not_found += 1
+                else:
+                    errors += 1
+                    
+            except Exception as e:
+                errors += 1
+        
+        msg = f'✅ یافت شد: {found}'
+        if not_found > 0:
+            msg += f', ❌ یافت نشد: {not_found}'
+        if errors > 0:
+            msg += f', ⚠️ خطا: {errors}'
+        
+        self.message_user(request, msg, level=messages.SUCCESS if errors == 0 else messages.WARNING)
+    
+    view_in_core.short_description = 'بررسی وجود در Core'
 
 
 # DeletionLog Admin

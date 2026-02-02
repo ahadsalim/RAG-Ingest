@@ -124,8 +124,9 @@ def _build_chunk_payload(embedding: Embedding, chunk: Chunk) -> Dict[str, Any]:
             
             # Content & Structure
             'path_label': unit.path_label or '',
-            'unit_type': unit.unit_type if hasattr(unit, 'unit_type') else '',
+            'unit_type': 'LUNIT',  # نوع سند (LegalUnit)
             'unit_number': unit.number if hasattr(unit, 'number') else '',
+            'unit_structure_type': unit.unit_type if hasattr(unit, 'unit_type') else '',  # نوع بخش (article, full_text, etc.)
             
             # Document Info
             'work_title': work.title_official if work else '',
@@ -219,6 +220,12 @@ def _build_qaentry_chunk_payload(embedding: Embedding, chunk: Chunk, qaentry: QA
             'question': qaentry.question[:200] if qaentry.question else '',
             'canonical_question': qaentry.canonical_question or '',
             
+            # Base fields (برای سازگاری با LegalUnit)
+            'unit_type': first_unit.unit_type if first_unit else 'QA_ENTRY',
+            'work_title': first_work.title_official if first_work else qaentry.question[:100],
+            'path_label': first_unit.path_label if first_unit else '',
+            'unit_number': first_unit.number if first_unit else '',
+            
             # Related units info
             'related_units': [
                 {
@@ -293,6 +300,12 @@ def _build_textentry_chunk_payload(embedding: Embedding, chunk: Chunk, textentry
             'text_entry_id': str(textentry.id),
             'title': textentry.title,
             'original_filename': textentry.original_filename or '',
+            
+            # Base fields (برای سازگاری با LegalUnit)
+            'unit_type': first_unit.unit_type if first_unit else 'TEXT_ENTRY',
+            'work_title': first_work.title_official if first_work else textentry.title,
+            'path_label': first_unit.path_label if first_unit else '',
+            'unit_number': first_unit.number if first_unit else '',
             
             # Related units info
             'related_units': [

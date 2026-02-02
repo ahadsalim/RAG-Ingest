@@ -11,6 +11,39 @@
 
 {% block content %}
 <div id="content-main">
+    <!-- Search Filter Bar -->
+    <div style="background: #f8f9fa; border: 1px solid #ddd; border-radius: 6px; padding: 15px; margin-bottom: 20px;">
+        <form method="get" action="" style="display: flex; align-items: center; gap: 10px;">
+            <label for="search-title" style="font-weight: bold; color: #333; white-space: nowrap;">جستجو بر اساس عنوان:</label>
+            <input 
+                type="text" 
+                id="search-title" 
+                name="q" 
+                value="{{ search_query|default:'' }}" 
+                placeholder="عنوان سند را وارد کنید..."
+                style="flex: 1; padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;"
+            >
+            <button type="submit" style="padding: 8px 20px; background: #417690; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; white-space: nowrap;">
+                🔍 جستجو
+            </button>
+            {% if search_query %}
+            <a href="?" style="padding: 8px 20px; background: #dc3545; color: white; border-radius: 4px; text-decoration: none; font-weight: bold; white-space: nowrap;">
+                ✖ پاک کردن
+            </a>
+            {% endif %}
+        </form>
+        {% if search_query %}
+        <div style="margin-top: 10px; color: #666; font-size: 13px;">
+            نتایج جستجو برای: <strong>"{{ search_query }}"</strong>
+            {% if manifestations %}
+                - {{ manifestations|length }} سند یافت شد
+            {% else %}
+                - هیچ سندی یافت نشد
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+    
     <div class="module" style="margin: 20px 0;">
         {% if manifestations %}
         <table style="width: 100%; border-collapse: collapse;">

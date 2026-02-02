@@ -336,17 +336,29 @@ class LUnitAdmin(SimpleJalaliAdminMixin, MPTTModelAdmin, SimpleHistoryAdmin):
         manifestation_id = request.GET.get('manifestation__id__exact')
         
         if not manifestation_id:
+            # دریافت query جستجو
+            search_query = request.GET.get('q', '').strip()
+            
             # نمایش لیست اسناد حقوقی
             manifestations = InstrumentManifestation.objects.select_related(
                 'expr', 'expr__work'
             ).annotate(
                 legalunit_count=models.Count('units')
-            ).order_by('-created_at')
+            )
+            
+            # اعمال فیلتر جستجو
+            if search_query:
+                manifestations = manifestations.filter(
+                    expr__work__title_official__icontains=search_query
+                )
+            
+            manifestations = manifestations.order_by('-created_at')
             
             context = {
                 **self.admin_site.each_context(request),
                 'title': 'اسناد حقوقی',
                 'manifestations': manifestations,
+                'search_query': search_query,
                 'opts': self.model._meta,
                 'has_view_permission': self.has_view_permission(request),
                 'has_add_permission': self.has_add_permission(request),

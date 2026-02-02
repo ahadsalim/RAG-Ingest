@@ -1181,6 +1181,66 @@ class QAEntryAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
         return super().get_queryset(request).select_related(
             'created_by'
         ).prefetch_related('tags', 'related_units')
+    
+    def get_deleted_objects(self, objs, request):
+        """
+        Override to bypass SyncLog permission check.
+        Delete SyncLogs before checking cascade deletion.
+        """
+        from django.db import connection
+        from .models import Chunk
+        
+        # If objs is a single object, make it a list
+        if not hasattr(objs, '__iter__'):
+            objs = [objs]
+        
+        # Collect all chunk IDs
+        all_chunk_ids = []
+        for obj in objs:
+            chunk_ids = list(Chunk.objects.filter(qaentry_id=obj.id).values_list('id', flat=True))
+            all_chunk_ids.extend(chunk_ids)
+        
+        # Delete SyncLogs using raw SQL to bypass permissions
+        if all_chunk_ids:
+            with connection.cursor() as cursor:
+                placeholders = ','.join(['%s'] * len(all_chunk_ids))
+                query = f"DELETE FROM embeddings_synclog WHERE chunk_id IN ({placeholders})"
+                cursor.execute(query, all_chunk_ids)
+        
+        # Now call parent to get deleted objects (SyncLogs already deleted)
+        return super().get_deleted_objects(objs, request)
+    
+    def delete_model(self, request, obj):
+        """Override delete to clean up SyncLogs, chunks, and embeddings first."""
+        from django.db import transaction, connection
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        
+        try:
+            with transaction.atomic():
+                # Get chunk IDs for this QAEntry
+                from .models import Chunk
+                chunk_ids = list(Chunk.objects.filter(qaentry_id=obj.id).values_list('id', flat=True))
+                
+                if chunk_ids:
+                    # Delete SyncLogs using raw SQL to bypass permissions
+                    with connection.cursor() as cursor:
+                        placeholders = ','.join(['%s'] * len(chunk_ids))
+                        query = f"DELETE FROM embeddings_synclog WHERE chunk_id IN ({placeholders})"
+                        cursor.execute(query, chunk_ids)
+                        deleted_count = cursor.rowcount
+                        
+                        if deleted_count > 0:
+                            logger.info(f'Deleted {deleted_count} SyncLog entries before deleting QAEntry {obj.id}')
+                
+                # Now delete the object (signals will handle chunk and embedding cleanup)
+                super().delete_model(request, obj)
+                
+        except Exception as e:
+            logger.error(f'Error deleting QAEntry {obj.id}: {e}', exc_info=True)
+            self.message_user(request, f'❌ خطا در حذف: {e}', level='error')
+            raise
 
 
 # IngestLogRAG moved to embeddings/admin.py to group with EmbeddingProxy
@@ -1378,6 +1438,34 @@ class TextEntryAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
         return super().get_queryset(request).select_related(
             'created_by'
         ).prefetch_related('vocabulary_terms', 'related_units')
+    
+    def get_deleted_objects(self, objs, request):
+        """
+        Override to bypass SyncLog permission check.
+        Delete SyncLogs before checking cascade deletion.
+        """
+        from django.db import connection
+        from .models import Chunk
+        
+        # If objs is a single object, make it a list
+        if not hasattr(objs, '__iter__'):
+            objs = [objs]
+        
+        # Collect all chunk IDs
+        all_chunk_ids = []
+        for obj in objs:
+            chunk_ids = list(Chunk.objects.filter(textentry_id=obj.id).values_list('id', flat=True))
+            all_chunk_ids.extend(chunk_ids)
+        
+        # Delete SyncLogs using raw SQL to bypass permissions
+        if all_chunk_ids:
+            with connection.cursor() as cursor:
+                placeholders = ','.join(['%s'] * len(all_chunk_ids))
+                query = f"DELETE FROM embeddings_synclog WHERE chunk_id IN ({placeholders})"
+                cursor.execute(query, all_chunk_ids)
+        
+        # Now call parent to get deleted objects (SyncLogs already deleted)
+        return super().get_deleted_objects(objs, request)
     
     def delete_model(self, request, obj):
         """Override delete to clean up SyncLogs, chunks, and embeddings first."""

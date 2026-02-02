@@ -218,70 +218,98 @@ def handle_chunk_post_delete(sender, instance, **kwargs):
     logger.info(f"Chunk {instance.id} deleted. Unit: {instance.unit_id}, Expr: {instance.expr_id}")
 
 
-def _delete_from_core(node_id: str) -> bool:
+def _uuid_to_point_id(uuid_str: str) -> int:
     """
-    Helper function برای حذف نود از Core.
+    تبدیل UUID به Point ID عددی برای Qdrant
     
     Args:
-        node_id: شناسه نود در Core
+        uuid_str: UUID string (مثل "4e4e403c-4bb5-42cf-8b0a-69f49bdd5ca6")
+    
+    Returns:
+        Point ID عددی
+    """
+    import hashlib
+    
+    # محاسبه MD5 hash از UUID
+    md5_hash = hashlib.md5(uuid_str.encode()).hexdigest()
+    
+    # گرفتن اولین 16 کاراکتر
+    first_16_chars = md5_hash[:16]
+    
+    # تبدیل به عدد (base 16)
+    point_id = int(first_16_chars, 16)
+    
+    return point_id
+
+
+def _delete_from_core(node_id: str) -> bool:
+    """
+    Helper function برای حذف نود از Core با استفاده از API جدید.
+    
+    Args:
+        node_id: UUID نود در Core
         
     Returns:
-        True اگر موفق یا Core API هنوز DELETE را پشتیبانی نمی‌کند (HTTP 405)
-        
-    Raises:
-        Exception: اگر حذف ناموفق باشد
+        True اگر موفق
+        False اگر ناموفق
     """
     try:
-        from ingest.core.sync.node_verifier import create_deleter_from_config
-        deleter = create_deleter_from_config()
-        success, error = deleter.delete_node(str(node_id))
+        from ingest.apps.embeddings.models import CoreConfig
+        import requests
         
-        if success:
-            logger.info(f"Successfully deleted node {node_id} from Core")
+        config = CoreConfig.get_config()
+        if not config or not config.core_api_url:
+            logger.warning(f"Core API not configured. Allowing local deletion for node {node_id}")
+            return True
+        
+        # تبدیل UUID به Point ID
+        try:
+            point_id = _uuid_to_point_id(node_id)
+            logger.debug(f"Converted UUID {node_id} to Point ID {point_id}")
+        except Exception as e:
+            logger.error(f"Failed to convert UUID {node_id} to Point ID: {e}")
+            # اگر تبدیل ناموفق بود، از خود UUID استفاده کن (Core خودش تبدیل می‌کند)
+            point_id = node_id
+        
+        # ساخت headers با API Key
+        headers = {'Content-Type': 'application/json'}
+        if config.core_api_key:
+            headers['X-API-Key'] = config.core_api_key
+        
+        # فراخوانی DELETE endpoint
+        url = f"{config.core_api_url}/api/v1/sync/node/{point_id}"
+        logger.info(f"Attempting to delete node {node_id} (Point ID: {point_id}) from Core: {url}")
+        
+        response = requests.delete(url, headers=headers, timeout=10)
+        
+        if response.status_code in [200, 204]:
+            logger.info(f"✅ Successfully deleted node {node_id} from Core")
+            return True
+        elif response.status_code == 404:
+            # نود در Core وجود ندارد - احتمالاً قبلاً حذف شده
+            logger.warning(f"Node {node_id} not found in Core (HTTP 404). Allowing local deletion.")
+            return True
+        elif response.status_code == 405:
+            # Core API هنوز DELETE را پشتیبانی نمی‌کند
+            logger.warning(f"Core API doesn't support DELETE yet (HTTP 405). Allowing local deletion for node {node_id}")
             return True
         else:
-            # اگر Core API هنوز DELETE را پشتیبانی نمی‌کند، اجازه حذف بده
-            if error and 'HTTP 405' in str(error):
-                logger.warning(f"Core API doesn't support DELETE yet (HTTP 405). Allowing local deletion for node {node_id}")
-                return True
-            # در غیر این صورت خطا
-            logger.error(f"Failed to delete node {node_id} from Core: {error}")
+            # خطای دیگر - جلوگیری از حذف محلی
+            try:
+                error_detail = response.json()
+            except:
+                error_detail = response.text
+            logger.error(f"❌ Failed to delete node {node_id} from Core: HTTP {response.status_code}, Response: {error_detail}")
             return False
             
-    except ImportError:
-        # Fallback به روش قدیمی با requests
-        try:
-            from ingest.apps.embeddings.models import CoreConfig
-            import requests
-            
-            config = CoreConfig.get_config()
-            if config and config.core_api_url:
-                headers = {'Content-Type': 'application/json'}
-                if config.core_api_key:
-                    headers['X-API-Key'] = config.core_api_key
-                
-                url = f"{config.core_api_url}/api/v1/sync/node/{node_id}"
-                response = requests.delete(url, headers=headers, timeout=10)
-                
-                if response.status_code in [200, 204]:
-                    logger.info(f"Successfully deleted node {node_id} from Core")
-                    return True
-                elif response.status_code == 405:
-                    # Core API هنوز DELETE را پشتیبانی نمی‌کند
-                    logger.warning(f"Core API doesn't support DELETE yet (HTTP 405). Allowing local deletion for node {node_id}")
-                    return True
-                elif response.status_code == 404:
-                    # نود در Core وجود ندارد - احتمالاً قبلاً حذف شده
-                    logger.warning(f"Node {node_id} not found in Core (HTTP 404). Allowing local deletion.")
-                    return True
-                else:
-                    logger.error(f"Failed to delete node {node_id}: HTTP {response.status_code}")
-                    return False
-        except Exception as e:
-            logger.error(f"Error deleting node {node_id} from Core: {e}")
-            return False
+    except requests.exceptions.Timeout:
+        logger.error(f"Timeout while deleting node {node_id} from Core")
+        return False
+    except requests.exceptions.ConnectionError:
+        logger.error(f"Connection error while deleting node {node_id} from Core")
+        return False
     except Exception as e:
-        logger.error(f"Error deleting node {node_id} from Core: {e}")
+        logger.error(f"Error deleting node {node_id} from Core: {e}", exc_info=True)
         return False
 
 
