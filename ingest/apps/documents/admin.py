@@ -1278,7 +1278,7 @@ class TextEntryAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
         'title', 'text_type', 'validity_status', 'jalali_validity_start_display', 
         'created_by', 'jalali_created_at_display'
     )
-    list_filter = ('text_type', 'created_at', 'vocabulary_terms', 'validity_start_date', 'validity_end_date')
+    list_filter = ('text_type', 'created_by', 'created_at', 'validity_start_date', 'validity_end_date')
     search_fields = ('title', 'content')
     readonly_fields = ('jalali_created_at_display', 'jalali_updated_at_display', 'jalali_validity_start_display', 'original_filename', 'content_extracted')
     inlines = [TextEntryVocabularyTermInline, TextEntryRelatedUnitInline]

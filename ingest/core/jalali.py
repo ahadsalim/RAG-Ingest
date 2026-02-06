@@ -165,7 +165,7 @@ def parse_jalali_date(date_str: str) -> Optional[date]:
                 # Create Jalali date and convert to Gregorian
                 jalali_date = jdatetime.date(year, month, day)
                 return jalali_date.togregorian()
-            except (ValueError, jdatetime.InvalidJalaliDate):
+            except (ValueError, OverflowError):
                 continue
     
     return None
