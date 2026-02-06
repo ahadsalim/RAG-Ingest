@@ -1,5 +1,5 @@
 {% extends "admin/base_site.html" %}
-{% load i18n static %}
+{% load i18n static ingest_jalali %}
 
 {% block breadcrumbs %}
 <div class="breadcrumbs">
@@ -78,7 +78,6 @@
                     </td>
                     <td style="padding: 12px; text-align: center; color: #666;">
                         {% if manifestation.publication_date %}
-                            {% load ingest_jalali %}
                             {{ manifestation.publication_date|jalali_date }}
                         {% else %}
                             -
