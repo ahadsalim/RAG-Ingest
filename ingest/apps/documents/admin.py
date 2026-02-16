@@ -253,6 +253,7 @@ class InstrumentExpressionAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
     list_display = ('work', 'language', 'consolidation_level', 'expression_date', 'jalali_created_at_display')
     list_filter = ('consolidation_level', 'language', 'created_at')
     search_fields = ('work__title_official', 'eli_uri_expr')
+    autocomplete_fields = ['work']
     readonly_fields = ('id', 'created_at', 'updated_at')
     
     def get_queryset(self, request):
@@ -285,6 +286,7 @@ class InstrumentManifestationAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
     list_display = ('expr', 'publication_date', 'repeal_status', 'jalali_created_at_display')
     list_filter = ('repeal_status', 'publication_date', 'created_at')
     search_fields = ('expr__work__title_official', 'official_gazette_name', 'source_url')
+    autocomplete_fields = ['expr']
     readonly_fields = ('id', 'checksum_sha256', 'retrieval_date', 'created_at', 'updated_at')
     inlines = [FileAssetInline]
     

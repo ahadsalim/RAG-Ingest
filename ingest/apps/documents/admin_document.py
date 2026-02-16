@@ -16,6 +16,7 @@ from .models import (
     FileAsset
 )
 from .enums import DocumentType, ConsolidationLevel
+from django.db.models import Count
 
 # Import Jalali fields - same as forms.py
 try:
@@ -26,6 +27,51 @@ except ImportError:
     from django.forms import DateField as JalaliDateField
     from django.forms.widgets import DateInput as JalaliDateWidget
     JALALI_AVAILABLE = False
+
+
+class DocTypeListFilter(admin.SimpleListFilter):
+    """فیلتر بر اساس نوع سند."""
+    title = 'نوع سند'
+    parameter_name = 'doc_type'
+
+    def lookups(self, request, model_admin):
+        return DocumentType.choices
+
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(expr__work__doc_type=self.value())
+        return queryset
+
+
+class UnitCountListFilter(admin.SimpleListFilter):
+    """فیلتر بر اساس تعداد بندها."""
+    title = 'تعداد بندها'
+    parameter_name = 'unit_count'
+
+    def lookups(self, request, model_admin):
+        return (
+            ('0', 'بدون بند (۰)'),
+            ('1-10', '۱ تا ۱۰'),
+            ('11-50', '۱۱ تا ۵۰'),
+            ('51-100', '۵۱ تا ۱۰۰'),
+            ('100+', 'بیش از ۱۰۰'),
+        )
+
+    def queryset(self, request, queryset):
+        if self.value() is None:
+            return queryset
+        qs = queryset.annotate(_unit_count=Count('units'))
+        if self.value() == '0':
+            return qs.filter(_unit_count=0)
+        elif self.value() == '1-10':
+            return qs.filter(_unit_count__gte=1, _unit_count__lte=10)
+        elif self.value() == '11-50':
+            return qs.filter(_unit_count__gte=11, _unit_count__lte=50)
+        elif self.value() == '51-100':
+            return qs.filter(_unit_count__gte=51, _unit_count__lte=100)
+        elif self.value() == '100+':
+            return qs.filter(_unit_count__gt=100)
+        return queryset
 
 
 class UnifiedDocumentForm(forms.ModelForm):
@@ -224,7 +270,7 @@ class UnifiedDocumentAdmin(SimpleJalaliAdminMixin, SimpleHistoryAdmin):
     jalali_publication_date_display.short_description = 'تاریخ انتشار'
     jalali_publication_date_display.admin_order_field = 'publication_date'
     
-    list_filter = ('repeal_status', 'publication_date', 'created_at')
+    list_filter = (DocTypeListFilter, UnitCountListFilter, 'repeal_status', 'publication_date', 'created_at')
     search_fields = ('expr__work__title_official', 'official_gazette_name')
     ordering = ('expr__work__title_official',)  # مرتب‌سازی پیش‌فرض بر اساس عنوان
     readonly_fields = ('id', 'checksum_sha256', 'retrieval_date', 'created_at', 'updated_at')
