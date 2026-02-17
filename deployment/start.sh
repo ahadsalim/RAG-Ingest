@@ -592,6 +592,67 @@ CRON_EOF
     print_info "  • backup_auto.sh: هر 6 ساعت"
 }
 
+setup_monitoring() {
+    print_header "بررسی سرویس‌های مانیتورینگ"
+    
+    print_info "Exporterها به صورت خودکار با سایر سرویس‌ها راه‌اندازی شده‌اند"
+    
+    # Test exporters
+    sleep 5
+    print_step "بررسی وضعیت Exporterها..."
+    
+    local all_ok=true
+    
+    if curl -sf http://localhost:9100/metrics > /dev/null 2>&1; then
+        print_success "Node Exporter: OK"
+    else
+        print_warning "Node Exporter: در دسترس نیست"
+        all_ok=false
+    fi
+    
+    if curl -sf http://localhost:9187/metrics > /dev/null 2>&1; then
+        print_success "PostgreSQL Exporter: OK"
+    else
+        print_warning "PostgreSQL Exporter: در دسترس نیست"
+        all_ok=false
+    fi
+    
+    if curl -sf http://localhost:9121/metrics > /dev/null 2>&1; then
+        print_success "Redis Exporter: OK"
+    else
+        print_warning "Redis Exporter: در دسترس نیست"
+        all_ok=false
+    fi
+    
+    if curl -sf http://localhost:8080/metrics > /dev/null 2>&1; then
+        print_success "cAdvisor: OK"
+    else
+        print_warning "cAdvisor: در دسترس نیست"
+        all_ok=false
+    fi
+    
+    if docker ps | grep -q promtail-ingest; then
+        print_success "Promtail: OK"
+    else
+        print_warning "Promtail: در حال اجرا نیست"
+        all_ok=false
+    fi
+    
+    if [ "$all_ok" = true ]; then
+        print_success "تمام Exporterها با موفقیت راه‌اندازی شدند"
+    else
+        print_warning "برخی Exporterها مشکل دارند - لاگ‌ها را بررسی کنید"
+    fi
+    
+    print_info ""
+    print_info "سرویس‌های مانیتورینگ نصب شده:"
+    print_info "  • Node Exporter (پورت 9100) - متریک‌های سیستم"
+    print_info "  • PostgreSQL Exporter (پورت 9187) - متریک‌های دیتابیس"
+    print_info "  • Redis Exporter (پورت 9121) - متریک‌های Redis"
+    print_info "  • Promtail (پورت 9080) - ارسال لاگ به Loki"
+    print_info "  • cAdvisor (پورت 8080) - متریک‌های کانتینرها"
+}
+
 # =============================================================================
 # Post-Installation Guide
 # =============================================================================
@@ -627,12 +688,21 @@ show_credentials() {
 show_urls() {
     print_header "آدرس‌های دسترسی"
     
+    local server_ip=$(hostname -I | awk '{print $1}')
+    
     echo ""
     echo -e "${BOLD}🌐 آدرس‌های سیستم:${NC}"
     echo -e "  • پنل مدیریت:  ${CYAN}http://${DOMAIN_NAME}:8001/admin/${NC}"
     echo -e "  • صفحه ورود:   ${CYAN}http://${DOMAIN_NAME}:8001/accounts/login/${NC}"
     echo -e "  • API Health:  ${CYAN}http://${DOMAIN_NAME}:8001/api/health/${NC}"
     echo -e "  • MinIO:       ${CYAN}${MINIO_ENDPOINT}${NC} (سرور خارجی)"
+    echo ""
+    echo -e "${BOLD}📊 Monitoring Endpoints (برای سرور مانیتورینگ):${NC}"
+    echo -e "  • Node Exporter:       ${CYAN}http://${server_ip}:9100/metrics${NC}"
+    echo -e "  • PostgreSQL Exporter: ${CYAN}http://${server_ip}:9187/metrics${NC}"
+    echo -e "  • Redis Exporter:      ${CYAN}http://${server_ip}:9121/metrics${NC}"
+    echo -e "  • cAdvisor:            ${CYAN}http://${server_ip}:8080/metrics${NC}"
+    echo -e "  • Promtail → Loki:     ${CYAN}http://10.10.10.40:3100${NC}"
     echo ""
 }
 
@@ -736,6 +806,11 @@ show_post_install_steps() {
     echo "   - DOCKER-USER chain فعال باشد: sudo iptables -L DOCKER-USER -n"
     echo "   - مستند امنیتی: /srv/documents/SECURITY_INCIDENT_2026.md"
     echo ""
+    echo "8. ${YELLOW}[مهم]${NC} اطلاعات مانیتورینگ را به سرور مانیتورینگ منتقل کنید"
+    echo -e "   - اطلاعات در فایل ${CYAN}CREDENTIALS.txt${NC} موجود است"
+    echo "   - بخش 'اطلاعات مانیتورینگ' را به سرور 10.10.10.40 منتقل کنید"
+    echo "   - پیکربندی‌های Prometheus را در prometheus.yml اضافه کنید"
+    echo ""
 }
 
 show_useful_commands() {
@@ -830,6 +905,7 @@ main() {
     configure_firewall
     configure_docker_security
     setup_cron_jobs
+    setup_monitoring
     
     # Post-installation guide
     echo ""
@@ -845,6 +921,7 @@ main() {
     
     # Save credentials to file
     local creds_file="$PROJECT_DIR/CREDENTIALS.txt"
+    local server_ip=$(hostname -I | awk '{print $1}')
     cat > "$creds_file" << EOF
 # RAG-Ingest Credentials
 # Generated: $(date)
@@ -869,6 +946,62 @@ MinIO (External):
 Bale Safir API:
   Client ID: ${BALE_CLIENT_ID:-"تنظیم نشده"}
   Client Secret: ${BALE_CLIENT_SECRET:-"تنظیم نشده"}
+
+================================================================================
+اطلاعات مانیتورینگ - برای سرور مانیتورینگ (10.10.10.40)
+================================================================================
+
+Server IP: ${server_ip}
+
+Exporters (برای Prometheus):
+  • Node Exporter:       http://${server_ip}:9100/metrics
+  • PostgreSQL Exporter: http://${server_ip}:9187/metrics
+  • Redis Exporter:      http://${server_ip}:9121/metrics
+  • cAdvisor:            http://${server_ip}:8080/metrics
+
+Promtail (برای Loki):
+  • Loki Endpoint: http://10.10.10.40:3100
+  • Config File: /srv/deployment/promtail-config.yml
+  • Label: server="ingest"
+
+پیکربندی Prometheus (اضافه کنید به prometheus.yml):
+
+scrape_configs:
+  - job_name: 'node-exporter-ingest'
+    static_configs:
+      - targets: ['${server_ip}:9100']
+        labels:
+          server: 'ingest'
+          environment: 'production'
+
+  - job_name: 'postgres-exporter-ingest'
+    static_configs:
+      - targets: ['${server_ip}:9187']
+        labels:
+          server: 'ingest'
+          db_name: 'ingest-db'
+          environment: 'production'
+
+  - job_name: 'redis-exporter-ingest'
+    static_configs:
+      - targets: ['${server_ip}:9121']
+        labels:
+          server: 'ingest'
+          redis_instance: 'ingest-redis'
+          environment: 'production'
+
+  - job_name: 'cadvisor-ingest'
+    static_configs:
+      - targets: ['${server_ip}:8080']
+        labels:
+          server: 'ingest'
+          environment: 'production'
+
+نکات مهم:
+  • مطمئن شوید Loki در 10.10.10.40:3100 در حال اجرا است
+  • Promtail به صورت خودکار لاگ‌ها را به Loki ارسال می‌کند
+  • تمام Exporterها با network_mode: host اجرا می‌شوند
+================================================================================
 EOF
     chmod 600 "$creds_file"
     

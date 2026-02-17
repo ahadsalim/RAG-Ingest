@@ -144,6 +144,60 @@ services:
       - /dev/kmsg
     networks: [ ingest_net ]
 
+  node-exporter:
+    image: quay.io/prometheus/node-exporter:v1.7.0
+    container_name: node-exporter-ingest
+    restart: unless-stopped
+    network_mode: host
+    command:
+      - '--path.rootfs=/host'
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    volumes:
+      - /:/host:ro,rslave
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+    pid: host
+
+  postgres-exporter:
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: postgres-exporter-ingest
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:${DB_PORT:-15432}/${POSTGRES_DB}?sslmode=disable"
+    command:
+      - '--web.listen-address=:9187'
+    depends_on:
+      db:
+        condition: service_healthy
+
+  redis-exporter:
+    image: quay.io/oliver006/redis_exporter:v1.55.0
+    container_name: redis-exporter-ingest
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      REDIS_ADDR: "localhost:6380"
+    command:
+      - '--web.listen-address=:9121'
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  promtail:
+    image: grafana/promtail:2.8.0
+    container_name: promtail-ingest
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/log:/var/log:ro
+      - ./promtail-config.yml:/etc/promtail/config.yml:ro
+    command:
+      - '-config.file=/etc/promtail/config.yml'
+
 volumes:
   postgres_data:
   static_volume:
