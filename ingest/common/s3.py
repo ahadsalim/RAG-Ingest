@@ -5,7 +5,7 @@ from typing import Optional
 
 
 def get_s3_client():
-    """Get configured S3 client for MinIO."""
+    """Get configured S3 client for S3-compatible storage (external MinIO)."""
     return boto3.client(
         's3',
         endpoint_url=settings.AWS_S3_ENDPOINT_URL,

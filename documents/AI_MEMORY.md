@@ -1,6 +1,6 @@
 # 🧠 AI Memory - RAG-Ingest Project
 
-**آخرین به‌روزرسانی**: 1404/09/27 (2025-12-17)
+**آخرین به‌روزرسانی**: 1404/11/28 (2026-02-17)
 
 ---
 
@@ -35,7 +35,39 @@ Persian Numbers: تبدیل به انگلیسی
 
 ---
 
-## 📝 تغییرات اخیر (Session های قبلی)
+## � حادثه امنیتی — 1404/11/28 (2026-02-17)
+
+### حمله به Redis از طریق اینترنت
+- **IP مهاجم**: `160.30.159.104`
+- **روش**: دستور `SLAVEOF` از طریق پورت باز 6380 (بدون رمز، بدون protected-mode)
+- **تأثیر**: Redis → read-only → Celery worker کرش → کلید مخرب `x` تزریق شد
+- **بدافزار**: cron job برای دانلود و اجرای `j.sh` (احتمالاً crypto miner)
+- **نفوذ به host**: ❌ نفوذ نکرده (محدود به Docker container)
+- **مستند کامل**: `/srv/documents/SECURITY_INCIDENT_2026.md`
+
+### اقدامات اصلاحی
+1. ✅ همه پورت‌های داخلی bind به `127.0.0.1` شدند (Redis, PostgreSQL, cAdvisor, MinIO)
+2. ✅ Redis hardened: `protected-mode yes` + غیرفعال کردن `SLAVEOF/REPLICAOF/DEBUG/CONFIG`
+3. ✅ UFW اصلاح شد: فقط 22/80/443 از اینترنت، بقیه فقط از LAN (192.168.100.0/24)
+4. ✅ `DOCKER-USER` iptables chain تنظیم شد (Docker به طور پیش‌فرض UFW را دور می‌زند!)
+5. ✅ systemd service ایجاد شد: `/etc/systemd/system/docker-user-iptables.service`
+6. ✅ `deployment/start.sh` بروزرسانی شد با تمام موارد امنیتی
+
+### ⚠️ نکات حیاتی برای AI بعدی
+1. **هرگز پورت Redis/PostgreSQL/MinIO را بدون `127.0.0.1` expose نکنید**
+2. **Docker به طور پیش‌فرض UFW را دور می‌زند** — حتماً `DOCKER-USER` chain بررسی شود
+3. **قبل از تغییر docker-compose**: پورت‌ها را بررسی کنید — فرمت صحیح: `"127.0.0.1:HOST_PORT:CONTAINER_PORT"`
+4. **بررسی دوره‌ای**: `ss -tlnp | grep -v 127.0.0.1` — فقط 22, 80, 443 باید public باشند
+
+### فایل‌های تغییر یافته
+- `/srv/deployment/docker-compose.ingest.yml` — bind پورت‌ها به localhost + Redis hardening
+- `/srv/deployment/start.sh` — تابع‌های `configure_firewall` و `configure_docker_security` بازنویسی شد
+- `/etc/ufw/after.rules` — DOCKER-USER chain اضافه شد
+- `/etc/systemd/system/docker-user-iptables.service` — سرویس جدید
+
+---
+
+## � تغییرات اخیر (Session های قبلی)
 
 ### 1. سیستم Chunking یکپارچه
 - ✅ QAEntry و TextEntry حالا chunk می‌شوند
@@ -270,13 +302,17 @@ docker logs deployment-worker-1 --tail 100
 
 ```
 /srv/documents/
-├── PROJECT_DOCUMENTATION.md  # مستندات جامع
-├── AI_MEMORY.md              # این فایل
-├── ToDoList.md               # آرشیو - تحلیل performance
-├── LUNIT_COMPLETE_GUIDE.md   # آرشیو - راهنمای LUnit
-├── CHANGES_2025-11-22.md     # آرشیو - تغییرات
+├── PROJECT_DOCUMENTATION.md       # مستندات جامع
+├── AI_MEMORY.md                   # این فایل
+├── SECURITY_INCIDENT_2026.md      # 🔴 گزارش حادثه هک Redis (2026-02-17)
+├── MINIO_SERVICE_ACCOUNTS.md      # راهنمای Service Account های MinIO
+├── NPM_MINIO_CONFIG.md            # تنظیمات Nginx Proxy Manager برای MinIO
+├── OPTIMIZATION_REPORT.md         # گزارش بهینه‌سازی
+├── ToDoList.md                    # آرشیو - تحلیل performance
+├── LUNIT_COMPLETE_GUIDE.md        # آرشیو - راهنمای LUnit
+├── CHANGES_2025-11-22.md          # آرشیو - تغییرات
 ├── FIXES_2025-11-22_PARENT_FIELD.md  # آرشیو - اصلاح parent
-└── LEGALUNIT_FORM_ANALYSIS.md # آرشیو - تحلیل فرم
+└── LEGALUNIT_FORM_ANALYSIS.md     # آرشیو - تحلیل فرم
 ```
 
 ---

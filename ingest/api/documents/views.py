@@ -119,7 +119,7 @@ class FileAssetViewSet(FullyOptimizedViewMixin, viewsets.ModelViewSet):
 
     @transaction.atomic
     def create(self, request, *args, **kwargs):
-        """Custom create method to handle file upload with MinIO-first approach."""
+        """Custom create method to handle file upload with S3-first approach."""
         uploaded_file = request.FILES.get('file')
         if not uploaded_file:
             return Response(
@@ -152,7 +152,7 @@ class FileAssetViewSet(FullyOptimizedViewMixin, viewsets.ModelViewSet):
                     status=status.HTTP_400_BAD_REQUEST
                 )
         
-        # Upload file using service (MinIO first, then DB)
+        # Upload file using service (S3 first, then DB)
         file_asset = file_upload_service.upload_file(
             uploaded_file=uploaded_file,
             uploaded_by=request.user,
@@ -170,7 +170,7 @@ class FileAssetViewSet(FullyOptimizedViewMixin, viewsets.ModelViewSet):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def perform_destroy(self, instance):
-        """Custom destroy method to delete from MinIO as well."""
+        """Custom destroy method to delete from S3 storage as well."""
         file_upload_service.delete_file(instance)
 
 

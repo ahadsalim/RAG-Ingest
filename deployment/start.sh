@@ -93,7 +93,7 @@ check_system_requirements() {
     fi
     
     # Check if ports are available
-    for port in 8001 9000 9001 15432 6379; do
+    for port in 80 443 81 8001 15432 6380; do
         if netstat -tuln 2>/dev/null | grep -q ":$port " || ss -tuln 2>/dev/null | grep -q ":$port "; then
             print_warning "پورت $port در حال استفاده است"
         fi
@@ -170,8 +170,6 @@ generate_credentials() {
     SECRET_KEY=$(generate_password 64)
     DB_PASSWORD=$(generate_password 32)
     REDIS_PASSWORD=$(generate_password 32)
-    MINIO_ACCESS_KEY=$(generate_password 20)
-    MINIO_SECRET_KEY=$(generate_password 40)
     BALE_CLIENT_ID=""
     BALE_CLIENT_SECRET=""
     
@@ -189,6 +187,30 @@ configure_domain() {
     DOMAIN_NAME=${DOMAIN_NAME:-localhost}
     
     print_success "دامنه تنظیم شد: $DOMAIN_NAME"
+}
+
+configure_minio() {
+    print_header "تنظیم سرور MinIO (Object Storage)"
+    
+    echo ""
+    echo "MinIO به عنوان سرور مستقل خارجی اجرا می‌شود."
+    echo "لطفاً اطلاعات اتصال به سرور MinIO را وارد کنید."
+    echo ""
+    read -p "آدرس MinIO (مثال: http://10.10.10.50:9000): " MINIO_ENDPOINT
+    MINIO_ENDPOINT=${MINIO_ENDPOINT:-http://10.10.10.50:9000}
+    
+    read -p "Access Key: " MINIO_ACCESS_KEY
+    MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-minioadmin}
+    
+    read -p "Secret Key: " MINIO_SECRET_KEY
+    MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-minioadmin123}
+    
+    read -p "نام Bucket (پیش‌فرض: ingest-system): " MINIO_BUCKET
+    MINIO_BUCKET=${MINIO_BUCKET:-ingest-system}
+    
+    print_success "تنظیمات MinIO:"
+    print_info "  Endpoint: $MINIO_ENDPOINT"
+    print_info "  Bucket: $MINIO_BUCKET"
 }
 
 configure_bale_api() {
@@ -268,12 +290,12 @@ CELERY_BROKER_URL=redis://redis:6379/0
 CELERY_RESULT_BACKEND=redis://redis:6379/0
 
 # =============================================================================
-# MinIO Storage
+# MinIO Storage (External Server)
 # =============================================================================
 AWS_ACCESS_KEY_ID=${MINIO_ACCESS_KEY}
 AWS_SECRET_ACCESS_KEY=${MINIO_SECRET_KEY}
-AWS_STORAGE_BUCKET_NAME=ingest-system
-AWS_S3_ENDPOINT_URL=http://minio:9000
+AWS_STORAGE_BUCKET_NAME=${MINIO_BUCKET}
+AWS_S3_ENDPOINT_URL=${MINIO_ENDPOINT}
 AWS_S3_REGION_NAME=us-east-1
 AWS_S3_USE_SSL=false
 
@@ -386,7 +408,7 @@ else:
 }
 
 configure_firewall() {
-    print_header "تنظیم فایروال"
+    print_header "تنظیم فایروال (UFW)"
     
     if ! command -v ufw >/dev/null 2>&1; then
         print_warning "UFW نصب نیست"
@@ -399,37 +421,174 @@ configure_firewall() {
     ufw default deny incoming
     ufw default allow outgoing
     
-    # Essential ports
-    ufw allow OpenSSH
-    ufw allow 80/tcp    # HTTP
-    ufw allow 443/tcp   # HTTPS
-    ufw allow 81/tcp    # Nginx Proxy Manager
-    ufw allow 8001/tcp  # Web App
-    ufw allow 9000/tcp  # MinIO API
-    ufw allow 9001/tcp  # MinIO Console
+    # --- Public ports (accessible from internet) ---
+    ufw allow OpenSSH          # SSH
+    ufw allow 80/tcp           # HTTP
+    ufw allow 443/tcp          # HTTPS
+    
+    # --- LAN-only ports (internal services) ---
+    # Detect LAN subnet
+    local lan_subnet=""
+    read -p "سابنت شبکه داخلی (LAN) را وارد کنید (مثال: 192.168.100.0/24): " lan_subnet
+    lan_subnet=${lan_subnet:-192.168.100.0/24}
+    
+    ufw allow from "$lan_subnet" to any port 81 proto tcp comment 'NPM Admin - LAN only'
+    ufw allow from "$lan_subnet" to any port 8001 proto tcp comment 'Django direct - LAN only'
+    ufw allow from "$lan_subnet" to any port 6380 proto tcp comment 'Redis - LAN only'
+    ufw allow from "$lan_subnet" to any port 15432 proto tcp comment 'PostgreSQL - LAN only'
+    ufw allow from "$lan_subnet" to any port 8080 proto tcp comment 'cAdvisor - LAN only'
     
     ufw --force enable
     
     print_success "فایروال تنظیم شد"
+    print_info "پورت‌های عمومی: 22 (SSH), 80 (HTTP), 443 (HTTPS)"
+    print_info "پورت‌های داخلی (فقط $lan_subnet): 81, 8001, 6380, 15432, 8080"
+}
+
+configure_docker_security() {
+    print_header "تنظیمات امنیتی Docker"
+    
+    # --- DOCKER-USER iptables chain ---
+    # Docker bypasses UFW by default. DOCKER-USER chain is the ONLY way
+    # to filter traffic destined for Docker containers.
+    print_step "تنظیم DOCKER-USER iptables chain..."
+    
+    local lan_subnet="192.168.100.0/24"
+    local dmz_subnet="10.10.10.0/24"
+    
+    # Detect LAN subnet from existing interfaces
+    local detected_lan=$(ip -4 addr show | grep 'inet 192\.' | awk '{print $2}' | head -1)
+    if [ -n "$detected_lan" ]; then
+        lan_subnet=$(echo "$detected_lan" | sed 's/\.[0-9]*\//.0\//')
+    fi
+    local detected_dmz=$(ip -4 addr show | grep 'inet 10\.' | awk '{print $2}' | head -1)
+    if [ -n "$detected_dmz" ]; then
+        dmz_subnet=$(echo "$detected_dmz" | sed 's/\.[0-9]*\//.0\//')
+    fi
+    
+    # Add DOCKER-USER rules to /etc/ufw/after.rules
+    if ! grep -q "DOCKER-USER" /etc/ufw/after.rules 2>/dev/null; then
+        cat >> /etc/ufw/after.rules << DOCKER_EOF
+
+# ============================================================
+# DOCKER-USER chain: Control Docker container traffic
+# Docker bypasses ufw by default. This chain is the ONLY way
+# to filter traffic destined for Docker containers.
+# Added by start.sh - Security hardening
+# ============================================================
+*filter
+:DOCKER-USER - [0:0]
+
+# Allow established/related connections
+-A DOCKER-USER -m conntrack --ctstate ESTABLISHED,RELATED -j RETURN
+
+# Allow all traffic from Docker internal networks
+-A DOCKER-USER -s 172.16.0.0/12 -j RETURN
+
+# Allow all traffic from LAN
+-A DOCKER-USER -s ${lan_subnet} -j RETURN
+
+# Allow all traffic from DMZ
+-A DOCKER-USER -s ${dmz_subnet} -j RETURN
+
+# Allow all traffic from localhost
+-A DOCKER-USER -s 127.0.0.0/8 -j RETURN
+
+# Allow HTTP/HTTPS (Nginx Proxy Manager) from anywhere
+-A DOCKER-USER -p tcp --dport 80 -j RETURN
+-A DOCKER-USER -p tcp --dport 443 -j RETURN
+
+# DROP everything else destined for Docker containers
+-A DOCKER-USER -j DROP
+
+COMMIT
+DOCKER_EOF
+        print_success "DOCKER-USER chain به /etc/ufw/after.rules اضافه شد"
+    else
+        print_info "DOCKER-USER chain قبلاً تنظیم شده است"
+    fi
+    
+    # --- Create systemd service for persistent DOCKER-USER rules ---
+    print_step "ایجاد systemd service برای DOCKER-USER..."
+    
+    cat > /etc/systemd/system/docker-user-iptables.service << SYSTEMD_EOF
+[Unit]
+Description=Apply DOCKER-USER iptables rules
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/bash -c '\
+  iptables -F DOCKER-USER 2>/dev/null; \
+  iptables -A DOCKER-USER -m conntrack --ctstate ESTABLISHED,RELATED -j RETURN; \
+  iptables -A DOCKER-USER -s 172.16.0.0/12 -j RETURN; \
+  iptables -A DOCKER-USER -s ${lan_subnet} -j RETURN; \
+  iptables -A DOCKER-USER -s ${dmz_subnet} -j RETURN; \
+  iptables -A DOCKER-USER -s 127.0.0.0/8 -j RETURN; \
+  iptables -A DOCKER-USER -p tcp --dport 80 -j RETURN; \
+  iptables -A DOCKER-USER -p tcp --dport 443 -j RETURN; \
+  iptables -A DOCKER-USER -j DROP'
+
+[Install]
+WantedBy=multi-user.target
+SYSTEMD_EOF
+    
+    systemctl daemon-reload
+    systemctl enable docker-user-iptables.service
+    
+    # Apply rules immediately
+    iptables -F DOCKER-USER 2>/dev/null || true
+    iptables -A DOCKER-USER -m conntrack --ctstate ESTABLISHED,RELATED -j RETURN
+    iptables -A DOCKER-USER -s 172.16.0.0/12 -j RETURN
+    iptables -A DOCKER-USER -s "$lan_subnet" -j RETURN
+    iptables -A DOCKER-USER -s "$dmz_subnet" -j RETURN
+    iptables -A DOCKER-USER -s 127.0.0.0/8 -j RETURN
+    iptables -A DOCKER-USER -p tcp --dport 80 -j RETURN
+    iptables -A DOCKER-USER -p tcp --dport 443 -j RETURN
+    iptables -A DOCKER-USER -j DROP
+    
+    # Reload UFW to apply after.rules
+    ufw reload 2>/dev/null || true
+    
+    print_success "DOCKER-USER chain فعال شد"
+    print_success "systemd service ایجاد شد (بعد از restart سرور هم اعمال می‌شود)"
+    
+    # --- Verify ---
+    print_step "بررسی نهایی امنیت..."
+    
+    # Check Redis is not exposed
+    if ss -tlnp | grep -q "0.0.0.0:6380"; then
+        print_warning "⚠️ پورت Redis (6380) از بیرون قابل دسترسی است! docker-compose را بررسی کنید."
+    else
+        print_success "Redis فقط از localhost قابل دسترسی است"
+    fi
+    
+    # Check PostgreSQL is not exposed
+    if ss -tlnp | grep -q "0.0.0.0:15432"; then
+        print_warning "⚠️ پورت PostgreSQL (15432) از بیرون قابل دسترسی است!"
+    else
+        print_success "PostgreSQL فقط از localhost قابل دسترسی است"
+    fi
+    
+    print_success "تنظیمات امنیتی Docker انجام شد"
 }
 
 setup_cron_jobs() {
     print_info "تنظیم Cron Jobs برای Backup خودکار..."
     
     # Remove existing backup cron jobs
-    crontab -l 2>/dev/null | grep -v "backup_minio.sh" | grep -v "backup_auto.sh" | crontab - 2>/dev/null || true
+    crontab -l 2>/dev/null | grep -v "backup_auto.sh" | crontab - 2>/dev/null || true
     
     # Add new cron jobs
     (crontab -l 2>/dev/null; cat << 'CRON_EOF'
 # RAG-Ingest Backup Cron Jobs
-0 4 * * * /srv/deployment/backup_minio.sh --auto >> /var/log/minio_backup.log 2>&1
-0 16 * * * /srv/deployment/backup_minio.sh --auto >> /var/log/minio_backup.log 2>&1
 0 */6 * * * /srv/deployment/backup_auto.sh >> /var/log/ingest_auto_backup.log 2>&1
 CRON_EOF
     ) | crontab -
     
     print_success "Cron Jobs تنظیم شد:"
-    print_info "  • backup_minio.sh: 4:00 AM و 4:00 PM UTC"
     print_info "  • backup_auto.sh: هر 6 ساعت"
 }
 
@@ -451,9 +610,11 @@ show_credentials() {
     echo -e "  ${CYAN}Database:${NC}"
     echo -e "    Password: ${GREEN}${DB_PASSWORD}${NC}"
     echo ""
-    echo -e "  ${CYAN}MinIO:${NC}"
+    echo -e "  ${CYAN}MinIO (External):${NC}"
+    echo -e "    Endpoint: ${GREEN}${MINIO_ENDPOINT}${NC}"
     echo -e "    Access Key: ${GREEN}${MINIO_ACCESS_KEY}${NC}"
     echo -e "    Secret Key: ${GREEN}${MINIO_SECRET_KEY}${NC}"
+    echo -e "    Bucket: ${GREEN}${MINIO_BUCKET}${NC}"
     echo ""
     if [ -n "$BALE_CLIENT_ID" ]; then
         echo -e "  ${CYAN}Bale Safir API:${NC}"
@@ -471,7 +632,7 @@ show_urls() {
     echo -e "  • پنل مدیریت:  ${CYAN}http://${DOMAIN_NAME}:8001/admin/${NC}"
     echo -e "  • صفحه ورود:   ${CYAN}http://${DOMAIN_NAME}:8001/accounts/login/${NC}"
     echo -e "  • API Health:  ${CYAN}http://${DOMAIN_NAME}:8001/api/health/${NC}"
-    echo -e "  • MinIO:       ${CYAN}http://${DOMAIN_NAME}:9001${NC}"
+    echo -e "  • MinIO:       ${CYAN}${MINIO_ENDPOINT}${NC} (سرور خارجی)"
     echo ""
 }
 
@@ -527,62 +688,9 @@ client_max_body_size 100M;${NC}"
     echo ""
     echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo ""
-    echo -e "${BOLD}🗄️  تنظیمات MinIO در NPM:${NC}"
-    echo ""
-    echo -e "${CYAN}5. ایجاد Proxy Host برای S3 API (s3.tejarat.chat):${NC}"
-    echo -e "   • Domain: ${GREEN}s3.tejarat.chat${NC}"
-    echo -e "   • Forward Hostname: ${GREEN}minio${NC}"
-    echo -e "   • Forward Port: ${GREEN}9000${NC}"
-    echo -e "   • Enable: ${GREEN}Cache Assets, Block Common Exploits, Websockets Support${NC}"
-    echo ""
-    echo -e "   ${BOLD}Custom Nginx Configuration (Advanced):${NC}"
-    echo -e "${YELLOW}# Increase timeouts for large file uploads
-client_max_body_size 1000M;
-proxy_connect_timeout 600;
-proxy_send_timeout 600;
-proxy_read_timeout 600;
-send_timeout 600;
-
-# S3 specific headers
-proxy_set_header X-Real-IP \$remote_addr;
-proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-proxy_set_header X-Forwarded-Proto \$scheme;
-proxy_set_header Host \$http_host;
-
-# Disable buffering for streaming
-proxy_buffering off;
-proxy_request_buffering off;${NC}"
-    echo ""
-    echo -e "${CYAN}6. ایجاد Proxy Host برای MinIO Console (storage.tejarat.chat):${NC}"
-    echo -e "   • Domain: ${GREEN}storage.tejarat.chat${NC}"
-    echo -e "   • Forward Hostname: ${GREEN}minio${NC}"
-    echo -e "   • Forward Port: ${GREEN}9001${NC}"
-    echo -e "   • Enable: ${GREEN}Cache Assets, Block Common Exploits, Websockets Support${NC}"
-    echo ""
-    echo -e "   ${BOLD}Custom Nginx Configuration (Advanced):${NC}"
-    echo -e "${YELLOW}# Console specific settings
-proxy_set_header X-Real-IP \$remote_addr;
-proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-proxy_set_header X-Forwarded-Proto \$scheme;
-proxy_set_header Host \$http_host;
-
-# WebSocket support for real-time updates
-proxy_http_version 1.1;
-proxy_set_header Upgrade \$http_upgrade;
-proxy_set_header Connection \"upgrade\";
-
-# Timeouts
-proxy_connect_timeout 600;
-proxy_send_timeout 600;
-proxy_read_timeout 600;${NC}"
-    echo ""
-    echo -e "${BOLD}⚠️  نکات مهم MinIO:${NC}"
-    echo -e "   • ${GREEN}s3.tejarat.chat${NC} برای S3 API (عملیات فایل از ماشین‌های دیگر)"
-    echo -e "   • ${GREEN}storage.tejarat.chat${NC} برای MinIO Console (رابط مدیریتی وب)"
-    echo -e "   • پورت 9000 = S3 API | پورت 9001 = Web Console"
-    echo -e "   • برای ساخت Service Account: ورود به Console → Access Keys → Create"
-    echo -e "   • جزئیات بیشتر: ${CYAN}/srv/deployment/NPM_MINIO_CONFIG.md${NC}"
-    echo -e "   • راهنمای Service Accounts: ${CYAN}/srv/deployment/MINIO_SERVICE_ACCOUNTS.md${NC}"
+    echo -e "${BOLD}⚠️  نکته: MinIO روی سرور خارجی مستقل اجرا می‌شود.${NC}"
+    echo -e "   آدرس: ${GREEN}${MINIO_ENDPOINT}${NC}"
+    echo -e "   تنظیمات Proxy برای MinIO باید روی سرور MinIO انجام شود."
     echo ""
 }
 
@@ -615,12 +723,18 @@ show_post_install_steps() {
     echo "5. ${GREEN}[توصیه]${NC} Backup خودکار را تنظیم کنید"
     echo -e "   ${CYAN}./backup_manager.sh${NC}"
     echo ""
-    echo "6. ${GREEN}[توصیه]${NC} تنظیمات امنیتی را فعال کنید"
+    echo "6. ${GREEN}[توصیه]${NC} تنظیمات امنیتی SSL را فعال کنید"
     echo "   - بعد از تنظیم SSL، در .env این موارد را true کنید:"
     echo "     SECURE_SSL_REDIRECT=True"
     echo "     SESSION_COOKIE_SECURE=True"
     echo "     CSRF_COOKIE_SECURE=True"
     echo "     SECURE_HSTS_SECONDS=31536000"
+    echo ""
+    echo "7. ${RED}[فوری]${NC} بررسی امنیت شبکه"
+    echo "   - مطمئن شوید Redis/PostgreSQL از اینترنت قابل دسترسی نیستند"
+    echo "   - دستور بررسی: ss -tlnp | grep -v 127.0.0.1"
+    echo "   - DOCKER-USER chain فعال باشد: sudo iptables -L DOCKER-USER -n"
+    echo "   - مستند امنیتی: /srv/documents/SECURITY_INCIDENT_2026.md"
     echo ""
 }
 
@@ -658,19 +772,15 @@ show_cron_jobs() {
     echo ""
     echo -e "${BOLD}Cron های فعال برای Backup خودکار:${NC}"
     echo ""
-    echo -e "  ${CYAN}0 4 * * *${NC}   backup_minio.sh   → بکاپ MinIO ساعت 4:00 صبح UTC"
-    echo -e "  ${CYAN}0 16 * * *${NC}  backup_minio.sh   → بکاپ MinIO ساعت 4:00 عصر UTC"
     echo -e "  ${CYAN}0 */6 * * *${NC} backup_auto.sh    → بکاپ DB+NPM هر 6 ساعت"
     echo ""
     echo -e "${BOLD}دستورات ایجاد مجدد (اگر پاک شده باشند):${NC}"
-    echo -e "  ${CYAN}$SCRIPT_DIR/backup_minio.sh setup${NC}"
     echo -e "  ${CYAN}$SCRIPT_DIR/backup_auto.sh --setup${NC}"
     echo ""
     echo -e "${BOLD}مشاهده cron های فعلی:${NC}"
     echo -e "  ${CYAN}crontab -l${NC}"
     echo ""
     echo -e "${BOLD}فایل‌های لاگ:${NC}"
-    echo -e "  • MinIO Backup: ${CYAN}/var/log/minio_backup.log${NC}"
     echo -e "  • Auto Backup:  ${CYAN}/var/log/ingest_auto_backup.log${NC}"
     echo ""
 }
@@ -690,7 +800,6 @@ main() {
     echo "  • Docker و Docker Compose"
     echo "  • PostgreSQL با pgvector"
     echo "  • Redis"
-    echo "  • MinIO (Object Storage)"
     echo "  • Celery (Background Tasks)"
     echo "  • Django Application"
     echo ""
@@ -711,6 +820,7 @@ main() {
     # Configuration
     generate_credentials
     configure_domain
+    configure_minio
     configure_bale_api
     create_env_file
     setup_directories
@@ -718,6 +828,7 @@ main() {
     # Deployment
     build_and_start
     configure_firewall
+    configure_docker_security
     setup_cron_jobs
     
     # Post-installation guide
@@ -749,9 +860,11 @@ Django Admin:
 Database:
   Password: ${DB_PASSWORD}
 
-MinIO:
+MinIO (External):
+  Endpoint: ${MINIO_ENDPOINT}
   Access Key: ${MINIO_ACCESS_KEY}
   Secret Key: ${MINIO_SECRET_KEY}
+  Bucket: ${MINIO_BUCKET}
 
 Bale Safir API:
   Client ID: ${BALE_CLIENT_ID:-"تنظیم نشده"}

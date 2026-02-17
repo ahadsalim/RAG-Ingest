@@ -3,7 +3,7 @@
 # =============================================================================
 # Manual Backup & Restore Script
 # Supports: Full backup (DB + Config + NPM) and Database-only backup
-# Note: MinIO has its own separate backup script (backup_minio.sh)
+# Note: MinIO (external server) has its own separate backup script (backup_minio.sh)
 # =============================================================================
 
 set -e
@@ -233,7 +233,7 @@ restore_full() {
     fi
     
     print_warning "This will REPLACE all data (database + NPM config)!"
-    print_info "Note: MinIO data is NOT included. Use backup_minio.sh for MinIO."
+    print_info "Note: MinIO data is NOT included (external server). Use backup_minio.sh for MinIO."
     read -p "Continue? (y/N): " confirm
     if [[ ! $confirm =~ ^[Yy]$ ]]; then
         print_info "Operation cancelled"

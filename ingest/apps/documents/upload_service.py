@@ -1,5 +1,5 @@
 """
-File upload service for handling MinIO uploads with proper error handling.
+File upload service for handling S3 storage uploads with proper error handling.
 """
 import hashlib
 import uuid
@@ -9,7 +9,7 @@ from django.conf import settings
 from django.core.files.uploadedfile import UploadedFile
 import logging
 
-# Optional imports for S3/MinIO functionality
+# Optional imports for S3 storage functionality
 try:
     import boto3
     from botocore.config import Config
@@ -27,14 +27,14 @@ logger = logging.getLogger(__name__)
 
 
 class FileUploadService:
-    """Service for uploading files to MinIO and creating database records."""
+    """Service for uploading files to S3 storage and creating database records."""
     
     def __init__(self):
         self.s3_client = None
         self._init_s3_client()
     
     def _init_s3_client(self):
-        """Initialize S3/MinIO client."""
+        """Initialize S3 storage client."""
         if not S3_DEPENDENCIES_AVAILABLE:
             logger.warning("S3 dependencies (boto3, botocore) not available. File upload functionality disabled.")
             self.s3_client = None
@@ -58,14 +58,14 @@ class FileUploadService:
         return hashlib.sha256(file_content).hexdigest()
     
     def _generate_object_key(self, filename: str, file_hash: str) -> str:
-        """Generate unique object key for MinIO storage."""
+        """Generate unique object key for S3 storage."""
         file_uuid = str(uuid.uuid4())
         # Use first 8 chars of hash for deduplication
         hash_prefix = file_hash[:8]
         return f"uploads/{hash_prefix}/{file_uuid}_{filename}"
     
-    def _upload_to_minio(self, file_content: bytes, object_key: str, content_type: str) -> bool:
-        """Upload file content to MinIO."""
+    def _upload_to_s3(self, file_content: bytes, object_key: str, content_type: str) -> bool:
+        """Upload file content to S3 storage."""
         if not self.s3_client:
             logger.error("S3 client not initialized")
             return False
@@ -78,14 +78,14 @@ class FileUploadService:
                 ContentType=content_type,
                 ServerSideEncryption='AES256'  # Optional encryption
             )
-            logger.info(f"Successfully uploaded file to MinIO: {object_key}")
+            logger.info(f"Successfully uploaded file to S3: {object_key}")
             return True
         except ClientError as e:
-            logger.error(f"Failed to upload file to MinIO: {str(e)}")
+            logger.error(f"Failed to upload file to S3: {str(e)}")
             return False
     
-    def _delete_from_minio(self, object_key: str) -> bool:
-        """Delete file from MinIO (cleanup on failure)."""
+    def _delete_from_s3(self, object_key: str) -> bool:
+        """Delete file from S3 storage (cleanup on failure)."""
         if not self.s3_client:
             return False
         
@@ -94,10 +94,10 @@ class FileUploadService:
                 Bucket=settings.AWS_STORAGE_BUCKET_NAME,
                 Key=object_key
             )
-            logger.info(f"Deleted file from MinIO: {object_key}")
+            logger.info(f"Deleted file from S3: {object_key}")
             return True
         except ClientError as e:
-            logger.error(f"Failed to delete file from MinIO: {str(e)}")
+            logger.error(f"Failed to delete file from S3: {str(e)}")
             return False
     
     @transaction.atomic
@@ -109,7 +109,7 @@ class FileUploadService:
         manifestation=None
     ) -> Optional[FileAsset]:
         """
-        Upload file to MinIO first, then create database record.
+        Upload file to S3 storage first, then create database record.
         
         Args:
             uploaded_file: Django UploadedFile instance
@@ -142,18 +142,18 @@ class FileUploadService:
         # Generate object key
         object_key = self._generate_object_key(uploaded_file.name, file_hash)
         
-        # Step 1: Upload to MinIO first
-        upload_success = self._upload_to_minio(
+        # Step 1: Upload to S3 first
+        upload_success = self._upload_to_s3(
             file_content=file_content,
             object_key=object_key,
             content_type=uploaded_file.content_type or 'application/octet-stream'
         )
         
         if not upload_success:
-            logger.error("Failed to upload file to MinIO, aborting database creation")
+            logger.error("Failed to upload file to S3, aborting database creation")
             return None
         
-        # Step 2: Create database record only after successful MinIO upload
+        # Step 2: Create database record only after successful S3 upload
         try:
             file_asset = FileAsset.objects.create(
                 legal_unit=legal_unit,
@@ -173,15 +173,15 @@ class FileUploadService:
         except Exception as e:
             logger.error(f"Failed to create FileAsset record: {str(e)}")
             
-            # Cleanup: Delete file from MinIO since DB creation failed
-            self._delete_from_minio(object_key)
+            # Cleanup: Delete file from S3 since DB creation failed
+            self._delete_from_s3(object_key)
             
             # Re-raise the exception to trigger transaction rollback
             raise
     
     def delete_file(self, file_asset: FileAsset) -> bool:
         """
-        Delete file from both MinIO and database.
+        Delete file from both S3 storage and database.
         
         Args:
             file_asset: FileAsset instance to delete
@@ -191,14 +191,14 @@ class FileUploadService:
         """
         object_key = file_asset.object_key
         
-        # Delete from MinIO first
-        minio_deleted = self._delete_from_minio(object_key)
+        # Delete from S3 first
+        s3_deleted = self._delete_from_s3(object_key)
         
-        # Delete database record regardless of MinIO result
+        # Delete database record regardless of S3 result
         try:
             file_asset.delete()
             logger.info(f"Deleted FileAsset record: {file_asset.id}")
-            return minio_deleted  # Return MinIO deletion status
+            return s3_deleted  # Return S3 deletion status
         except Exception as e:
             logger.error(f"Failed to delete FileAsset record: {str(e)}")
             return False

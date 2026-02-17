@@ -29,5 +29,5 @@ CSRF_COOKIE_SECURE = False
 # CORS settings for development
 CORS_ALLOW_ALL_ORIGINS = True
 
-# MinIO settings for development
+# S3 Storage settings for development
 AWS_S3_USE_SSL = False

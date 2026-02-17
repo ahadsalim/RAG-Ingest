@@ -52,10 +52,10 @@ class HealthCheckView(APIView):
 
     def _check_storage(self):
         try:
-            # Check MinIO configuration
-            minio_endpoint = getattr(settings, 'AWS_S3_ENDPOINT_URL', None)
-            if not minio_endpoint:
-                return {"status": "disabled", "message": "MinIO endpoint not configured"}
+            # Check S3 storage configuration
+            s3_endpoint = getattr(settings, 'AWS_S3_ENDPOINT_URL', None)
+            if not s3_endpoint:
+                return {"status": "disabled", "message": "S3 endpoint not configured"}
 
             if not _S3_AVAILABLE:
                 return {"status": "disabled", "message": "S3 dependencies not installed"}
@@ -68,7 +68,7 @@ class HealthCheckView(APIView):
 
             s3 = boto3.client(
                 's3',
-                endpoint_url=minio_endpoint,
+                endpoint_url=s3_endpoint,
                 aws_access_key_id=access_key,
                 aws_secret_access_key=secret_key,
                 config=Config(signature_version='s3v4'),
@@ -77,7 +77,7 @@ class HealthCheckView(APIView):
 
             # Validate connectivity with a lightweight call
             s3.head_bucket(Bucket=bucket)
-            return {"status": "ok", "message": "Storage connection successful", "endpoint": minio_endpoint, "bucket": bucket}
+            return {"status": "ok", "message": "Storage connection successful", "endpoint": s3_endpoint, "bucket": bucket}
             
         except Exception as e:
             return {"status": "disabled", "message": f"Storage disabled: {str(e)}"}
