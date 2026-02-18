@@ -131,8 +131,7 @@ services:
     image: gcr.io/cadvisor/cadvisor:latest
     container_name: cadvisor
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:8080:8080"
+    network_mode: host
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:ro
@@ -142,7 +141,6 @@ services:
     privileged: true
     devices:
       - /dev/kmsg
-    networks: [ ingest_net ]
 
   node-exporter:
     image: quay.io/prometheus/node-exporter:v1.7.0
