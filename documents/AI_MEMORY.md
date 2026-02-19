@@ -67,7 +67,105 @@ Persian Numbers: تبدیل به انگلیسی
 
 ---
 
-## � تغییرات اخیر (Session های قبلی)
+## 🗄️ مهاجرت MinIO به سرور خارجی — 1404/11/30 (2026-02-19)
+
+### انتقال از Local Container به External Server
+- **سرور قبلی**: Docker container محلی (`deployment-minio-1`)
+- **سرور جدید**: سرور خارجی `10.10.10.50:9000`
+- **دلیل**: جداسازی storage از application server
+
+### تغییرات انجام شده
+1. ✅ حذف `minio` و `minio-init` از `docker-compose.ingest.yml`
+2. ✅ حذف volume `minio_data`
+3. ✅ بروزرسانی `deployment/start.sh`:
+   - اضافه شدن `configure_minio()` برای پرسیدن آدرس سرور خارجی
+   - حذف تولید کلیدهای MinIO محلی
+   - حذف port check و firewall rules برای 9000/9001
+   - حذف Nginx Proxy Manager config برای MinIO
+   - حذف cron jobs بکاپ MinIO محلی
+4. ✅ بروزرسانی Django settings:
+   - `base.py`: حذف default `http://minio:9000` → فقط از `.env` خوانده می‌شود
+   - `prod.py`: حذف default های داخلی (`minioadmin`)
+   - `dev.py`: بروزرسانی کامنت‌ها
+5. ✅ بازنویسی `deployment/backup_minio.sh`:
+   - استفاده از `mc` (MinIO Client) به جای `docker volume`
+   - پشتیبانی از بکاپ از سرور خارجی via S3 API
+6. ✅ بروزرسانی کامنت‌ها در کد:
+   - `upload_service.py`, `api/views.py`, `s3.py` → از "MinIO" به "S3 Storage"
+7. ✅ حذف فایل `deployment/docker/minio-init.sh`
+8. ✅ توقف و حذف container محلی `deployment-minio-1`
+
+### مشکل FileAsset Upload و راه‌حل — 1404/11/30 (2026-02-19)
+
+#### خطای 500 در Admin Panel
+**مشکل**: خطای 500 هنگام آپلود فایل از `/admin/documents/fileasset/add/`
+
+**علت‌های مشکل**:
+1. ❌ کلیدهای دسترسی MinIO در `.env` نادرست بود → `403 Forbidden`
+2. ❌ استفاده از `ServerSideEncryption='AES256'` که MinIO خارجی بدون KMS از آن پشتیبانی نمی‌کرد → `NotImplemented` error
+3. ❌ `upload_service.py` برای مدل قدیمی نوشته شده بود که فیلدهای `bucket`, `object_key`, `sha256` داشت، اما مدل فعلی `FileAsset` فقط یک `FileField` ساده دارد
+
+**راه‌حل‌های اعمال شده**:
+1. ✅ بروزرسانی کلیدهای MinIO در `.env` (توسط کاربر)
+2. ✅ حذف `ServerSideEncryption='AES256'` از `_upload_to_s3()`
+3. ✅ بازنویسی کامل `upload_service.py`:
+   ```python
+   # قبل (دستی S3 upload):
+   file_asset = FileAsset.objects.create(
+       bucket=..., object_key=..., sha256=..., ...
+   )
+   
+   # بعد (استفاده از Django FileField):
+   file_asset = FileAsset.objects.create(
+       file=uploaded_file,
+       legal_unit=...,
+       uploaded_by=...
+   )
+   ```
+4. ✅ ساده‌سازی `delete_file()` - Django's storage backend خودش فایل را از S3 حذف می‌کند
+
+### ⚠️ تصمیم امنیتی: حذف ServerSideEncryption
+
+**سوال**: آیا حذف `ServerSideEncryption='AES256'` مشکل امنیتی ایجاد می‌کند؟
+
+**پاسخ**: خیر، برای این پروژه مشکلی ایجاد نمی‌کند چون:
+- ✅ داده‌ها **عمومی و غیرحساس** هستند (اسناد قانونی عمومی)
+- ✅ سرور MinIO در **شبکه داخلی (DMZ)** قرار دارد
+- ✅ دسترسی با **Access Key محدود** شده است
+- ✅ برای فعال‌سازی `ServerSideEncryption` نیاز به **KMS (Key Management Service)** در MinIO است
+
+**گزینه‌های امنیتی برای آینده** (در صورت نیاز):
+1. **فعال‌سازی KMS در MinIO** → امکان استفاده از encryption at rest
+2. **استفاده از HTTPS** به جای HTTP → رمزنگاری در حین انتقال
+3. **Disk Encryption** در سطح OS (LUKS/BitLocker)
+
+**نتیجه**: وضعیت فعلی (HTTP + بدون encryption at rest) برای داده‌های عمومی **قابل قبول** است.
+
+### فایل‌های تغییر یافته
+- `/srv/deployment/docker-compose.ingest.yml` — حذف minio services
+- `/srv/deployment/start.sh` — configure_minio + حذف local minio setup
+- `/srv/deployment/backup_minio.sh` — بازنویسی با mc client
+- `/srv/ingest/settings/base.py` — حذف default endpoint
+- `/srv/ingest/settings/prod.py` — حذف internal defaults
+- `/srv/ingest/settings/dev.py` — بروزرسانی کامنت
+- `/srv/ingest/apps/documents/upload_service.py` — ساده‌سازی کامل
+- `/srv/ingest/api/views.py` — بروزرسانی health check
+- `/srv/ingest/api/documents/views.py` — بروزرسانی کامنت‌ها
+- `/srv/ingest/common/s3.py` — بروزرسانی docstring
+- `/srv/deployment/backup_manual.sh` — بروزرسانی کامنت‌ها
+- `/srv/.env` — بروزرسانی کامنت و کلیدهای MinIO
+
+### نکات مهم برای آینده
+1. **MinIO اکنون خارجی است** - هرگز local container راه‌اندازی نکنید
+2. **کلیدهای MinIO در `.env`** - باید با سرور `10.10.10.50` مطابقت داشته باشند
+3. **FileAsset از FileField استفاده می‌کند** - نه bucket/object_key جداگانه
+4. **Django's storage backend** خودش S3 upload/delete را مدیریت می‌کند
+5. **ServerSideEncryption نیاز به KMS دارد** - برای داده‌های عمومی ضروری نیست
+6. **بکاپ MinIO** با `mc` client از سرور خارجی: `./backup_minio.sh backup`
+
+---
+
+## 📝 تغییرات اخیر (Session های قبلی)
 
 ### 1. سیستم Chunking یکپارچه
 - ✅ QAEntry و TextEntry حالا chunk می‌شوند
