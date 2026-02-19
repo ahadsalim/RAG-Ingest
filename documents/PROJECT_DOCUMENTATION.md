@@ -1,7 +1,7 @@
 # 📚 مستندات جامع پروژه RAG-Ingest
 
-**نسخه**: 2.0  
-**تاریخ**: 1404/09/25 (2025-12-15)  
+**نسخه**: 3.0  
+**تاریخ**: 1404/11/30 (2026-02-19)  
 **وضعیت**: ✅ Production Ready
 
 ---
@@ -399,7 +399,140 @@ docker exec deployment-web-1 python manage.py collectstatic --noinput
 
 ---
 
-## 🛠️ مدیریت سیستم
+## �️ MinIO Storage (سرور خارجی)
+
+### معرفی
+پروژه از **MinIO خارجی** در آدرس `10.10.10.50:9000` برای ذخیره‌سازی فایل‌ها استفاده می‌کند.
+
+**دامنه‌ها:**
+- **S3 API**: `https://s3.tejarat.chat` (برای عملیات فایل)
+- **Console**: `https://storage.tejarat.chat` (رابط مدیریتی)
+
+### تنظیمات در .env
+
+```bash
+AWS_ACCESS_KEY_ID=your_access_key
+AWS_SECRET_ACCESS_KEY=your_secret_key
+AWS_STORAGE_BUCKET_NAME=ingest-system
+AWS_S3_ENDPOINT_URL=http://10.10.10.50:9000
+AWS_S3_USE_SSL=False
+```
+
+### ساخت Service Account
+
+#### مرحله 1: دسترسی به Console
+```
+https://storage.tejarat.chat
+```
+
+#### مرحله 2: ایجاد Access Key
+1. از منوی چپ → **Access Keys**
+2. کلیک روی **Create access key +**
+3. تنظیمات:
+   - **Access Key**: دلخواه یا خودکار
+   - **Secret Key**: دلخواه یا خودکار
+   - **Expiry**: بدون تاریخ انقضا (برای production)
+   - **Policy**: `readwrite` یا سفارشی
+
+#### مثال Policy سفارشی (فقط bucket خاص):
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
+      "Resource": ["arn:aws:s3:::ingest-system/*"]
+    },
+    {
+      "Effect": "Allow",
+      "Action": ["s3:ListBucket"],
+      "Resource": ["arn:aws:s3:::ingest-system"]
+    }
+  ]
+}
+```
+
+#### مرحله 3: ذخیره Credentials
+⚠️ **مهم**: بعد از ساخت، Secret Key فقط یک بار نمایش داده می‌شود - حتماً ذخیره کنید!
+
+### استفاده از MinIO Client (mc)
+
+```bash
+# نصب mc
+wget https://dl.min.io/client/mc/release/linux-amd64/mc
+chmod +x mc
+sudo mv mc /usr/local/bin/
+
+# تنظیم alias
+mc alias set myminio http://10.10.10.50:9000 ACCESS_KEY SECRET_KEY
+
+# لیست buckets
+mc ls myminio
+
+# لیست فایل‌ها
+mc ls myminio/ingest-system
+
+# کپی فایل
+mc cp local-file.txt myminio/ingest-system/
+```
+
+### بکاپ MinIO
+
+```bash
+# بکاپ دستی
+cd /srv/deployment
+./backup_minio.sh backup
+
+# بکاپ خودکار (cron)
+# هر روز ساعت 4 صبح و 4 عصر
+0 4,16 * * * /srv/deployment/backup_minio.sh --auto
+```
+
+### تنظیمات Nginx Proxy Manager
+
+#### 1️⃣ S3 API Endpoint
+- **Domain**: `s3.tejarat.chat`
+- **Forward**: `minio:9000`
+- **SSL**: Let's Encrypt
+- **Custom Config**:
+```nginx
+client_max_body_size 1000M;
+proxy_connect_timeout 600;
+proxy_send_timeout 600;
+proxy_read_timeout 600;
+proxy_buffering off;
+```
+
+#### 2️⃣ MinIO Console
+- **Domain**: `storage.tejarat.chat`
+- **Forward**: `minio:9001`
+- **SSL**: Let's Encrypt
+- **Websockets**: ✅ فعال
+
+### توصیه‌های امنیتی
+
+1. ✅ برای هر ماشین یک Service Account جداگانه
+2. ✅ از Policy محدودکننده استفاده کنید
+3. ✅ Root credentials فقط برای مدیریت
+4. ✅ Secret Keys در `.env` ذخیره شوند
+5. ✅ Service Accounts غیرفعال را حذف کنید
+
+### عیب‌یابی
+
+**مشکل: 403 Forbidden**
+- بررسی کلیدهای دسترسی در `.env`
+- چک کردن Policy در MinIO Console
+- مطمئن شوید bucket `ingest-system` وجود دارد
+
+**مشکل: Connection Timeout**
+- بررسی دسترسی شبکه به `10.10.10.50:9000`
+- چک کردن firewall rules
+- تست با: `curl http://10.10.10.50:9000/minio/health/live`
+
+---
+
+## ��️ مدیریت سیستم
 
 ### دستورات مفید
 
@@ -536,5 +669,5 @@ docker exec deployment-web-1 python manage.py shell
 ---
 
 **تهیه‌کننده**: Cascade AI  
-**تاریخ**: 2025-12-15  
-**نسخه**: 2.0
+**تاریخ**: 2026-02-19  
+**نسخه**: 3.0

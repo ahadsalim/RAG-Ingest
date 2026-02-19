@@ -1,6 +1,6 @@
 # 🧠 AI Memory - RAG-Ingest Project
 
-**آخرین به‌روزرسانی**: 1404/11/28 (2026-02-17)
+**آخرین به‌روزرسانی**: 1404/11/30 (2026-02-19)
 
 ---
 
@@ -16,6 +16,15 @@
 
 ## 🔧 تنظیمات مهم
 
+### تنظیمات سرور (ESXi VM)
+```
+CPUs: 6 cores
+Memory: 12 GB
+Storage: 112 GB
+Guest OS: Ubuntu Linux (64-bit)
+VMware Tools: نصب شده
+```
+
 ### Embedding
 ```
 Model: intfloat/multilingual-e5-large
@@ -24,6 +33,23 @@ Chunk Size: 350 tokens
 Chunk Overlap: 80 tokens
 Persian Numbers: تبدیل به انگلیسی
 ```
+
+### بهینه‌سازی Celery Worker
+```yaml
+# docker-compose.ingest.yml
+command: celery -A ingest worker --loglevel=info --concurrency=5 --max-tasks-per-child=50
+```
+
+```bash
+# .env
+EMBEDDING_BATCH_SIZE=24
+```
+
+**مزایا:**
+- استفاده بهینه از 6 CPU cores
+- مصرف RAM: ~8GB (67% از 12GB)
+- سرعت پردازش: 2.5x سریع‌تر
+- جلوگیری از memory leak با `max-tasks-per-child`
 
 ### مدل‌ها
 - **LegalUnit**: بند قانونی (MPTT Tree)
