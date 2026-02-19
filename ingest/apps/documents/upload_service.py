@@ -75,8 +75,7 @@ class FileUploadService:
                 Bucket=settings.AWS_STORAGE_BUCKET_NAME,
                 Key=object_key,
                 Body=file_content,
-                ContentType=content_type,
-                ServerSideEncryption='AES256'  # Optional encryption
+                ContentType=content_type
             )
             logger.info(f"Successfully uploaded file to S3: {object_key}")
             return True
@@ -109,7 +108,7 @@ class FileUploadService:
         manifestation=None
     ) -> Optional[FileAsset]:
         """
-        Upload file to S3 storage first, then create database record.
+        Upload file using Django's FileField with S3 storage backend.
         
         Args:
             uploaded_file: Django UploadedFile instance
@@ -124,64 +123,26 @@ class FileUploadService:
             logger.error("No file provided for upload")
             return None
         
-        if not S3_DEPENDENCIES_AVAILABLE:
-            logger.error("S3 dependencies not available. File upload functionality disabled.")
-            return None
-        
-        # Read file content
         try:
-            file_content = uploaded_file.read()
-            uploaded_file.seek(0)  # Reset file pointer
-        except Exception as e:
-            logger.error(f"Failed to read uploaded file: {str(e)}")
-            return None
-        
-        # Calculate file hash
-        file_hash = self._calculate_sha256(file_content)
-        
-        # Generate object key
-        object_key = self._generate_object_key(uploaded_file.name, file_hash)
-        
-        # Step 1: Upload to S3 first
-        upload_success = self._upload_to_s3(
-            file_content=file_content,
-            object_key=object_key,
-            content_type=uploaded_file.content_type or 'application/octet-stream'
-        )
-        
-        if not upload_success:
-            logger.error("Failed to upload file to S3, aborting database creation")
-            return None
-        
-        # Step 2: Create database record only after successful S3 upload
-        try:
+            # Create FileAsset - Django's FileField with S3 storage handles upload automatically
             file_asset = FileAsset.objects.create(
+                file=uploaded_file,
                 legal_unit=legal_unit,
                 manifestation=manifestation,
-                bucket=settings.AWS_STORAGE_BUCKET_NAME,
-                object_key=object_key,
-                original_filename=uploaded_file.name,
-                content_type=uploaded_file.content_type or 'application/octet-stream',
-                size_bytes=len(file_content),
-                sha256=file_hash,
                 uploaded_by=uploaded_by
             )
             
-            logger.info(f"Successfully created FileAsset record: {file_asset.id}")
+            logger.info(f"Successfully created FileAsset: {file_asset.id}, file: {file_asset.file.name}")
             return file_asset
             
         except Exception as e:
-            logger.error(f"Failed to create FileAsset record: {str(e)}")
-            
-            # Cleanup: Delete file from S3 since DB creation failed
-            self._delete_from_s3(object_key)
-            
-            # Re-raise the exception to trigger transaction rollback
+            logger.error(f"Failed to create FileAsset: {str(e)}")
             raise
     
     def delete_file(self, file_asset: FileAsset) -> bool:
         """
         Delete file from both S3 storage and database.
+        Django's FileField with S3 storage backend handles S3 deletion automatically.
         
         Args:
             file_asset: FileAsset instance to delete
@@ -189,18 +150,13 @@ class FileUploadService:
         Returns:
             True if successful, False otherwise
         """
-        object_key = file_asset.object_key
-        
-        # Delete from S3 first
-        s3_deleted = self._delete_from_s3(object_key)
-        
-        # Delete database record regardless of S3 result
         try:
-            file_asset.delete()
-            logger.info(f"Deleted FileAsset record: {file_asset.id}")
-            return s3_deleted  # Return S3 deletion status
+            file_name = file_asset.file.name
+            file_asset.delete()  # Django's storage backend deletes from S3 automatically
+            logger.info(f"Deleted FileAsset: {file_asset.id}, file: {file_name}")
+            return True
         except Exception as e:
-            logger.error(f"Failed to delete FileAsset record: {str(e)}")
+            logger.error(f"Failed to delete FileAsset: {str(e)}")
             return False
 
 
