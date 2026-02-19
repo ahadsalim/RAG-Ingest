@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/Version-2.1-brightgreen.svg)
+![Version](https://img.shields.io/badge/Version-3.0-brightgreen.svg)
 ![Python](https://img.shields.io/badge/Python-3.11-blue.svg)
 ![Django](https://img.shields.io/badge/Django-5.1-green.svg)
 ![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)
@@ -46,7 +46,7 @@
 - **درخت سلسله‌مراتبی**: MPTT برای ساختار قوانین (باب، فصل، ماده، تبصره)
 
 ### 🔐 امنیت و احراز هویت
-- **احراز هویت OTP**: ورود با شماره موبایل و کد تایید از پیام‌رسان بله
+- **احراز هویت OTP**: ورود با شماره موبایل و کد تایید SMS (Kavenegar)
 - **احراز هویت JWT**: دسترسی امن به API
 - **Backup خودکار**: پشتیبان‌گیری روزانه
 - **مقیاس‌پذیری**: معماری Microservices
@@ -64,8 +64,9 @@
 ### پیش‌نیازها
 ```bash
 # سیستم‌عامل: Ubuntu 20.04+ / Debian 11+
-# RAM: حداقل 4GB (توصیه 8GB)
-# Storage: حداقل 20GB
+# RAM: حداقل 8GB (توصیه 12GB)
+# Storage: حداقل 50GB (توصیه 100GB)
+# CPU: حداقل 4 cores (توصیه 6 cores)
 # Docker: 24.0+
 ```
 
@@ -135,7 +136,7 @@ cd /srv/deployment
 |--------|------|---------------|
 | **وب‌اپ** | http://localhost:8001 | - |
 | **پنل ادمین** | http://localhost:8001/admin/ | admin / admin123 |
-| **MinIO** | http://localhost:9001 | minioadmin / minioadmin123 |
+| **MinIO Console** | https://storage.tejarat.chat | (سرور خارجی) |
 | **API Docs** | http://localhost:8001/api/docs/ | - |
 
 ### کار با کد
@@ -233,9 +234,11 @@ SECRET_KEY=your-secret-key
 DEBUG=False
 ALLOWED_HOSTS=your-domain.com
 
-# MinIO
-MINIO_ROOT_USER=minioadmin
-MINIO_ROOT_PASSWORD=secure_password
+# MinIO (سرور خارجی)
+AWS_ACCESS_KEY_ID=your_access_key
+AWS_SECRET_ACCESS_KEY=your_secret_key
+AWS_STORAGE_BUCKET_NAME=ingest-system
+AWS_S3_ENDPOINT_URL=http://10.10.10.50:9000
 
 # Redis
 REDIS_URL=redis://redis:6379/0
@@ -253,7 +256,7 @@ EMBEDDING_CONFIG = {
     'dimension': 1024,
     'chunk_size': 350,
     'overlap': 80,
-    'batch_size': 16
+    'batch_size': 24
 }
 ```
 
@@ -410,8 +413,8 @@ docker compose -f docker-compose.ingest.yml restart web worker
 | **تعداد فایل‌های Python** | 160 |
 | **کل خطوط کد** | ~35,800 |
 | **خطوط Python** | ~26,500 |
-| **نسخه** | 2.1 |
-| **آخرین به‌روزرسانی** | آذر ۱۴۰۳ |
+| **نسخه** | 3.0 |
+| **آخرین به‌روزرسانی** | بهمن ۱۴۰۴ (فوریه ۲۰۲۶) |
 
 ---
 
