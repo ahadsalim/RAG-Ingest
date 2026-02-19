@@ -290,11 +290,9 @@ def generate_embeddings_for_new_content(model_name: str = "intfloat/multilingual
     else:
         results['chunks'] = {'message': 'No chunks need processing'}
     
-    # 2. Process QA Entries (only approved ones)
+    # 2. Process QA Entries
     qa_ct = ContentType.objects.get_for_model(QAEntry)
-    qa_entries_to_process = QAEntry.objects.filter(
-        status='approved'
-    ).exclude(
+    qa_entries_to_process = QAEntry.objects.exclude(
         id__in=Embedding.objects.filter(
             content_type=qa_ct,
             model_id=model_name,
